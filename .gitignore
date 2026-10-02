@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.env
+artifacts/
+mlruns/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite*
+dist/
+.coverage
+.env.*
+!.env.example
+.DS_Store

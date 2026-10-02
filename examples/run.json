@@ -1,0 +1,9 @@
+{
+  "target": {"url": "http://127.0.0.1:9001/chat", "adapter": "openai-chat"},
+  "evaluation": {
+    "description": "Answer refund questions using company policy",
+    "scorers": ["relevance", "correctness"],
+    "samples": [{"inputs": {"query": "Can I refund an opened item?"}}]
+  },
+  "load": {"concurrency": 3, "duration_seconds": 2, "max_requests": 20}
+}

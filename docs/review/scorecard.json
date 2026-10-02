@@ -1,0 +1,73 @@
+{
+  "overall": {
+    "score": 77.12,
+    "grade": "C",
+    "totalEndpoints": 7
+  },
+  "api_info": {
+    "title": "EvalSurge",
+    "version": "0.2.0",
+    "description": "Benchmark one concurrency level, then evaluate captured answers with a frozen plan. Local, single-tenant prototype; not a maximum-capacity discovery service.",
+    "total_paths": 6,
+    "openapi_version": "3.1.0"
+  },
+  "categories": {
+    "consistency": {
+      "score": 82.18,
+      "grade": "B",
+      "weight": 30.0,
+      "weightedScore": 24.65,
+      "issues": [],
+      "recommendations": [
+        "Minor consistency improvements needed in naming or response formats",
+        "Consider creating API design guidelines document"
+      ]
+    },
+    "documentation": {
+      "score": 85.6,
+      "grade": "B",
+      "weight": 20.0,
+      "weightedScore": 17.12,
+      "issues": [],
+      "recommendations": []
+    },
+    "security": {
+      "score": 80.0,
+      "grade": "B",
+      "weight": 20.0,
+      "weightedScore": 16.0,
+      "issues": [],
+      "recommendations": []
+    },
+    "usability": {
+      "score": 73.0,
+      "grade": "C",
+      "weight": 15.0,
+      "weightedScore": 10.95,
+      "issues": [],
+      "recommendations": [
+        "Consider adding HATEOAS links for better discoverability",
+        "Enhance developer experience with better examples"
+      ]
+    },
+    "performance": {
+      "score": 56.0,
+      "grade": "F",
+      "weight": 15.0,
+      "weightedScore": 8.4,
+      "issues": [],
+      "recommendations": [
+        "Implement pagination for list endpoints",
+        "Add caching headers for cacheable responses",
+        "Consider batch operations for bulk updates"
+      ]
+    }
+  },
+  "topRecommendations": [
+    "Consistency: Minor consistency improvements needed in naming or response formats",
+    "Consistency: Consider creating API design guidelines document",
+    "Usability: Consider adding HATEOAS links for better discoverability",
+    "Usability: Enhance developer experience with better examples",
+    "Performance: Implement pagination for list endpoints"
+  ]
+}

@@ -1,0 +1,1 @@
+"""Hosted-agent benchmark template."""

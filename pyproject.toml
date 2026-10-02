@@ -1,0 +1,39 @@
+[project]
+name = "evalsurge"
+version = "0.2.0"
+description = "Concurrency benchmarks and evidence-aware MLflow evaluation for hosted agents"
+readme = "README.md"
+license = "MIT"
+authors = [{name = "Ram Vegiraju"}]
+requires-python = ">=3.11"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Operating System :: POSIX",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Testing",
+]
+
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1", "httpx>=0.27,<1", "openai>=1.60,<3", "mlflow>=3.16,<3.17", "databricks-sdk>=0.85", "locust>=2.46,<3", "python-dotenv>=1", "pydantic>=2.10,<3", "requests>=2.32,<3", "gevent>=25,<26"]
+
+[project.urls]
+Repository = "https://github.com/RamVegiraju/EvalSurge"
+Issues = "https://github.com/RamVegiraju/EvalSurge/issues"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.9"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "BLE", "SIM"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["benchmark_agents"]

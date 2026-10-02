@@ -1,0 +1,2181 @@
+{
+  "summary": {
+    "total_changes": 54,
+    "breaking_changes": 9,
+    "potentially_breaking_changes": 1,
+    "non_breaking_changes": 31,
+    "enhancements": 13,
+    "critical_severity": 0,
+    "high_severity": 9,
+    "medium_severity": 1,
+    "low_severity": 0,
+    "info_severity": 44
+  },
+  "hasBreakingChanges": true,
+  "changes": [
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "versioning",
+      "path": "/info/version",
+      "message": "API version changed from '0.1.0' to '0.2.0'",
+      "oldValue": "0.1.0",
+      "newValue": "0.2.0",
+      "migrationGuide": "",
+      "impactDescription": "Version change indicates API evolution"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "metadata",
+      "path": "/info/title",
+      "message": "API title changed from 'Benchmark Agents' to 'EvalSurge'",
+      "oldValue": "Benchmark Agents",
+      "newValue": "EvalSurge",
+      "migrationGuide": "",
+      "impactDescription": "Title change is cosmetic and doesn't affect functionality"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "servers",
+      "path": "/servers",
+      "message": "New server URL added: /",
+      "oldValue": null,
+      "newValue": "/",
+      "migrationGuide": "",
+      "impactDescription": "New server option provides additional deployment flexibility"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "endpoints",
+      "path": "/paths/v1/runs/{run_id}/requests",
+      "message": "New endpoint added: GET /v1/runs/{run_id}/requests",
+      "oldValue": null,
+      "newValue": "GET /v1/runs/{run_id}/requests",
+      "migrationGuide": "",
+      "impactDescription": "New functionality available to clients"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "endpoints",
+      "path": "/paths/v1/evaluation-plans/{plan_id}",
+      "message": "New endpoint added: GET /v1/evaluation-plans/{plan_id}",
+      "oldValue": null,
+      "newValue": "GET /v1/evaluation-plans/{plan_id}",
+      "migrationGuide": "",
+      "impactDescription": "New functionality available to clients"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "endpoints",
+      "path": "/paths/v1/runs/get",
+      "message": "New HTTP method added: GET /v1/runs",
+      "oldValue": null,
+      "newValue": "GET /v1/runs",
+      "migrationGuide": "",
+      "impactDescription": "New method provides additional functionality for this resource"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "parameters",
+      "path": "/paths/v1/runs/post/parameters",
+      "message": "New optional parameter added: idempotency-key (in: header)",
+      "oldValue": null,
+      "newValue": {
+        "description": "Optional retry key; reuse with identical input only.",
+        "in": "header",
+        "name": "idempotency-key",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Idempotency-Key"
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "Optional parameter provides additional functionality"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/post/responses/429",
+      "message": "New response status code 429 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_429",
+                "message": "Benchmark already active",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Benchmark already active",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Retry-After": {
+            "description": "Suggested polling/retry delay in seconds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/post/responses/401",
+      "message": "New response status code 401 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_401",
+                "message": "API key missing or invalid",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "API key missing or invalid",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/post/responses/403",
+      "message": "New response status code 403 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_403",
+                "message": "Access denied",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Access denied",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/post/responses/409",
+      "message": "New response status code 409 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_409",
+                "message": "Resource state conflict",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource state conflict",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/post/responses/404",
+      "message": "New response status code 404 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_404",
+                "message": "Resource not found",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource not found",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/post/responses/502",
+      "message": "New response status code 502 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_502",
+                "message": "Planner provider failure",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Planner provider failure",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "security",
+      "path": "/paths/v1/runs/post/security",
+      "message": "Security requirements added",
+      "oldValue": null,
+      "newValue": [
+        {
+          "APIKeyHeader": []
+        }
+      ],
+      "migrationGuide": "Ensure proper authentication/authorization when calling this endpoint",
+      "impactDescription": "Endpoint now requires authentication"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "responses",
+      "path": "/paths/v1/evaluation-plans/post/responses/200",
+      "message": "Response status code 200 removed",
+      "oldValue": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "newValue": null,
+      "migrationGuide": "Handle alternative status codes: ['429', '201', '401', '422', '403', '409', '404', '502']",
+      "impactDescription": "Clients expecting status code 200 need to handle different responses"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/evaluation-plans/post/responses/429",
+      "message": "New response status code 429 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_429",
+                "message": "Benchmark already active",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Benchmark already active",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Retry-After": {
+            "description": "Suggested polling/retry delay in seconds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/evaluation-plans/post/responses/201",
+      "message": "New response status code 201 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Plan"
+            }
+          }
+        },
+        "description": "Successful Response",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Location": {
+            "description": "Relative URL of the created resource.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/evaluation-plans/post/responses/401",
+      "message": "New response status code 401 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_401",
+                "message": "API key missing or invalid",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "API key missing or invalid",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/evaluation-plans/post/responses/403",
+      "message": "New response status code 403 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_403",
+                "message": "Access denied",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Access denied",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/evaluation-plans/post/responses/409",
+      "message": "New response status code 409 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_409",
+                "message": "Resource state conflict",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource state conflict",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/evaluation-plans/post/responses/404",
+      "message": "New response status code 404 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_404",
+                "message": "Resource not found",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource not found",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/evaluation-plans/post/responses/502",
+      "message": "New response status code 502 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_502",
+                "message": "Planner provider failure",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Planner provider failure",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "security",
+      "path": "/paths/v1/evaluation-plans/post/security",
+      "message": "Security requirements added",
+      "oldValue": null,
+      "newValue": [
+        {
+          "APIKeyHeader": []
+        }
+      ],
+      "migrationGuide": "Ensure proper authentication/authorization when calling this endpoint",
+      "impactDescription": "Endpoint now requires authentication"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/cancel/post/responses/429",
+      "message": "New response status code 429 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_429",
+                "message": "Benchmark already active",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Benchmark already active",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Retry-After": {
+            "description": "Suggested polling/retry delay in seconds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/cancel/post/responses/401",
+      "message": "New response status code 401 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_401",
+                "message": "API key missing or invalid",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "API key missing or invalid",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/cancel/post/responses/403",
+      "message": "New response status code 403 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_403",
+                "message": "Access denied",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Access denied",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/cancel/post/responses/409",
+      "message": "New response status code 409 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_409",
+                "message": "Resource state conflict",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource state conflict",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/cancel/post/responses/404",
+      "message": "New response status code 404 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_404",
+                "message": "Resource not found",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource not found",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/cancel/post/responses/502",
+      "message": "New response status code 502 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_502",
+                "message": "Planner provider failure",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Planner provider failure",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "security",
+      "path": "/paths/v1/runs/{run_id}/cancel/post/security",
+      "message": "Security requirements added",
+      "oldValue": null,
+      "newValue": [
+        {
+          "APIKeyHeader": []
+        }
+      ],
+      "migrationGuide": "Ensure proper authentication/authorization when calling this endpoint",
+      "impactDescription": "Endpoint now requires authentication"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/get/responses/429",
+      "message": "New response status code 429 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_429",
+                "message": "Benchmark already active",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Benchmark already active",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Retry-After": {
+            "description": "Suggested polling/retry delay in seconds.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/get/responses/401",
+      "message": "New response status code 401 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_401",
+                "message": "API key missing or invalid",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "API key missing or invalid",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/get/responses/403",
+      "message": "New response status code 403 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_403",
+                "message": "Access denied",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Access denied",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/get/responses/409",
+      "message": "New response status code 409 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_409",
+                "message": "Resource state conflict",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource state conflict",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/get/responses/404",
+      "message": "New response status code 404 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_404",
+                "message": "Resource not found",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource not found",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "responses",
+      "path": "/paths/v1/runs/{run_id}/get/responses/502",
+      "message": "New response status code 502 added",
+      "oldValue": null,
+      "newValue": {
+        "content": {
+          "application/json": {
+            "example": {
+              "error": {
+                "code": "http_502",
+                "message": "Planner provider failure",
+                "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+              }
+            },
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Planner provider failure",
+        "headers": {
+          "Cache-Control": {
+            "description": "Private run data must not be cached.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "description": "Disable content sniffing.",
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Request-ID": {
+            "description": "Server-generated correlation UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "migrationGuide": "",
+      "impactDescription": "New status code provides more specific response information"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "security",
+      "path": "/paths/v1/runs/{run_id}/get/security",
+      "message": "Security requirements added",
+      "oldValue": null,
+      "newValue": [
+        {
+          "APIKeyHeader": []
+        }
+      ],
+      "migrationGuide": "Ensure proper authentication/authorization when calling this endpoint",
+      "impactDescription": "Endpoint now requires authentication"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "components",
+      "path": "/components/schemas/HTTPValidationError",
+      "message": "Schema 'HTTPValidationError' removed from components",
+      "oldValue": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "newValue": null,
+      "migrationGuide": "Remove references to schema 'HTTPValidationError' or use alternative schemas",
+      "impactDescription": "References to this schema will fail validation"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "components",
+      "path": "/components/schemas/ValidationError",
+      "message": "Schema 'ValidationError' removed from components",
+      "oldValue": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "newValue": null,
+      "migrationGuide": "Remove references to schema 'ValidationError' or use alternative schemas",
+      "impactDescription": "References to this schema will fail validation"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/RunResponse",
+      "message": "New schema 'RunResponse' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "Run snapshot; inspect load_status and evaluation_status separately.",
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/RunRequest"
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Type"
+          },
+          "evaluation": {
+            "additionalProperties": true,
+            "description": "Per-scorer MLflow run IDs, scores, errors, and sampling coverage.",
+            "title": "Evaluation",
+            "type": "object"
+          },
+          "evaluation_status": {
+            "description": "Evaluation phase outcome; completed only when selected assessments succeed.",
+            "title": "Evaluation Status",
+            "type": "string"
+          },
+          "id": {
+            "description": "Resource UUID.",
+            "title": "Id",
+            "type": "string"
+          },
+          "load_status": {
+            "description": "Load phase: queued, running, completed, cancelled, interrupted, or failed.",
+            "title": "Load Status",
+            "type": "string"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "description": "Descriptive client performance metrics and measurement coverage.",
+            "title": "Metrics",
+            "type": "object"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "status": {
+            "description": "Lifecycle status, not a quality pass/fail verdict.",
+            "title": "Status",
+            "type": "string"
+          },
+          "trace_coverage": {
+            "description": "Scope of observability evidence available to this run.",
+            "title": "Trace Coverage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "load_status",
+          "evaluation_status",
+          "config",
+          "plan",
+          "trace_coverage"
+        ],
+        "title": "RunResponse",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/ErrorResponse",
+      "message": "New schema 'ErrorResponse' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "Consistent error envelope used by API and validation failures.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail",
+            "description": "Error details without echoed request data."
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/RunPage",
+      "message": "New schema 'RunPage' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "Paginated local run history in UUID order.",
+        "properties": {
+          "items": {
+            "description": "Compact run summaries.",
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "description": "Maximum entries returned, at most 100.",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Zero-based history offset.",
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Number of runs matching the status filter.",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "offset",
+          "limit",
+          "total"
+        ],
+        "title": "RunPage",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/RequestPage",
+      "message": "New schema 'RequestPage' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "Bounded page of captured request records, including failures.",
+        "properties": {
+          "items": {
+            "description": "Captured client records in dispatch order.",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "description": "Maximum returned records, at most 100.",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Zero-based offset into request records.",
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Known request records, including incomplete attempts.",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "offset",
+          "limit",
+          "total"
+        ],
+        "title": "RequestPage",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/Accepted",
+      "message": "New schema 'Accepted' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "Resource identifier and relative polling URL.",
+        "properties": {
+          "id": {
+            "description": "Resource UUID.",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "description": "Lifecycle status, not a quality pass/fail verdict.",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "description": "Relative URL to poll this resource.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "url"
+        ],
+        "title": "Accepted",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/Plan",
+      "message": "New schema 'Plan' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "Persisted pre-load evaluation policy; hashes bind data and installed rubric sources.",
+        "properties": {
+          "dataset_hash": {
+            "description": "SHA-256 of canonical workload samples and references.",
+            "title": "Dataset Hash",
+            "type": "string"
+          },
+          "description": {
+            "description": "Original objective and quality criteria.",
+            "title": "Description",
+            "type": "string"
+          },
+          "evaluation_hash": {
+            "description": "SHA-256 of all evaluation inputs, including sampling settings.",
+            "title": "Evaluation Hash",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "judge_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judge Host"
+          },
+          "judge_max_completion_tokens": {
+            "default": 2048,
+            "title": "Judge Max Completion Tokens",
+            "type": "integer"
+          },
+          "judge_max_retries": {
+            "default": 2,
+            "title": "Judge Max Retries",
+            "type": "integer"
+          },
+          "judge_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judge Model"
+          },
+          "judge_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judge Profile"
+          },
+          "judge_timeout_seconds": {
+            "default": 60,
+            "title": "Judge Timeout Seconds",
+            "type": "integer"
+          },
+          "max_scored_requests": {
+            "description": "Frozen maximum assessments per scorer.",
+            "title": "Max Scored Requests",
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "planner_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planner Model"
+          },
+          "recommendations": {
+            "description": "Catalog selections and evidence requirements.",
+            "items": {
+              "$ref": "#/components/schemas/Recommendation"
+            },
+            "title": "Recommendations",
+            "type": "array"
+          },
+          "rubric_hash": {
+            "description": "SHA-256 of the installed MLflow prompt sources.",
+            "title": "Rubric Hash",
+            "type": "string"
+          },
+          "rubric_version": {
+            "default": "mlflow-3.16-rubrics-v1",
+            "title": "Rubric Version",
+            "type": "string"
+          },
+          "sampling_policy": {
+            "default": "case-time-stratified-v1",
+            "title": "Sampling Policy",
+            "type": "string"
+          },
+          "sampling_seed": {
+            "description": "Frozen deterministic sampling seed.",
+            "title": "Sampling Seed",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "explicit",
+              "llm"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "time_bins": {
+            "default": 4,
+            "title": "Time Bins",
+            "type": "integer"
+          },
+          "version": {
+            "default": "2",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "rubric_hash",
+          "dataset_hash",
+          "evaluation_hash",
+          "max_scored_requests",
+          "sampling_seed",
+          "description",
+          "recommendations"
+        ],
+        "title": "Plan",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/Recommendation",
+      "message": "New schema 'Recommendation' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "A proposed scorer with deterministic evidence readiness and coverage.",
+        "properties": {
+          "eligible_samples": {
+            "description": "Cases with the required pre-load evidence.",
+            "title": "Eligible Samples",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "required_fields": {
+            "description": "Evidence required by this scorer.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Required Fields",
+            "type": "array"
+          },
+          "scorer": {
+            "title": "Scorer",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "needs_data"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total_samples": {
+            "description": "Total submitted workload cases.",
+            "title": "Total Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scorer",
+          "reason",
+          "status",
+          "required_fields",
+          "eligible_samples",
+          "total_samples"
+        ],
+        "title": "Recommendation",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/RunSummary",
+      "message": "New schema 'RunSummary' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "Compact history entry without prompts, answers, or reference data.",
+        "properties": {
+          "evaluation_status": {
+            "description": "Evaluation phase outcome.",
+            "title": "Evaluation Status",
+            "type": "string"
+          },
+          "id": {
+            "description": "Run UUID.",
+            "title": "Id",
+            "type": "string"
+          },
+          "load_status": {
+            "description": "Load phase outcome.",
+            "title": "Load Status",
+            "type": "string"
+          },
+          "status": {
+            "description": "Overall lifecycle status.",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "description": "Relative URL for full metrics and evaluation results.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "load_status",
+          "evaluation_status",
+          "url"
+        ],
+        "title": "RunSummary",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "enhancement",
+      "severity": "info",
+      "category": "components",
+      "path": "/components/schemas/ErrorDetail",
+      "message": "New schema 'ErrorDetail' added to components",
+      "oldValue": null,
+      "newValue": {
+        "additionalProperties": false,
+        "description": "Stable error code, safe message, and server request correlation identifier.",
+        "properties": {
+          "code": {
+            "description": "Machine-readable error code.",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Safe human-readable explanation.",
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "Correlates this error with X-Request-ID.",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "request_id"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New reusable schema available"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "schema",
+      "path": "/components/schemas/Evaluation/properties",
+      "message": "New optional property 'sampling_seed' added to schema 'Evaluation'",
+      "oldValue": null,
+      "newValue": {
+        "default": 42,
+        "description": "Seed for deterministic sampling of the same captured request records.",
+        "maximum": 4294967295.0,
+        "minimum": 0.0,
+        "title": "Sampling Seed",
+        "type": "integer"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New property provides additional data without breaking existing clients"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "schema",
+      "path": "/components/schemas/Target/properties",
+      "message": "Property 'auth' removed from schema 'Target'",
+      "oldValue": {
+        "type": "string",
+        "enum": [
+          "none",
+          "databricks"
+        ],
+        "title": "Auth",
+        "default": "none"
+      },
+      "newValue": null,
+      "migrationGuide": "Remove references to 'auth' property in client code",
+      "impactDescription": "Clients expecting this property will receive incomplete data"
+    },
+    {
+      "changeType": "breaking",
+      "severity": "high",
+      "category": "schema",
+      "path": "/components/schemas/Target/properties",
+      "message": "Property 'auth_env' removed from schema 'Target'",
+      "oldValue": {
+        "anyOf": [
+          {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Auth Env"
+      },
+      "newValue": null,
+      "migrationGuide": "Remove references to 'auth_env' property in client code",
+      "impactDescription": "Clients expecting this property will receive incomplete data"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "schema",
+      "path": "/components/schemas/Target/properties",
+      "message": "New optional property 'connection_id' added to schema 'Target'",
+      "oldValue": null,
+      "newValue": {
+        "anyOf": [
+          {
+            "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Connection Id"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New property provides additional data without breaking existing clients"
+    },
+    {
+      "changeType": "non_breaking",
+      "severity": "info",
+      "category": "schema",
+      "path": "/components/schemas/RunRequest/properties",
+      "message": "New optional property 'plan_id' added to schema 'RunRequest'",
+      "oldValue": null,
+      "newValue": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Reuse a persisted evaluation plan UUID.",
+        "title": "Plan Id"
+      },
+      "migrationGuide": "",
+      "impactDescription": "New property provides additional data without breaking existing clients"
+    },
+    {
+      "changeType": "potentially_breaking",
+      "severity": "medium",
+      "category": "security",
+      "path": "/components/securitySchemes",
+      "message": "Security scheme definitions changed",
+      "oldValue": {},
+      "newValue": {
+        "APIKeyHeader": {
+          "in": "header",
+          "name": "X-API-Key",
+          "type": "apiKey"
+        }
+      },
+      "migrationGuide": "Review authentication implementation for compatibility with new security schemes",
+      "impactDescription": "Authentication mechanisms may have changed"
+    }
+  ]
+}
