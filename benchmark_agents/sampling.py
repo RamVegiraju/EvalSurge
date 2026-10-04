@@ -10,7 +10,19 @@ from .models import Plan
 def select_rows(
     eligible: list[dict[str, Any]], rows: list[dict[str, Any]], plan: Plan
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Round-robin shuffled strata, not earliest completions; preserve exact selected IDs."""
+    """Balance a seeded response sample across workload cases and elapsed-time bins.
+
+    Args:
+        eligible: Successful, evidence-qualified rows containing request_id,
+            case_id, and optional start_offset_ms.
+        rows: All attempts, used to establish the observed request-start window.
+        plan: Frozen seed, time-bin count, sampling policy, and assessment budget.
+
+    Returns:
+        Selected rows and coverage metadata. Selection is reproducible for identical
+        records regardless of their input order and does not mutate those records.
+        Balanced scorer means are not population-weighted estimates.
+    """
     end = max((r.get("start_offset_ms", 0) for r in rows), default=0)
     buckets: dict[tuple[int, int], list[dict[str, Any]]] = {}
     for row in sorted(eligible, key=lambda r: r["request_id"]):

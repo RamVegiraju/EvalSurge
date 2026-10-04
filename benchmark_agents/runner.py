@@ -8,7 +8,22 @@ from .models import RunRequest, Sample
 
 
 def payload(request: RunRequest, sample: Sample) -> dict[str, Any]:
-    """Build one of the two supported hosted endpoint contracts."""
+    """Convert one workload case into the selected streaming wire contract.
+
+    Args:
+        request: Target adapter and model settings for this run.
+        sample: A nonempty query or messages array; messages take precedence.
+
+    Returns:
+        A streaming OpenAI Chat Completions or MLflow agent-server request body.
+        Additional sample input keys remain evaluation metadata, not target fields.
+        No reasoning, tool, or sampling settings are injected. Streamed token usage
+        is requested only when target.request_usage is enabled for openai-chat.
+
+    Raises:
+        ValueError: A query is missing or messages are not nonempty role-bearing
+            objects. This validates the supported envelope, not all provider fields.
+    """
     messages = sample.inputs.get("messages")
     if messages is None:
         query = sample.inputs.get("query")
@@ -26,23 +41,45 @@ def payload(request: RunRequest, sample: Sample) -> dict[str, Any]:
         raise ValueError("inputs.messages must be a nonempty array of objects with a role")
     if request.target.adapter == "mlflow-agent-server":
         return {"input": messages, "stream": True}
-    return {
+    body = {
         "model": request.target.model,
         "messages": messages,
         "stream": True,
-        "stream_options": {"include_usage": True},
     }
+    if request.target.request_usage:
+        body["stream_options"] = {"include_usage": True}
+    return body
 
 
 def percentile(values: list[float], quantile: float) -> float | None:
-    """Nearest-rank percentile with explicit empty result."""
+    """Compute a nearest-rank percentile without mutating the supplied values.
+
+    Args:
+        values: Observations to sort; an empty collection is allowed.
+        quantile: Requested fraction in (0, 1], as used by the metric summaries.
+
+    Returns:
+        The nearest-rank observation, or None when no observations are available.
+    """
     return sorted(values)[max(0, math.ceil(len(values) * quantile) - 1)] if values else None
 
 
 def summarize(
     rows: list[dict[str, Any]], elapsed: float, dispatch_seconds: float
 ) -> dict[str, Any]:
-    """Report rates over total wall time including drain."""
+    """Aggregate client measurements without applying quality thresholds.
+
+    Args:
+        rows: Completed or recovered attempts with success, error, timing, and
+            output_tokens fields.
+        elapsed: Positive measured wall time in seconds, including request drain.
+        dispatch_seconds: Offset of the last HTTP dispatch from the measured start.
+
+    Returns:
+        Attempt and success counts, error breakdown, rates, token-usage coverage,
+        and successful-only latency percentiles. WorkerInterrupted attempts do not
+        count toward completed TPS; other failed attempts do.
+    """
     successful = [r for r in rows if r["success"]]
     timing = {}
     for field in ("latency_ms", "ttft_ms", "first_event_ms"):

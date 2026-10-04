@@ -21,6 +21,12 @@ async def test_native_mlflow_captured_outputs(tmp_path, monkeypatch):
 
     class Client:
         def __init__(self, **kwargs):
+            assert kwargs == {
+                "profile": "frozen-profile",
+                "host": "https://fixture.example",
+                "timeout": 7,
+                "max_retries": 0,
+            }
             self.chat = SimpleNamespace(completions=self)
 
         def __enter__(self):
@@ -31,6 +37,7 @@ async def test_native_mlflow_captured_outputs(tmp_path, monkeypatch):
 
         def create(self, **kwargs):
             assert kwargs["model"] == "controlled-test"
+            assert kwargs["max_completion_tokens"] == 128
             assert "refund" in kwargs["messages"][1]["content"]
             assert "Opened items are not refundable." in kwargs["messages"][1]["content"]
             return SimpleNamespace(
@@ -46,7 +53,11 @@ async def test_native_mlflow_captured_outputs(tmp_path, monkeypatch):
     monkeypatch.setattr(judges, "judge_client", Client)
     config = Evaluation(description="Refund assistant", scorers=["relevance"])
     plan = await create_plan(config)
+    plan.judge_profile = "frozen-profile"
     plan.judge_host = "https://fixture.example"
+    plan.judge_timeout_seconds = 7
+    plan.judge_max_retries = 0
+    plan.judge_max_completion_tokens = 128
     rows = [
         {
             "success": True,
@@ -57,7 +68,7 @@ async def test_native_mlflow_captured_outputs(tmp_path, monkeypatch):
             "expectations": {},
         }
     ]
-    result = evaluate(rows, plan, config)
+    result = evaluate(rows, plan)
     assert result["status"] == "completed"
     assert result["results"][0]["scored"] == 1
     assert result["results"][0]["metrics"]["relevance_to_query/mean"] == 1

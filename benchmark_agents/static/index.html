@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EvalSurge · Agent benchmark report</title>
+  <link rel="stylesheet" href="./report.css">
+  <script src="./report.js" defer></script>
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to report</a>
+  <header>
+    <a href="./" class="brand"><span class="mark" aria-hidden="true">▂▅█</span> EvalSurge <span class="brand-tag">AGENT BENCHMARKS</span></a>
+    <nav aria-label="Primary"><a href="./" aria-current="page">Report</a><a href="../docs/">API docs ↗</a></nav>
+  </header>
+  <main id="main">
+    <form id="connect" class="card controls">
+      <label>Run ID <input id="run-id" required placeholder="Run UUID" autocomplete="off"></label>
+      <label>API key, if configured <input id="api-key" type="password" autocomplete="off" placeholder="Kept in memory only"></label>
+      <button id="refresh" type="submit">Load / refresh</button>
+    </form>
+    <p id="message" role="status" aria-live="polite">Choose a completed run to inspect its evidence.</p>
+    <section id="report" hidden>
+      <div class="intro"><div><p class="eyebrow">HOSTED AGENT / BENCHMARK REPORT</p><h1 id="title"></h1><p id="subtitle"></p></div><span id="status"></span></div>
+      <div id="context" class="card context"></div>
+      <nav class="section-nav" aria-label="Report sections"><a href="#quality">Judges & evaluations</a><a href="#performance">Performance</a><a href="#traces">Request traces</a><a href="#evidence">Evidence notes</a></nav>
+      <section id="quality" aria-labelledby="quality-title">
+        <div class="section-heading"><div><p class="eyebrow">QUALITY / FROZEN PLAN</p><h2 id="quality-title">Suggested judges</h2><p class="muted">Why each criterion was selected and what evidence it needs. Suggestions are not calibrated verdicts.</p></div><span id="plan-source" class="badge"></span></div>
+        <div id="suggestions" class="suggestions"></div>
+        <p id="plan-note" class="callout"></p>
+        <section class="card">
+          <div class="section-heading"><div><h2>Evaluation results</h2><p class="muted">Captured answers evaluated after load. Missing evidence and judge errors never count as passes.</p></div><span id="evaluation-status"></span></div>
+          <div id="evaluation-summary" class="evaluation-summary"></div>
+          <div id="judges" class="table-scroll"></div>
+          <p id="sampling-note" class="muted"></p>
+        </section>
+      </section>
+      <section id="performance" aria-labelledby="performance-title">
+      <div class="section-heading"><div><p class="eyebrow">PERFORMANCE / SINGLE LOAD LEVEL</p><h2 id="performance-title">Observed performance</h2></div></div>
+      <div id="metrics" class="metrics"></div>
+      <div class="split">
+        <section class="card"><h2>Latency anatomy</h2><p class="muted">Exclusive wall occupancy across correlated traces. Not a critical path.</p><div id="anatomy"></div></section>
+        <section class="card"><h2>Observed operation hotspots</h2><p id="hotspot-note" class="muted"></p><div id="hotspots"></div></section>
+      </div>
+      </section>
+      <section id="traces" class="card"><div class="section-heading"><div><p class="eyebrow">TRACE PROFILING</p><h2>Request latency heatmap</h2><p class="muted">Slow-to-fast within this page · milliseconds · select a request for its waterfall. Brighter cells mean more time; — means unknown.</p></div><span id="coverage" class="badge"></span></div>
+        <div class="table-scroll"><table id="heatmap"></table></div>
+        <div class="pagination"><button id="previous" type="button">← Previous</button><span id="page"></span><button id="next" type="button">Next →</button></div>
+      </section>
+      <section class="card">
+        <div class="section-heading"><h2 id="waterfall-title">Request span waterfall</h2><label class="toggle"><input id="show-framework" type="checkbox"> Show all spans</label></div>
+        <p id="waterfall-note" class="muted"></p><div id="legend" class="legend"></div><div id="waterfall"></div>
+      </section>
+      <details id="evidence" class="card"><summary>Evidence & measurement notes</summary><ul id="notes"></ul></details>
+      <footer>Source planes: client timing · correlated MLflow spans · MLflow assessments. Single-level measurements do not establish sustainable capacity.</footer>
+    </section>
+  </main>
+</body>
+</html>

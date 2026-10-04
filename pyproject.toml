@@ -13,14 +13,17 @@ classifiers = [
   "Topic :: Software Development :: Testing",
 ]
 
-dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1", "httpx>=0.27,<1", "openai>=1.60,<3", "mlflow>=3.16,<3.17", "databricks-sdk>=0.85", "locust>=2.46,<3", "python-dotenv>=1", "pydantic>=2.10,<3", "requests>=2.32,<3", "gevent>=25,<26"]
+dependencies = ["fastapi>=0.141.1,<1", "uvicorn>=0.54,<1", "httpx>=0.28.1,<1", "openai>=3.19.2,<4", "mlflow>=3.16.1,<3.17", "databricks-sdk>=0.146,<1", "locust>=2.46.6,<3", "python-dotenv>=1.2.3,<2", "pydantic>=2.13.5,<3", "requests>=2.34.2,<3", "gevent>=26.9,<27"]
+
+[project.optional-dependencies]
+agents = ["langgraph>=1.2.12,<2", "langgraph-checkpoint>=4.2,<5", "langchain-core>=1.6.5,<2", "langchain-openai>=1.6.6,<2", "openai-agents>=0.22.3,<1"]
 
 [project.urls]
 Repository = "https://github.com/RamVegiraju/EvalSurge"
 Issues = "https://github.com/RamVegiraju/EvalSurge/issues"
 
 [dependency-groups]
-dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.9"]
+dev = ["pytest>=9.1.1,<10", "pytest-asyncio>=1.4,<2", "ruff>=0.16.9,<1", "openapi-spec-validator>=0.9,<1", "pip-audit>=2.10.1,<3", "hatchling>=1.32.4,<2"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -32,7 +35,7 @@ line-length = 100
 select = ["E4", "E7", "E9", "F", "I", "BLE", "SIM"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.32.4,<2"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

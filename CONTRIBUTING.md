@@ -1,10 +1,26 @@
 # Contributing
 
-Use Python 3.11+ on Linux or macOS and `uv sync --locked --group dev`.
-Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest -q`, and `uv build` before proposing a change. Locust integration tests need localhost sockets and spawn subprocesses. No paid credentials are needed for tests.
+Use Python 3.11+ on Linux or macOS, Node.js 22+ for report/docs contract tests, and
+`uv sync --locked --extra agents --group dev`.
+Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest -q`, `uv run python scripts/export_openapi.py --check`, `uv run openapi-spec-validator docs/openapi.json`, `uv build --no-build-isolation`, and `uv run python scripts/verify_wheel.py` before proposing a change. Locust integration tests need localhost sockets and spawn subprocesses. No paid credentials are needed for tests.
 
 Keep dependencies explicit and minimal. Do not add a second load runner or provider routing framework without an architectural need. Maintain the shared streaming contract, frozen evaluation policy, evidence requirements, and separation between load and judging. Changes to timing or sampling definitions must update documentation and regression coverage.
+
+Document nontrivial functions with Google-style docstrings covering arguments, results, relevant exceptions, ownership, and side effects. Include measurement units and distinguish lifecycle completion from a passing quality verdict. Update [the code guide](docs/CODE_GUIDE.md) when responsibility boundaries change. Endpoint docstrings use `\f` to separate public operation descriptions from implementation details.
 
 Generate the OpenAPI snapshot with `uv run python scripts/export_openapi.py`. Document breaking changes in `docs/API_REVIEW.md`; the current 0.x API is not stable. Do not commit `.env`, tokens, profiles, benchmark outputs, SQLite databases, or real customer prompts.
 
 Describe the problem and resulting behavior in pull requests, with validation and limitations. Live paid tests require an explicitly authorized workspace, bounded traffic, and a separate validation record. Local mock tests do not establish model quality or remote throughput.
+
+Follow the root [engineering instructions](AGENTS.md) and focused repository skills
+in `.agents/skills/`. Material public API, load-engine, persistence, profiling, or
+evaluation changes require an ADR under `docs/adr/` and maintainer review; use
+[ADR 0001](docs/adr/0001-local-evidence-pipeline.md) as the current boundary.
+Dependency upgrades follow [the dependency policy](docs/DEPENDENCIES.md), including
+official-version checks, reviewed compatibility exceptions, and audited lockfiles.
+
+Maintainers must configure branch protection/rulesets to require the CI `test`
+matrix and `security` checks, reviewed pull requests, dismissed stale approvals,
+and code-owner approval. CODEOWNERS and the PR template request review but do not
+enable those settings. A sole author cannot independently approve their own change;
+add another authorized maintainer before claiming independent review enforcement.

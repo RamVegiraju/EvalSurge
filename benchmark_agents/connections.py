@@ -20,7 +20,19 @@ class Connection(Model):
 
 
 def resolve_connection(target: Target) -> Connection:
-    """Bind credentials to one exact URL; reject redirects and unapproved destinations."""
+    """Resolve an endpoint against the operator's destination policy.
+
+    Args:
+        target: Endpoint URL and optional server-owned connection identifier.
+
+    Returns:
+        A credential binding from BENCHMARK_CONNECTIONS, or an unauthenticated
+        binding for a loopback or explicitly allowlisted URL. No secrets are read.
+
+    Raises:
+        ValueError: The URL contains forbidden components, is not authorized,
+            differs from its connection, or uses remote credentialed HTTP.
+    """
     url = str(target.url)
     parsed = urlsplit(url)
     if parsed.username or parsed.password or parsed.fragment or parsed.query:
@@ -42,7 +54,20 @@ def resolve_connection(target: Target) -> Connection:
 
 
 def authentication(connection: Connection) -> Callable[[], dict[str, str]]:
-    """Create a refreshable header source; all failures stay in the request lifecycle."""
+    """Create a header source that resolves credentials when a request starts.
+
+    Args:
+        connection: Operator-owned destination and authentication settings.
+
+    Returns:
+        A callable producing fresh headers. Bearer tokens are read on each call;
+        Databricks authentication delegates refresh to the SDK.
+
+    Raises:
+        ValueError: Databricks credentials would target a different workspace,
+            SDK settings are absent, or a bearer credential is unavailable.
+            Bearer credential errors occur when the returned callable is called.
+    """
     if connection.auth == "databricks":
         workspace = workspace_client()
         if urlsplit(connection.url).scheme != "https" or (
@@ -53,6 +78,7 @@ def authentication(connection: Connection) -> Callable[[], dict[str, str]]:
     if connection.auth == "bearer":
 
         def bearer() -> dict[str, str]:
+            """Read the configured token at dispatch time, without caching it."""
             token = os.environ.get(connection.token_env or "")
             if not token:
                 raise ValueError("Connection credential is unavailable")

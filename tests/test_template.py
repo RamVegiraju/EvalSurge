@@ -24,6 +24,40 @@ def configuration(**load):
     )
 
 
+def test_should_preserve_hosted_agent_settings_and_allow_usage_opt_out():
+    from benchmark_agents.runner import payload, summarize
+
+    request = configuration()
+    sample = request.evaluation.samples[0]
+    sample.inputs.update({"reasoning_effort": "low", "tools": [{"name": "private_tool"}]})
+    default_body = payload(request, sample)
+    assert default_body["stream_options"] == {"include_usage": True}
+    assert set(default_body) == {"model", "messages", "stream", "stream_options"}
+    request.target.request_usage = False
+    assert set(payload(request, sample)) == {"model", "messages", "stream"}
+    request.target.adapter = "mlflow-agent-server"
+    assert payload(request, sample) == {
+        "input": [{"role": "user", "content": "Can I refund?"}],
+        "stream": True,
+    }
+    metrics = summarize(
+        [
+            {
+                "success": True,
+                "error": None,
+                "latency_ms": 10,
+                "ttft_ms": 5,
+                "first_event_ms": 1,
+                "output_tokens": None,
+            }
+        ],
+        elapsed=1,
+        dispatch_seconds=0,
+    )
+    assert metrics["token_usage_coverage"] == 0
+    assert metrics["reported_output_tokens_per_second"] is None
+
+
 def test_reference_coverage_and_missing_data():
     evaluation = Evaluation.model_validate(
         {

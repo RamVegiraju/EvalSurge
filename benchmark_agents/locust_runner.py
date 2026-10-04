@@ -18,7 +18,27 @@ from .storage import atomic_json, recover_rows
 async def run_load(
     request: RunRequest, run_id: str, cancel: asyncio.Event, artifact_dir: Path | None = None
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Launch Locust; retain completed and interrupted measurements on any worker exit."""
+    """Run the production Locust subprocess and recover its request measurements.
+
+    Args:
+        request: Validated endpoint, workload, and closed-loop load limits.
+        run_id: Unique identifier used for a new artifact subdirectory.
+        cancel: API-owned event; setting it requests dispatch stop and active drain.
+        artifact_dir: Storage root, defaulting to BENCHMARK_ARTIFACT_DIR or artifacts.
+
+    Returns:
+        Recovered request rows and a summary with independent load status,
+        worker exit code, and measurement completeness.
+
+    Raises:
+        FileExistsError: This run's artifact directory already exists.
+        ValueError: The target's server-owned connection is invalid.
+        OSError: Artifact writes or subprocess creation fail.
+
+    Configuration and connection metadata are persisted before launch. A bounded
+    outer deadline terminates and, if needed, kills an unresponsive worker. Missing
+    worker results use diagnostic parent-observed timing, not comparable load timing.
+    """
     root = (
         artifact_dir or Path(os.getenv("BENCHMARK_ARTIFACT_DIR", "artifacts"))
     ).resolve() / run_id

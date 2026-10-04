@@ -18,7 +18,14 @@ from .providers import judge_client
 
 
 def rubric_hash() -> str:
-    """Identify the exact installed prompt sources used by this implementation."""
+    """Hash the installed correctness, relevance, and safety prompt source files.
+
+    Returns:
+        A hexadecimal SHA-256 digest used to detect rubric drift before evaluation.
+
+    This reads MLflow's internal prompt modules, whose supported minor version is
+    constrained in pyproject.toml; it does not identify the served judge model revision.
+    """
     from mlflow.genai.judges.prompts import correctness, relevance_to_query, safety
 
     digest = hashlib.sha256()
@@ -28,6 +35,8 @@ def rubric_hash() -> str:
 
 
 class Verdict(BaseModel):
+    """Strict yes/no provider verdict; invalid responses become assessment errors."""
+
     model_config = ConfigDict(extra="forbid")
     result: Literal["yes", "no"]
     rationale: str
@@ -36,7 +45,20 @@ class Verdict(BaseModel):
 def build_prompt(
     name: str, inputs: dict[str, Any], outputs: Any, expectations: dict[str, Any]
 ) -> str:
-    """Reuse MLflow's shipped rubric, without its model-routing layer."""
+    """Render an installed MLflow rubric around the captured input and answer.
+
+    Args:
+        name: Supported relevance, correctness, or safety scorer identifier.
+        inputs: Original workload input, serialized as Unicode-preserving JSON.
+        outputs: Captured answer text or another JSON-serializable output.
+        expectations: Authoritative references used only by correctness.
+
+    Returns:
+        The prompt produced by MLflow's installed rubric implementation.
+
+    Raises:
+        ValueError: The scorer identifier is unsupported.
+    """
     from mlflow.genai.judges.prompts import correctness, relevance_to_query, safety
 
     request = json.dumps(inputs, ensure_ascii=False)
@@ -55,24 +77,43 @@ def build_prompt(
     raise ValueError(f"Unsupported judge: {name}")
 
 
-def direct_scorer(name: str, endpoint: str, plan: Plan | None = None) -> Any:
-    """Create a native MLflow scorer; judge exceptions become assessment errors."""
+def direct_scorer(name: str, endpoint: str, plan: Plan) -> Any:
+    """Create an MLflow scorer with a frozen Databricks transport configuration.
+
+    Args:
+        name: Supported rubric identifier; relevance maps to relevance_to_query.
+        endpoint: Databricks judge endpoint resolved by the evaluation plan.
+        plan: Frozen workspace, timeout, retry, and output-token settings.
+
+    Returns:
+        A callable MLflow scorer producing boolean Feedback with judge rationale.
+        This is a local wrapper, not a managed Databricks judge.
+    """
     metric_name = "relevance_to_query" if name == "relevance" else name
 
     @scorer(name=metric_name)
     def score(
         inputs: dict[str, Any], outputs: Any, expectations: dict[str, Any] | None = None
     ) -> Feedback:
-        options = (
-            {}
-            if plan is None
-            else {
-                "profile": plan.judge_profile,
-                "host": plan.judge_host,
-                "timeout": plan.judge_timeout_seconds,
-                "max_retries": plan.judge_max_retries,
-            }
-        )
+        """Judge one captured answer and validate the yes/no JSON verdict.
+
+        Args:
+            inputs: Original workload input passed by MLflow.
+            outputs: Captured answer, never a fresh target invocation.
+            expectations: Optional reference evidence for correctness.
+
+        Returns:
+            A boolean assessment named for the selected rubric.
+
+        Provider and verdict-validation errors propagate to MLflow, which records
+        assessment errors instead of treating missing scores as passing verdicts.
+        """
+        options = {
+            "profile": plan.judge_profile,
+            "host": plan.judge_host,
+            "timeout": plan.judge_timeout_seconds,
+            "max_retries": plan.judge_max_retries,
+        }
         with judge_client(**options) as client:
             response = client.chat.completions.create(
                 model=endpoint,
@@ -87,7 +128,7 @@ def direct_scorer(name: str, endpoint: str, plan: Plan | None = None) -> Any:
                     },
                 ],
                 response_format={"type": "json_object"},
-                max_completion_tokens=plan.judge_max_completion_tokens if plan else 2048,
+                max_completion_tokens=plan.judge_max_completion_tokens,
             )
         verdict = Verdict.model_validate_json(response.choices[0].message.content or "{}")
         return Feedback(

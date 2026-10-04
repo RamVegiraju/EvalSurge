@@ -1,22 +1,22 @@
 {
   "overall": {
-    "score": 77.12,
+    "score": 77.28,
     "grade": "C",
-    "totalEndpoints": 7
+    "totalEndpoints": 8
   },
   "api_info": {
     "title": "EvalSurge",
     "version": "0.2.0",
     "description": "Benchmark one concurrency level, then evaluate captured answers with a frozen plan. Local, single-tenant prototype; not a maximum-capacity discovery service.",
-    "total_paths": 6,
+    "total_paths": 7,
     "openapi_version": "3.1.0"
   },
   "categories": {
     "consistency": {
-      "score": 82.18,
+      "score": 81.83,
       "grade": "B",
       "weight": 30.0,
-      "weightedScore": 24.65,
+      "weightedScore": 24.55,
       "issues": [],
       "recommendations": [
         "Minor consistency improvements needed in naming or response formats",
@@ -24,10 +24,10 @@
       ]
     },
     "documentation": {
-      "score": 85.6,
+      "score": 86.89,
       "grade": "B",
       "weight": 20.0,
-      "weightedScore": 17.12,
+      "weightedScore": 17.38,
       "issues": [],
       "recommendations": []
     },

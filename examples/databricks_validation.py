@@ -18,6 +18,12 @@ from benchmark_agents.providers import DEFAULT_FM_ENDPOINT, planner_client
 
 
 async def main() -> None:
+    """Run the opt-in live judge check and save local evaluation artifacts.
+
+    The selected profile must be configured by the operator in .env. This issues
+    paid planner, inference, and judge calls, including a deliberately wrong answer
+    to check discrimination; it does not run Locust or establish calibration.
+    """
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     directory = Path("artifacts")
     directory.mkdir(exist_ok=True)
@@ -60,7 +66,7 @@ async def main() -> None:
             ("intentionally-incorrect", "Yes, opened items are always eligible for a full refund."),
         ]
     ]
-    result = await asyncio.to_thread(evaluate, rows, plan, config)
+    result = await asyncio.to_thread(evaluate, rows, plan)
     correctness = next(r for r in result["results"] if r["scorer"] == "correctness")
     assert correctness["metrics"].get("correctness/mean") == 0.5, correctness
     output = {

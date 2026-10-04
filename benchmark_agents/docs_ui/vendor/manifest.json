@@ -1,0 +1,20 @@
+{
+  "package": "swagger-ui-dist",
+  "version": "5.33.1",
+  "verified_on": "2026-10-04",
+  "commit": "cac3d136b5e37bfbe3288c8591f6f4fcf9870599",
+  "files": {
+    "swagger-ui-bundle.js": {
+      "sha256": "050bc415ee7048dcd881682678f720264e7da5e373f7461d7c58c755305255f7",
+      "git_blob": "a9fd9e51832af60a5e59b121cb181008563b99a6"
+    },
+    "swagger-ui.css": {
+      "sha256": "1ac324f7dcd27e4b9386b4bd6421271ec147e922a22c05ba24b11515e9aa6321",
+      "git_blob": "85943ae6a4d439347bc1e5595d073e3c3555a5c5"
+    },
+    "LICENSE": {
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+    }
+  }
+}

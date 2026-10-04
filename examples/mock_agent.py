@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
@@ -10,8 +11,11 @@ app = FastAPI()
 
 
 @app.post("/chat")
-async def chat():
-    async def events():
+async def chat() -> StreamingResponse:
+    """Return a deterministic SSE answer with metadata and provider-style usage."""
+
+    async def events() -> AsyncIterator[str]:
+        """Yield delayed answer deltas followed by usage and a terminal marker."""
         yield 'data: {"choices":[{"delta":{"role":"assistant"}}]}\n\n'
         for text in ["Opened items ", "are not refundable."]:
             await asyncio.sleep(0.025)

@@ -13,6 +13,13 @@ from benchmark_agents.providers import DEFAULT_FM_ENDPOINT, workspace_client
 
 
 async def main() -> None:
+    """Run the opt-in REST-to-Locust-to-Databricks validation with a bounded workload.
+
+    Uses the operator-selected profile in .env, makes paid inference and judge calls,
+    and stores the final report locally. Four requests verify integration, not stable
+    latency, maximum capacity, or general judge calibration. Server cleanup is always
+    requested after the validation phase.
+    """
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{Path('artifacts').resolve()}/locust-e2e.db"
     workspace = await asyncio.to_thread(workspace_client)

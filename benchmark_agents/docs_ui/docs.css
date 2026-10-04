@@ -1,0 +1,9 @@
+html { box-sizing: border-box; overflow-y: scroll; }
+*, *::before, *::after { box-sizing: inherit; }
+body { margin: 0; background: #fafafa; font-family: system-ui, sans-serif; }
+header { display: flex; align-items: center; gap: 24px; padding: 18px 24px; background: #14141c; color: #c5c5d5; font-size: 14px; }
+header a { color: #d8caff; text-decoration: none; }
+header a:first-child { font-size: 20px; font-weight: 700; color: #fff; }
+header a:last-child { margin-left: auto; }
+noscript { display: block; padding: 24px; }
+@media (max-width: 540px) { header span { display: none; } }

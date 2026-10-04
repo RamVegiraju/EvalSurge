@@ -23,9 +23,17 @@ RUN_EXAMPLE = {
 
 
 def install_schema(app: FastAPI) -> None:
-    """Keep shared HTTP documentation aligned with implemented middleware behavior."""
+    """Install the cached OpenAPI renderer with shared response-header examples.
+
+    Args:
+        app: Application whose routes and response models define the public schema.
+
+    The renderer documents intended header conventions; behavioral tests must also
+    verify them on success, handled errors, and unexpected failures.
+    """
 
     def schema() -> dict[str, Any]:
+        """Generate and cache the route schema, annotated with examples and headers."""
         if app.openapi_schema:
             return app.openapi_schema
         result = get_openapi(

@@ -8,6 +8,14 @@ from benchmark_agents.api import app
 
 
 def main() -> None:
+    """Export the public schema, or fail when --check finds a stale snapshot.
+
+    The destination is docs/openapi.json relative to this repository, independent
+    of the caller's working directory. Importing the API does not start a benchmark.
+
+    Raises:
+        SystemExit: --check detects a missing or outdated committed schema.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()

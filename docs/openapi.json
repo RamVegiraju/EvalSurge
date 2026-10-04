@@ -29,6 +29,96 @@
         "title": "Accepted",
         "type": "object"
       },
+      "AgentManifest": {
+        "additionalProperties": false,
+        "description": "Opt-in setup context for planning; source code is never executed by the API.",
+        "properties": {
+          "capabilities": {
+            "description": "Reviewed public capability descriptions.",
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "maxItems": 50,
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "description": "Agent objective.",
+            "maxLength": 4000,
+            "title": "Description",
+            "type": "string"
+          },
+          "framework": {
+            "description": "Framework whose setup the owner discloses.",
+            "enum": [
+              "langgraph",
+              "openai-agents"
+            ],
+            "title": "Framework",
+            "type": "string"
+          },
+          "name": {
+            "description": "Human-readable agent name.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "default": "user",
+            "description": "Manifest origin; static scans still require owner review.",
+            "enum": [
+              "user",
+              "static-scan"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "framework"
+        ],
+        "title": "AgentManifest",
+        "type": "object"
+      },
+      "Capability": {
+        "additionalProperties": false,
+        "description": "An explicitly disclosed capability, not proof of runtime behavior.",
+        "properties": {
+          "description": {
+            "default": "",
+            "description": "Purpose, without secrets.",
+            "maxLength": 2000,
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "default": "tool",
+            "description": "Declared capability category, not observed runtime evidence.",
+            "enum": [
+              "tool",
+              "retrieval",
+              "memory"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "description": "Public tool or memory name.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "Capability",
+        "type": "object"
+      },
       "ErrorDetail": {
         "additionalProperties": false,
         "description": "Stable error code, safe message, and server request correlation identifier.",
@@ -76,6 +166,17 @@
         "additionalProperties": false,
         "description": "Evaluation criteria, optional data, and a per-scorer assessment budget.",
         "properties": {
+          "agent_manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentManifest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opt-in, sanitized setup context; not runtime evidence."
+          },
           "description": {
             "description": "Agent objective and quality criteria.",
             "examples": [
@@ -93,6 +194,22 @@
             "minimum": 1.0,
             "title": "Max Scored Requests",
             "type": "integer"
+          },
+          "registered_scorers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Operator-allowlisted MLflow scorer aliases. None permits suggestions; [] disables.",
+            "title": "Registered Scorers"
           },
           "samples": {
             "description": "Optional for planning; at least one case is required for load generation.",
@@ -280,6 +397,14 @@
             "title": "Recommendations",
             "type": "array"
           },
+          "registered_scorers": {
+            "description": "Frozen trusted scorer versions and definition hashes.",
+            "items": {
+              "$ref": "#/components/schemas/RegisteredScorer"
+            },
+            "title": "Registered Scorers",
+            "type": "array"
+          },
           "rubric_hash": {
             "description": "SHA-256 of the installed MLflow prompt sources.",
             "title": "Rubric Hash",
@@ -313,8 +438,31 @@
             "title": "Time Bins",
             "type": "integer"
           },
+          "trace_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Frozen opt-in trace scope."
+          },
+          "tracking_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Operator-selected MLflow store.",
+            "title": "Tracking Uri"
+          },
           "version": {
-            "default": "2",
+            "default": "3",
             "title": "Version",
             "type": "string"
           }
@@ -330,6 +478,61 @@
           "recommendations"
         ],
         "title": "Plan",
+        "type": "object"
+      },
+      "ProfilingSummary": {
+        "additionalProperties": false,
+        "description": "Trace coverage and descriptive span hotspots, never a causal critical-path claim.",
+        "properties": {
+          "coverage": {
+            "description": "Validated trace count divided by total attempts.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Coverage",
+            "type": "number"
+          },
+          "gaps": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Counts by evidence-gap reason.",
+            "title": "Gaps",
+            "type": "object"
+          },
+          "hotspots": {
+            "description": "Inclusive per-operation timing summaries; overlaps remain.",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Hotspots",
+            "type": "array"
+          },
+          "notes": {
+            "description": "Attribution and measurement caveats.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "total_requests": {
+            "description": "Total captured attempts, including client failures.",
+            "title": "Total Requests",
+            "type": "integer"
+          },
+          "traced_requests": {
+            "description": "Attempts with validated correlated internal spans.",
+            "title": "Traced Requests",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_requests",
+          "traced_requests",
+          "coverage"
+        ],
+        "title": "ProfilingSummary",
         "type": "object"
       },
       "Recommendation": {
@@ -382,12 +585,79 @@
         "title": "Recommendation",
         "type": "object"
       },
+      "RegisteredScorer": {
+        "additionalProperties": false,
+        "description": "Trusted operator-owned MLflow scorer frozen to an exact registry version.",
+        "properties": {
+          "alias": {
+            "description": "Operator-allowlisted public scorer alias.",
+            "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+            "title": "Alias",
+            "type": "string"
+          },
+          "definition_hash": {
+            "description": "SHA-256 of the frozen serialized scorer definition.",
+            "title": "Definition Hash",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "description": "Operator-reviewed scorer purpose.",
+            "maxLength": 2000,
+            "title": "Description",
+            "type": "string"
+          },
+          "experiment_id": {
+            "description": "Operator-authorized scorer registry experiment.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Experiment Id",
+            "type": "string"
+          },
+          "name": {
+            "description": "Registered MLflow scorer name.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "required_fields": {
+            "description": "Evidence required for eligibility, including actual correlated Trace objects.",
+            "items": {
+              "enum": [
+                "inputs",
+                "outputs",
+                "expectations",
+                "trace"
+              ],
+              "type": "string"
+            },
+            "title": "Required Fields",
+            "type": "array"
+          },
+          "version": {
+            "description": "Exact registered version, never a mutable latest alias.",
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "alias",
+          "name",
+          "experiment_id",
+          "version",
+          "definition_hash"
+        ],
+        "title": "RegisteredScorer",
+        "type": "object"
+      },
       "RequestPage": {
         "additionalProperties": false,
         "description": "Bounded page of captured request records, including failures.",
         "properties": {
           "items": {
-            "description": "Captured client records in dispatch order.",
+            "description": "Captured client records in attempt-start order.",
             "items": {
               "additionalProperties": true,
               "type": "object"
@@ -418,6 +688,114 @@
           "total"
         ],
         "title": "RequestPage",
+        "type": "object"
+      },
+      "RequestProfile": {
+        "additionalProperties": false,
+        "description": "A correlated request trace or an explicit observability gap.",
+        "properties": {
+          "agent_duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Complete agent-root duration in milliseconds, when validated.",
+            "title": "Agent Duration Ms"
+          },
+          "case_id": {
+            "description": "Zero-based workload case index.",
+            "title": "Case Id",
+            "type": "integer"
+          },
+          "client_minus_agent_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nonnegative duration difference, not proven network time.",
+            "title": "Client Minus Agent Ms"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Client latency in milliseconds when measured.",
+            "title": "Latency Ms"
+          },
+          "occupancy_ms": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Non-additive span trees reduced to exclusive wall-clock buckets; concurrent leaves use parallel.",
+            "title": "Occupancy Ms",
+            "type": "object"
+          },
+          "request_id": {
+            "description": "Benchmark attempt identifier used for trace correlation.",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "spans": {
+            "description": "Bounded content-free waterfall for an available trace.",
+            "items": {
+              "$ref": "#/components/schemas/SpanProfile"
+            },
+            "title": "Spans",
+            "type": "array"
+          },
+          "status": {
+            "description": "Observed trace availability or an explicit evidence gap.",
+            "enum": [
+              "available",
+              "disabled",
+              "missing",
+              "scope_mismatch",
+              "invalid",
+              "budget",
+              "collection_failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "success": {
+            "description": "Client-measured request success, not a quality verdict.",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Target-provided MLflow trace identifier when available.",
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "request_id",
+          "case_id",
+          "success",
+          "latency_ms",
+          "status"
+        ],
+        "title": "RequestProfile",
         "type": "object"
       },
       "RunPage": {
@@ -455,6 +833,53 @@
           "total"
         ],
         "title": "RunPage",
+        "type": "object"
+      },
+      "RunReport": {
+        "additionalProperties": false,
+        "description": "One bounded report page joining performance, profiling, and quality evidence.",
+        "properties": {
+          "limit": {
+            "description": "Maximum returned profiles, at most 100.",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Zero-based offset into request profiles.",
+            "title": "Offset",
+            "type": "integer"
+          },
+          "profiling": {
+            "$ref": "#/components/schemas/ProfilingSummary",
+            "description": "Coverage and hotspots across the full run."
+          },
+          "requests": {
+            "description": "Request-profile page in attempt-start order.",
+            "items": {
+              "$ref": "#/components/schemas/RequestProfile"
+            },
+            "title": "Requests",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunResponse",
+            "description": "Run configuration, independent phases, and client metrics."
+          },
+          "total": {
+            "description": "Total request profiles, including explicit evidence gaps.",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run",
+          "profiling",
+          "requests",
+          "offset",
+          "limit",
+          "total"
+        ],
+        "title": "RunReport",
         "type": "object"
       },
       "RunRequest": {
@@ -519,6 +944,19 @@
           },
           "evaluation_status": {
             "description": "Evaluation phase outcome; completed only when selected assessments succeed.",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "completed_with_errors",
+              "completed_with_gaps",
+              "no_ready_scorers",
+              "needs_configuration",
+              "configuration_changed",
+              "failed",
+              "interrupted",
+              "skipped"
+            ],
             "title": "Evaluation Status",
             "type": "string"
           },
@@ -529,6 +967,14 @@
           },
           "load_status": {
             "description": "Load phase: queued, running, completed, cancelled, interrupted, or failed.",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "interrupted",
+              "cancelled"
+            ],
             "title": "Load Status",
             "type": "string"
           },
@@ -541,8 +987,30 @@
           "plan": {
             "$ref": "#/components/schemas/Plan"
           },
+          "profiling_status": {
+            "default": "pending",
+            "description": "Collection phase outcome; inspect trace coverage separately.",
+            "enum": [
+              "pending",
+              "completed",
+              "failed"
+            ],
+            "title": "Profiling Status",
+            "type": "string"
+          },
           "status": {
             "description": "Lifecycle status, not a quality pass/fail verdict.",
+            "enum": [
+              "queued",
+              "running",
+              "profiling",
+              "evaluating",
+              "completed",
+              "completed_with_gaps",
+              "failed",
+              "interrupted",
+              "cancelled"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -570,6 +1038,19 @@
         "properties": {
           "evaluation_status": {
             "description": "Evaluation phase outcome.",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "completed_with_errors",
+              "completed_with_gaps",
+              "no_ready_scorers",
+              "needs_configuration",
+              "configuration_changed",
+              "failed",
+              "interrupted",
+              "skipped"
+            ],
             "title": "Evaluation Status",
             "type": "string"
           },
@@ -580,11 +1061,30 @@
           },
           "load_status": {
             "description": "Load phase outcome.",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "interrupted",
+              "cancelled"
+            ],
             "title": "Load Status",
             "type": "string"
           },
           "status": {
             "description": "Overall lifecycle status.",
+            "enum": [
+              "queued",
+              "running",
+              "profiling",
+              "evaluating",
+              "completed",
+              "completed_with_gaps",
+              "failed",
+              "interrupted",
+              "cancelled"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -632,6 +1132,88 @@
         "title": "Sample",
         "type": "object"
       },
+      "SpanProfile": {
+        "additionalProperties": false,
+        "description": "Content-free normalized span; times are relative to the agent trace origin.",
+        "properties": {
+          "category": {
+            "description": "Normalized operation category; simultaneous leaves use a separate wall bucket.",
+            "enum": [
+              "model",
+              "tool",
+              "retrieval",
+              "memory",
+              "orchestration"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "depth": {
+            "description": "Validated tree depth, with the root at zero.",
+            "minimum": 0.0,
+            "title": "Depth",
+            "type": "integer"
+          },
+          "duration_ms": {
+            "description": "Inclusive span duration; overlaps are possible.",
+            "minimum": 0.0,
+            "title": "Duration Ms",
+            "type": "number"
+          },
+          "name": {
+            "description": "Truncated operation name, without span inputs or outputs.",
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent span identifier; null for the root.",
+            "title": "Parent Id"
+          },
+          "self_ms": {
+            "description": "Duration minus the union of direct-child intervals.",
+            "minimum": 0.0,
+            "title": "Self Ms",
+            "type": "number"
+          },
+          "span_id": {
+            "description": "Unique span identifier within the correlated trace.",
+            "title": "Span Id",
+            "type": "string"
+          },
+          "start_ms": {
+            "description": "Start offset in milliseconds from the agent root.",
+            "minimum": 0.0,
+            "title": "Start Ms",
+            "type": "number"
+          },
+          "status": {
+            "description": "MLflow span status; independent of the client request outcome.",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "span_id",
+          "parent_id",
+          "name",
+          "category",
+          "start_ms",
+          "duration_ms",
+          "self_ms",
+          "depth",
+          "status"
+        ],
+        "title": "SpanProfile",
+        "type": "object"
+      },
       "Target": {
         "additionalProperties": false,
         "description": "Hosted streaming endpoint and an optional server-owned connection reference.",
@@ -677,6 +1259,12 @@
             "title": "Model",
             "type": "string"
           },
+          "request_usage": {
+            "default": true,
+            "description": "Request streamed token usage for openai-chat. Disable when the endpoint rejects stream_options; absent usage stays unknown. Ignored by mlflow-agent-server.",
+            "title": "Request Usage",
+            "type": "boolean"
+          },
           "url": {
             "description": "Exact streaming URL authorized by server target policy.",
             "examples": [
@@ -693,6 +1281,49 @@
           "url"
         ],
         "title": "Target",
+        "type": "object"
+      },
+      "TraceSource": {
+        "additionalProperties": false,
+        "description": "Operator-owned trace-store scope; callers cannot supply a tracking destination.",
+        "properties": {
+          "experiment_ids": {
+            "description": "Experiments authorized for correlated trace reads.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Experiment Ids",
+            "type": "array"
+          },
+          "max_spans": {
+            "default": 250,
+            "description": "Maximum spans accepted in one complete trace.",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Spans",
+            "type": "integer"
+          },
+          "max_traces": {
+            "default": 100,
+            "description": "Maximum distinct traces fetched per run.",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Traces",
+            "type": "integer"
+          },
+          "tracking_uri": {
+            "description": "Frozen operator-selected MLflow destination.",
+            "title": "Tracking Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tracking_uri",
+          "experiment_ids"
+        ],
+        "title": "TraceSource",
         "type": "object"
       }
     },
@@ -941,6 +1572,45 @@
               }
             }
           },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_413",
+                    "message": "Request body exceeds the configured limit",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the configured limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1007,6 +1677,45 @@
               "Retry-After": {
                 "description": "Suggested polling/retry delay in seconds.",
                 "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_500",
+                    "message": "Unexpected server failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
                   "type": "string"
                 }
               },
@@ -1282,6 +1991,45 @@
               }
             }
           },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_413",
+                    "message": "Request body exceeds the configured limit",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the configured limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1348,6 +2096,45 @@
               "Retry-After": {
                 "description": "Suggested polling/retry delay in seconds.",
                 "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_500",
+                    "message": "Unexpected server failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
                   "type": "string"
                 }
               },
@@ -1657,6 +2444,45 @@
               }
             }
           },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_413",
+                    "message": "Request body exceeds the configured limit",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the configured limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1723,6 +2549,45 @@
               "Retry-After": {
                 "description": "Suggested polling/retry delay in seconds.",
                 "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_500",
+                    "message": "Unexpected server failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
                   "type": "string"
                 }
               },
@@ -2051,6 +2916,45 @@
               }
             }
           },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_413",
+                    "message": "Request body exceeds the configured limit",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the configured limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2117,6 +3021,45 @@
               "Retry-After": {
                 "description": "Suggested polling/retry delay in seconds.",
                 "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_500",
+                    "message": "Unexpected server failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
                   "type": "string"
                 }
               },
@@ -2392,6 +3335,45 @@
               }
             }
           },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_413",
+                    "message": "Request body exceeds the configured limit",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the configured limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2458,6 +3440,45 @@
               "Retry-After": {
                 "description": "Suggested polling/retry delay in seconds.",
                 "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_500",
+                    "message": "Unexpected server failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
                   "type": "string"
                 }
               },
@@ -2733,6 +3754,45 @@
               }
             }
           },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_413",
+                    "message": "Request body exceeds the configured limit",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the configured limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2817,6 +3877,45 @@
               }
             }
           },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_500",
+                    "message": "Unexpected server failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "502": {
             "content": {
               "application/json": {
@@ -2865,6 +3964,452 @@
         "summary": "Cancel",
         "tags": [
           "Runs"
+        ]
+      }
+    },
+    "/v1/runs/{run_id}/report": {
+      "get": {
+        "description": "Join performance, frozen quality policy, and a bounded heatmap/waterfall page.\n\nReport data is authenticated like all run resources. The public static shell\nat /reports/ contains no run data or credentials. Times remain agent-relative;\nmissing or failed trace collection is represented explicitly.",
+        "operationId": "get_report_v1_runs__run_id__report_get",
+        "parameters": [
+          {
+            "description": "UUID returned when this resource was created.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Zero-based attempt offset",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Zero-based attempt offset",
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum heatmap rows",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "description": "Maximum heatmap rows",
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunReport"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_401",
+                    "message": "API key missing or invalid",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "API key missing or invalid",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_403",
+                    "message": "Access denied",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Access denied",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_404",
+                    "message": "Resource not found",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_409",
+                    "message": "Resource state conflict",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource state conflict",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_413",
+                    "message": "Request body exceeds the configured limit",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the configured limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_422",
+                    "message": "Invalid request",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_429",
+                    "message": "Benchmark already active",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Benchmark already active",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Suggested polling/retry delay in seconds.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_500",
+                    "message": "Unexpected server failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_502",
+                    "message": "Planner provider failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Planner provider failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Get Report",
+        "tags": [
+          "Reports"
         ]
       }
     },
@@ -3101,6 +4646,45 @@
               }
             }
           },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_413",
+                    "message": "Request body exceeds the configured limit",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request body exceeds the configured limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "422": {
             "content": {
               "application/json": {
@@ -3167,6 +4751,45 @@
               "Retry-After": {
                 "description": "Suggested polling/retry delay in seconds.",
                 "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "http_500",
+                    "message": "Unexpected server failure",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
                   "type": "string"
                 }
               },

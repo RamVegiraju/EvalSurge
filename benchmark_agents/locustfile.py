@@ -34,14 +34,29 @@ connection = Connection.model_validate_json((destination.parent / "connection.js
 
 @events.test_start.add_listener
 def start(environment: Any, **kwargs: Any) -> None:
-    """Prepare refreshable authentication before the measured load window."""
+    """Start the measured window at Locust's test_start event.
+
+    Args:
+        environment: Locust event context; not needed to initialize the clock.
+        **kwargs: Additional event metadata accepted for Locust compatibility.
+
+    Authentication is deferred to each attempt and is included in the run window.
+    """
     global started
     started = time.perf_counter()
 
 
 @events.quitting.add_listener
 def finish(environment: Any, **kwargs: Any) -> None:
-    """Preserve raw measurements and actual concurrency on process exit."""
+    """Persist the aggregate summary when Locust emits its quitting event.
+
+    Args:
+        environment: Locust event context; measurements use this module's state.
+        **kwargs: Additional event metadata accepted for Locust compatibility.
+
+    Raw attempts already reside in the append-only journal. This snapshot records
+    measured wall time, attempted dispatches, and observed peak HTTP concurrency.
+    """
     elapsed = time.perf_counter() - started if started is not None else 0.001
     summary = summarize(rows, max(elapsed, 0.001), last_dispatch)
     summary.update(
@@ -61,11 +76,22 @@ class AgentUser(HttpUser):
     wait_time = constant(0)
 
     def on_start(self) -> None:
-        """Never attach ambient netrc credentials or inherit a proxy destination."""
+        """Disable ambient proxy and netrc discovery for this user's HTTP session."""
         self.client.trust_env = False
 
     @task
     def invoke(self) -> None:
+        """Execute one sequential, journaled streaming attempt for this Locust user.
+
+        Cases are assigned round-robin across users. Count, duration, and cancellation
+        limits stop new attempts while existing work drains. Authentication and
+        streaming share one deadline; TTFT starts only after authentication at HTTP
+        dispatch and ignores non-answer events.
+
+        Each attempt releases its active counters and records completion in cleanup,
+        including failed authentication, invalid streams, and target errors. Target
+        requests are never retried, because agent actions may have side effects.
+        """
         global issued, active, peak, last_dispatch, auth_headers, http_active
         if started is None:
             return

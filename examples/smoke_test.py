@@ -9,6 +9,12 @@ import uvicorn
 
 
 async def main() -> None:
+    """Exercise API submission, real Locust traffic, and polling over local sockets.
+
+    The mock target needs no paid credentials. Explicit scorers demonstrate missing
+    reference evidence, and configured judge credentials can enable paid scoring.
+    Both local servers are stopped even if submission or assertions fail.
+    """
     servers = [
         uvicorn.Server(
             uvicorn.Config(

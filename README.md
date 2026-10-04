@@ -1,28 +1,45 @@
 # EvalSurge
 
-A local-first Python REST API for benchmarking hosted agents with Locust, then evaluating the captured answers with MLflow. **Alpha, single tenant, one active run per process, Linux/macOS.**
+A local-first Python REST API for benchmarking hosted agents.
 
-Give it a streaming endpoint, an objective, workload samples, and target concurrency. EvalSurge freezes an evaluation plan, exercises the endpoint, and scores a representative sample of the captured responses. Description-only requests can recommend scorers and identify missing evidence; load generation requires at least one sample.
+- **Performance:** latency, time to first answer token, throughput, and errors.
+- **Evaluation:** suggested judges, brought MLflow judges, and per-criterion results.
+- **Profiling:** request heatmaps and tool/model/memory waterfalls from correlated MLflow traces.
 
-## Start locally
+**Local alpha:** Linux/macOS, single tenant, one active run. Not a shared production
+service, and a single load level does not establish sustainable capacity.
+
+## Quickstart
+
+Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and `jq` for the sample
+request. No model credentials or paid calls are needed.
+
+### 1. Install and start the API
 
 ```bash
-uv sync --locked --group dev
+git clone https://github.com/RamVegiraju/EvalSurge.git
+cd EvalSurge
+uv sync --locked --extra agents --group dev
 uv run uvicorn benchmark_agents.api:app --host 127.0.0.1 --port 8000 --no-proxy-headers
 ```
 
-Interactive API documentation is at `http://127.0.0.1:8000/docs`. The import package is currently `benchmark_agents`; the distribution and project are named EvalSurge.
+API docs: `http://127.0.0.1:8000/docs/`. Keep one API worker.
+The lockfile currently uses a package mirror; see [dependency setup limitations](docs/DEPENDENCIES.md#index-limitation--october-4-2026) if it is unavailable.
 
-Try a complete local mock run without LLM credentials:
+### 2. Start the sample agent
+
+In a second terminal, from the repository:
 
 ```bash
-uv run python examples/smoke_test.py
+uv run uvicorn examples.mock_agent:app --host 127.0.0.1 --port 9001 --no-proxy-headers
 ```
 
-For a separate mock endpoint, run `uv run uvicorn examples.mock_agent:app --port 9001`. Then:
+### 3. Send a benchmark request
+
+In a third terminal:
 
 ```bash
-curl http://127.0.0.1:8000/v1/runs \
+RUN_ID=$(curl --fail-with-body -sS http://127.0.0.1:8000/v1/runs \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: first-local-run' \
   -d '{
@@ -32,82 +49,68 @@ curl http://127.0.0.1:8000/v1/runs \
       "scorers": [],
       "samples": [{"inputs": {"query": "Can I refund an opened item?"}}]
     },
-    "load": {"concurrency": 3, "max_requests": 20}
-  }'
+    "load": {"concurrency": 3, "max_requests": 20, "duration_seconds": 10}
+  }' | jq -er '.id')
+echo "$RUN_ID"
 ```
 
-`scorers: []` explicitly requests performance only. Omit `scorers` to use the LLM planner; supply names to bypass it. Poll the `Location` header returned with HTTP 202. A run is terminal at `completed`, `completed_with_gaps`, `failed`, `interrupted`, or `cancelled`. Always inspect `load_status`, `evaluation_status`, request error rate, and quality coverage; a completed phase is not a quality pass.
+The API returns **202 Accepted**. `scorers: []` disables planning and judging.
+Use a new idempotency key for a new run; the same key and body replay the original.
 
-## Databricks inference and judging
+### 4. View the result
 
-Use Databricks SDK authentication. Copy `.env.example` to `.env` and configure your CLI profile. The live example loads it; for the server, use `uv run uvicorn benchmark_agents.api:app --env-file .env --no-proxy-headers`.
-
-Both planning and judging default to `databricks-gpt-5-4-mini` in an explicitly configured workspace. Model availability, prices, and endpoint revisions are workspace/provider concerns; no pricing guarantee or model calibration is implied. Override `BENCHMARK_PLANNER_MODEL` and `BENCHMARK_JUDGE_MODEL` on the server.
-
-Target credentials belong to **server-owned connections**. A request supplies `connection_id`, never an environment variable containing a credential. Example server configuration:
-
-```dotenv
-DATABRICKS_CONFIG_PROFILE=YOUR_PROFILE
-BENCHMARK_CONNECTIONS='{"workspace":{"url":"https://YOUR-WORKSPACE.cloud.databricks.com/serving-endpoints/chat/completions","auth":"databricks"}}'
-BENCHMARK_PLANNER_MODEL=databricks-gpt-5-4-mini
-BENCHMARK_JUDGE_MODEL=databricks-gpt-5-4-mini
-MLFLOW_TRACKING_URI=sqlite:///mlflow.db
-```
-
-The request's target URL must exactly match its connection. For bearer authentication, the operator can configure `{"url":"https://agent.example/chat","auth":"bearer","token_env":"AGENT_TOKEN"}`. Remote connections require HTTPS. Unauthenticated remote URLs require an exact entry in `BENCHMARK_ALLOWED_TARGETS` (JSON array). Loopback URLs are allowed for local testing. Redirects and ambient netrc/proxy credentials are disabled in the Locust worker.
-
-Run the small live validation in your configured workspace (one planner call, four target calls, up to four assessments per selected scorer, with bounded judge retries):
+Poll until `completed` or `completed_with_gaps`:
 
 ```bash
-uv run python examples/locust_databricks_e2e.py
+curl --fail-with-body -sS "http://127.0.0.1:8000/v1/runs/$RUN_ID" \
+  | jq '{status, load_status, profiling_status, evaluation_status, metrics}'
 ```
 
-No LiteLLM or `databricks-openai` dependency is used. Judging uses native MLflow `@scorer` wrappers around shipped MLflow rubrics and direct OpenAI-compatible Databricks calls authenticated by the SDK. These are not MLflow managed judges. Internal prompt imports are isolated, MLflow is constrained to 3.16.x, and source hashes detect rubric changes.
+`failed`, `cancelled`, and `interrupted` are also terminal; inspect their phase
+statuses. Open `http://127.0.0.1:8000/reports/?run=YOUR_RUN_ID` with the returned ID.
+For JSON, use `GET /v1/runs/{run_id}/report`.
 
-## API
-
-| Operation | Purpose |
-| --- | --- |
-| `POST /v1/evaluation-plans` | Create a persisted plan from a description and optional samples; returns 201 + Location |
-| `GET /v1/evaluation-plans/{plan_id}` | Inspect the frozen plan |
-| `POST /v1/runs` | Validate, freeze a plan, then start load; returns 202 + Location + Retry-After |
-| `GET /v1/runs?offset=0&limit=50&status=completed` | Compact persisted run history |
-| `GET /v1/runs/{run_id}` | Status, metrics, quality results, and plan |
-| `GET /v1/runs/{run_id}/requests?offset=0&limit=50` | Captured response records; maximum page size 100 |
-| `POST /v1/runs/{run_id}/cancel` | Stop new requests and drain active load |
-
-Plan creation and run submission can wait for the planner before responding; use a client timeout suited to the provider. A previously inspected `plan_id` avoids planning on submission. Its evaluation description, samples, scorers, and budget must match exactly. Changing only the target or load settings allows reuse.
-
-`Idempotency-Key` applies to run submission and persists with local artifacts. Reusing the key with different input returns 409. A concurrent run returns 429 + Retry-After. Validation errors use a consistent envelope and do not echo submitted values. All responses carry `X-Request-ID` and `Cache-Control: no-store`.
-
-JSON uses snake_case consistently with Python. The published OpenAPI schema is in [docs/openapi.json](docs/openapi.json). Version 0.2 breaks the unpublished 0.1 template; see [the migration notes](docs/API_REVIEW.md).
-
-## Measurements and evaluation
-
-- One closed-loop concurrency level, zero think time, round-robin workload cases. Duration and request count both cap dispatch; in-flight work drains under a deadline. This measures performance, **not maximum sustainable capacity**.
-- TPS uses elapsed time from Locust test start through drain, including ramp-up, auth, and journal overhead; subprocess bootstrap and post-run judging are excluded. Reported peak in flight measures HTTP calls, not merely configured users.
-- `ttft_ms` measures HTTP dispatch to the first nonempty answer-text delta received by the client. Metadata, tool calls, and hidden reasoning do not count. This approximates first visible answer availability; browser buffering/rendering is outside the measurement. Authentication time is separate.
-- Percentiles describe successful requests only; failed requests remain in raw records and error-rate denominators. Interrupted attempts are excluded from completed TPS. Token throughput uses provider-reported counts and includes a coverage fraction.
-- Evaluation runs after load on captured answers. It does not reinvoke the target. Sampling shuffles case × four elapsed-time bins using a fixed seed, then balances across strata. Coverage and selected request IDs are retained per scorer. Means describe that balanced sample, not a population-weighted estimate.
-- Relevance and safety need outputs; correctness also needs authoritative `expected_response` or `expected_facts`. Groundedness returns `needs_data` until retrieval trace ingestion exists. Missing evidence never receives a passing score.
-- Plans record judge model/workspace/profile, rubric version/hash, dataset and evaluation hashes, seed, policy, and budgets. A hosted endpoint can still change its underlying model; use versioned endpoints for stronger reproducibility.
-
-Framework labels are limited to LangGraph and OpenAI Agents. Actual interoperability is through `openai-chat` and `mlflow-agent-server` streaming wire adapters. There is no automatic instrumentation of an arbitrary remote agent, no internal span latency map yet, and no claim that every framework deployment exposes these contracts.
-
-## Reliability and scope
-
-Every attempt gets a flushed start record and completion record in `artifacts/<run-id>/requests.jsonl`. Worker exits retain completed responses and mark unfinished attempts `WorkerInterrupted`. Phase snapshots and reusable plans survive process restarts. This is local-disk recovery, not a durable queue or automatic job resumption. Filesystem loss and shared/network storage are outside the durability guarantee. Flushes add load-generator overhead; monitor the generator before interpreting high-throughput results.
-
-Use one Uvicorn process and persistent local storage. A filesystem lock rejects competing API processes. After a hard parent crash, restart recovery requests an old worker to stop; its bounded requests may still drain. Do not use this alpha as a multi-user hosted service. Shared deployment needs connection ACLs, egress enforcement, durable worker leases, distributed storage, quota enforcement, and stronger isolation. See [SECURITY.md](SECURITY.md).
-
-## Development
+The mock has no internal traces. To try real **LangGraph and OpenAI Agents**
+with tools, memory, and tracing, stop the mock and run:
 
 ```bash
-uv sync --locked --group dev
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest -q
-uv build
+uv run python -m examples.framework_e2e --serve
 ```
 
-Tests run the production Locust subprocess against localhost, including cancellation, authentication failure, truncation, timeout, and killed-worker recovery. They do not call paid models. Live validation is explicit and separate. See [VALIDATION.md](VALIDATION.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [CONTRIBUTING.md](CONTRIBUTING.md).
+This prints report URLs on port 9002. Model responses are fixtures, judging is
+disabled, and no paid calls are made. Stop with Ctrl-C.
+
+## Benchmark your agent
+
+Replace `target.url` with your authorized streaming endpoint and supply workload
+samples. Set `target.model` if required by its protocol.
+
+- **Suggested judges:** configure a planner, omit `evaluation.scorers`, and review
+  `POST /v1/evaluation-plans` before submitting its `plan_id`.
+- **Your judges and data:** supply samples/references and select operator-allowlisted
+  MLflow aliases through `evaluation.registered_scorers`.
+- **Internal profiling:** correlate agent-side MLflow traces; an endpoint alone
+  cannot reveal tool or memory timing.
+
+The report separates judge rationale/readiness from scored outcomes, coverage,
+and errors. Missing evidence never counts as a pass. Catalog judging currently
+requires Databricks; see [provider compatibility](docs/MODEL_COMPATIBILITY.md).
+
+Remote/authenticated agents require [server-owned connections](docs/USAGE.md#connections-and-authentication).
+If `BENCHMARK_API_KEY` is configured, add `X-API-Key` to API calls or enter it in
+the report form. Only benchmark agents you are authorized to exercise.
+
+## Documentation
+
+- [Configuration, API operations, and live examples](docs/USAGE.md)
+- [Traces, manifests, MLflow judges, and datasets](docs/PROFILING_AND_EVALUATION.md)
+- [Architecture](ARCHITECTURE.md) · [Code guide](docs/CODE_GUIDE.md) · [Validation](VALIDATION.md)
+- [Dependencies](docs/DEPENDENCIES.md) · [Security](SECURITY.md) · [Deployment gates](docs/PRODUCTION_READINESS.md)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and checks. Report bugs or ask
+questions in [GitHub Issues](https://github.com/RamVegiraju/EvalSurge/issues);
+report security issues privately as described in [SECURITY.md](SECURITY.md).
+
+Licensed under [MIT](LICENSE).

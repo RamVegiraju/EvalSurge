@@ -1,0 +1,34 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    versioning-strategy: increase
+    open-pull-requests-limit: 5
+    groups:
+      runtime-compatible:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - mlflow
+          - mlflow-skinny
+          - mlflow-tracing
+        update-types:
+          - minor
+          - patch
+      mlflow:
+        patterns:
+          - mlflow
+          - mlflow-skinny
+          - mlflow-tracing
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns:
+          - "*"

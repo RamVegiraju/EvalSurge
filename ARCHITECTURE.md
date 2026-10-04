@@ -1,6 +1,6 @@
 # EvalSurge architecture
 
-The current milestone is a reproducible single-run benchmark with durable partial records and representative quality sampling. Capacity discovery and internal trace attribution are separate future capabilities.
+The current milestone is a reproducible single-run benchmark with durable partial records, correlated framework traces, a bounded visual report, and representative quality sampling. Shared hosting and capacity discovery remain separate release gates.
 
 ```mermaid
 flowchart LR
@@ -10,18 +10,22 @@ flowchart LR
     F --> L[Locust subprocess]
     L --> T[Hosted streaming agent]
     L --> J[Append-only request journal]
+    T --> M[Agent-side MLflow spans and correlation metadata]
+    J --> I[Post-load scoped trace collector]
+    M --> I
     J --> S[Seeded case and time sampling]
     S --> E[MLflow evaluation of captured answers]
     E --> D[Direct Databricks judge calls]
     E --> R[Report with separate phase statuses]
     J --> R
+    I --> R
 ```
 
 ## Responsibility boundaries
 
 - `api.py`: application factory, admission control, authorization, idempotency, phase transitions, persisted plans, paginated results, safe HTTP errors.
 - `connections.py`: operator-owned credential references bound to exact target URLs. API callers cannot select arbitrary environment secrets.
-- `planner.py`: optional LLM selection from four scorer IDs. Deterministic validation decides readiness. The model cannot change load limits, destinations, credentials, rubric implementations, or evidence requirements.
+- `planner.py`: bounded optional LLM selection from catalog IDs and operator-allowlisted aliases, using opt-in manifests. Deterministic validation decides readiness. The model cannot change load limits, destinations, credentials, rubric implementations, or evidence requirements.
 - `models.py`: strict request contracts with unknown fields rejected and bounded workloads.
 - `locust_runner.py`: subprocess isolation, cancellation, outer deadline, durable artifact directory, partial recovery.
 - `locustfile.py`: sequential users, round-robin cases, protected authentication/request lifecycle, bounded streams, per-request measurement.
@@ -30,16 +34,30 @@ flowchart LR
 - `storage.py`: fsync'd request events, atomic snapshots, and recovery of interrupted attempts. A killed writer's incomplete final line is ignored.
 - `sampling.py`: fixed-seed randomized case/time strata over the observed dispatch window. The seed reproduces selection from identical records; it does not make model responses deterministic.
 - `evaluator.py` / `judges.py`: evaluate captured answers after load, preserve assessment coverage/errors, and call Databricks directly using MLflow-shipped rubrics. MLflow stores evaluation runs and assessments locally by default; inference uses the configured workspace.
+- `scorer_registry.py`: exact-version trusted scorer resolution, public serialization hashes, and frozen operator-owned MLflow/trace scope.
+- `profiling.py`: post-load correlation validation, bounded content-free normalization, union-based self time, wall occupancy with explicit parallel work, and descriptive per-name hotspots.
+- `middleware.py`: incremental body-size enforcement, including chunked HTTP.
+- `static/`: same-origin report shell; it carries no credentials or embedded run data and uses authenticated JSON.
+- `docs_ui/`: public self-hosted Swagger UI with pinned upstream assets and external
+  initialization; no CDN or inline-script exception to the global CSP.
 
 ## State and evidence
 
+Hosted-target payloads remain model/provider independent within their documented
+wire adapters; optional token-usage requests can be disabled explicitly. Demo
+reasoning presets are exact provider/model matches and never injected by Locust.
+Planning and catalog-judging provider coverage are separate, narrower contracts.
+See [ADR 0002](docs/adr/0002-model-compatibility-boundaries.md) and the
+[support matrix](docs/MODEL_COMPATIBILITY.md); no automatic parameter/model fallback
+or target retry is introduced.
+
 A run persists its config and frozen plan before load. The plan records the model endpoint, workspace/profile, installed rubric hash, dataset and policy hashes, sampling settings, maximum responses per scorer, judge output-token limit, timeout, and retry cap. Reusing a plan rejects changed evaluation inputs. Rubric drift is checked before judging. Endpoint names are not immutable model versions; the operator must pin a served revision where supported.
 
-The overall state progresses `queued → running → evaluating → completed | completed_with_gaps`. Load failure, cancellation, or interruption terminates separately and skips evaluation. `load_status` and `evaluation_status` are retained independently. Evaluation failure never discards measurements. A quality score of zero is a valid completed assessment, not a transport failure.
+The overall state progresses `queued → running → profiling → evaluating → completed | completed_with_gaps`. Load failure, cancellation, or interruption terminates separately and skips evaluation. Profiling still exposes partial observations when available. `load_status`, `profiling_status`, and `evaluation_status` are retained independently. Evaluation or trace-collection failure never discards measurements. A quality score of zero is a valid completed assessment, not a transport failure.
 
 Per-attempt journals record starts before authentication and flush completions in the request cleanup path. Authentication exceptions decrement active counts and become infrastructure failures. HTTP in-flight counters exclude authentication. A worker kill recovers completed rows, marks remaining starts interrupted, and marks aggregate completeness false. Interrupted-run rates use parent-observed elapsed time and are diagnostic, not comparable benchmark results. In-memory job ownership is not resumed after restart.
 
-The process lock enforces one API owner on local POSIX storage. Restart recovery requests cancellation of abandoned load. There is no automatic retry of agent traffic: retries can duplicate external actions and distort metrics. A future distributed implementation needs a durable queue, leases with fencing, heartbeat recovery, explicit retry semantics, and transactional admission/idempotency.
+The process lock enforces one API owner on local POSIX storage. Compact summaries feed a history/idempotency index; finished payloads are evicted from API memory. Startup migrates missing compact summaries once. Persisted active phases read as interrupted, including idempotency replay. Restart recovery requests cancellation of abandoned load. There is no automatic retry of agent traffic: retries can duplicate external actions and distort metrics. A future distributed implementation needs a durable queue, leases with fencing, heartbeat recovery, explicit retry semantics, and transactional admission/idempotency.
 
 ## Measurement contract
 
@@ -53,12 +71,22 @@ Quality sampling stratifies on case and request-start time, not completion order
 
 Endpoint-only measurements observe a client envelope and optionally a returned MLflow trace ID. They cannot reconstruct remote retrieval, tool, orchestration, queueing, or LLM spans. Auto-enabling MLflow requires changes inside the hosted agent process or existing trace export, plus correlation IDs.
 
-A later LangGraph/OpenAI Agents instrumentation package should attach run/request IDs to server traces and ingest them separately from the load journal. The latency visualization should distinguish wall-clock critical path from summed span duration, account for overlapping spans, and report unobserved time. It should not attribute network residuals to a specific server component without evidence.
+The real framework demos attach run/request IDs to server traces and emit a trace-ID metadata event before answer text. The collector validates exact metadata and experiment membership, then excludes trace contents from report artifacts. Actual Trace objects remain in memory for trace-aware native evaluation only. Each attempt has a separately persisted profile; the report reads at most 100 profiles per page.
+
+Self time subtracts the union of direct-child intervals. A sweep partitions root wall time by the deepest active leaves; multiple concurrent leaves occupy an explicit parallel bucket. Inclusive per-name p95 highlights observed slow spans, not proven causal bottlenecks. Agent-relative timestamps cannot locate residual client time on a network/server timeline. Missing traces, invalid trees, scope mismatches, and collection budgets remain visible gaps.
+
+Bounds: one active run, 100 concurrent users, 10,000 attempts, 1,000 workload cases, 8 MB request bodies, three planner input previews, 20 disclosed capability previews, at most 200 fetched traces, and bounded spans per trace. At the default 100 traces × 250 spans, normalization/report complexity is bounded independently of the full request journal. This optimizes local simplicity and deterministic evidence over horizontal scale; large journals/history still need indexed external storage and retention.
 
 ## Next milestones
 
+The quality-first report and documentation delivery decisions are recorded in
+[ADR 0003](docs/adr/0003-self-hosted-docs-quality-first-report.md). Judge suggestions
+and assessment results remain separate evidence. A reversible focused waterfall
+view hides enclosing spans for readability without changing persisted spans,
+occupancy calculations, or hotspot summaries.
+
 1. Capacity discovery: concurrency stages, excluded warmup, repeated measurement windows, explicit latency/error/quality thresholds, and generator saturation checks.
-2. Framework instrumentation and trace correlation, followed by latency visualization and retrieval-groundedness evaluation.
+2. Harden framework integrations for deployment, add the catalog retrieval-groundedness wrapper, and calibrate trace-aware quality criteria.
 3. Calibrate judges with labeled positive and negative cases; support reviewed custom rubrics and preserve rubric lineage.
 4. Shared deployment: durable queue/database, workers with leases, per-tenant connection ACLs, egress control, quotas, bounded retention, and provider spend accounting.
 
