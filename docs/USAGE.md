@@ -4,6 +4,50 @@ Start with the [README quickstart](../README.md). This guide covers hosted
 connections, evaluation planning, API behavior, and bounded live examples.
 The Python import package is `benchmark_agents`; the distribution is `evalsurge`.
 
+## Where to run EvalSurge
+
+Today, the FastAPI process starts Locust as a subprocess **on the API host**. A
+caller that submits a run from another machine does not move the load generator:
+the API host sends target requests, stores the journal and reports, and collects
+traces for profiling. Run one API owner with persistent local POSIX storage, as
+described under [measurement and recovery](#measurement-limits-and-recovery).
+
+| Goal | Runner placement | What the result means |
+| --- | --- | --- |
+| Integration check or small comparison | Your workstation | Confirms the connection, protocol, report, and judges; workstation and internet variability can dominate. |
+| Repeatable service load | A dedicated VM or container with stable CPU, memory, disk, and egress, separate from the agent | Measures the target from that runner's network path. Keep placement and resources fixed across comparisons. |
+| User-perceived latency by geography | Separate runners in the client regions of interest | Includes each region's network path; do not compare it as if it were server-only latency. |
+
+A short-lived CI job can run smoke checks if it exports protected artifacts before
+its filesystem is discarded. Its changing machine and network make it a poor
+baseline for capacity comparisons.
+If the API is reachable beyond loopback, follow the [security boundary](../SECURITY.md)
+for authentication and TLS; this single-tenant release is not a shared service.
+
+For a Databricks App target, run EvalSurge outside the **agent App's compute** on
+a dedicated host that can reach the App URL and use an operator-owned authorized
+connection. A runner in the same cloud region is useful for service-side load
+comparisons; a runner in the user's region is useful for end-user latency. The
+current `databricks` connection accepts workspace-host URLs only; an App URL
+currently needs an exact URL-bound bearer connection, a valid token, and a
+supported streaming protocol. App-native OAuth refresh is not yet implemented.
+The local alpha does not provide a managed distributed runner or a one-click
+Databricks Job deployment. If using short-lived job compute, arrange the API
+lifecycle, credentials, reachable target, and persistent POSIX artifacts yourself.
+
+The runner has its own ceiling: CPU, memory, open sockets/file descriptors,
+network bandwidth and egress quotas, authentication, and journal disk I/O can
+limit dispatch or raise latency. The target, its model/tool dependencies, and
+the network path can limit it too. Client latency is measured from this runner
+after authentication at HTTP dispatch; it is not browser latency. Run throughput
+includes ramp-up, authentication, journaling, and drain. This release does not
+measure runner resource saturation or distinguish a runner ceiling from a target
+ceiling. Record runner size/region, target region, network path, workload, and
+concurrency with results; monitor runner CPU, memory, sockets, egress, and disk
+I/O separately. If those saturate, increase runner resources and repeat before
+making a target-capacity claim. One closed-loop load level is descriptive, not a
+maximum sustainable throughput measurement.
+
 ## Connections and authentication
 
 Target credentials belong to server-owned connections, not benchmark request
