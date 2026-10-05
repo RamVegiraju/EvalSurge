@@ -24,6 +24,11 @@ uv run uvicorn benchmark_agents.api:app --host 127.0.0.1 --port 8000 --no-proxy-
 ```
 
 API docs: `http://127.0.0.1:8000/docs/`. Keep one API worker.
+The API host also runs the Locust load generator. A laptop is suitable for this
+quickstart; use a separate, dedicated runner for repeatable load measurements.
+Runner size and network location affect the result. See [where to run
+EvalSurge](docs/USAGE.md#where-to-run-evalsurge).
+
 The lockfile currently uses a package mirror; see [dependency setup limitations](docs/DEPENDENCIES.md#index-limitation--october-4-2026) if it is unavailable.
 
 ### 2. Start the sample agent
