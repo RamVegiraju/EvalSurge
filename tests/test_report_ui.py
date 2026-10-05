@@ -58,6 +58,42 @@ def render(report: dict[str, Any], **actions: Any) -> dict[str, Any]:
     return json.loads(result.stdout)
 
 
+def test_failed_preflight_report_shows_error_instead_of_benchmark_success(evidence) -> None:
+    evidence["run"].update(
+        status="failed",
+        load_status="skipped",
+        profiling_status="skipped",
+        evaluation_status="skipped",
+        metrics={},
+        evaluation={},
+        preflight={
+            "status": "failed",
+            "request_id": "probe",
+            "http_status": 401,
+            "error": {
+                "code": "target_http_error",
+                "message": "Inference preflight failed. Load test did not start. Check target access.",
+            },
+        },
+    )
+    evidence["requests"] = []
+    evidence["total"] = 0
+    evidence["profiling"].update(
+        total_requests=0,
+        traced_requests=0,
+        coverage=0,
+        hotspots=[],
+        gaps={},
+    )
+    output = render(evidence)
+    assert "Load test did not start" in output["nodes"]["message"]["text"]
+    assert "Inference check failed" in output["nodes"]["context"]["text"]
+    assert "target_http_error" in output["nodes"]["context"]["text"]
+    assert "HTTP 401" in output["nodes"]["context"]["text"]
+    assert "Skipped" in output["nodes"]["judges"]["text"]
+    assert "No internal hotspot evidence" in output["nodes"]["hotspots"]["text"]
+
+
 @pytest.fixture
 def evidence() -> dict[str, Any]:
     return {

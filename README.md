@@ -57,13 +57,17 @@ echo "$RUN_ID"
 The API returns **202 Accepted**. `scorers: []` disables planning and judging.
 Use a new idempotency key for a new run; the same key and body replay the original.
 
+Before load, the API invokes the first sample once to check inference. Failure
+stops the run and surfaces `preflight.error` in the API and report. This extra call
+can execute tools/incur cost; it is excluded from load metrics and judging.
+
 ### 4. View the result
 
 Poll until `completed` or `completed_with_gaps`:
 
 ```bash
 curl --fail-with-body -sS "http://127.0.0.1:8000/v1/runs/$RUN_ID" \
-  | jq '{status, load_status, profiling_status, evaluation_status, metrics}'
+  | jq '{status, preflight, load_status, profiling_status, evaluation_status, metrics}'
 ```
 
 `failed`, `cancelled`, and `interrupted` are also terminal; inspect their phase

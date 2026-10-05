@@ -80,6 +80,50 @@ is not implemented and remains `needs_data`. Brought trace-aware MLflow judges
 can be operator-allowlisted; missing evidence never becomes a passing assessment.
 See [judges and dataset integration](PROFILING_AND_EVALUATION.md).
 
+## Fail-fast inference check
+
+Every new run checks the first workload sample once, at concurrency one, before
+measured load. The same target/model, adapter, usage setting, operator-owned
+credentials, and `load.timeout_seconds` apply. HTTP 200 alone is insufficient:
+the SSE response must finish normally with nonempty answer text. Redirects,
+provider error events, malformed/empty/truncated streams, and deadlines fail.
+
+Submission still returns 202; poll `GET /v1/runs/{run_id}`. A failed check returns
+`status: "failed"`, skipped load/profiling/evaluation, and diagnostics such as:
+
+```json
+{
+  "status": "failed",
+  "load_status": "skipped",
+  "preflight": {
+    "status": "failed",
+    "request_id": "probe-correlation-id",
+    "http_status": 401,
+    "error": {
+      "code": "target_http_error",
+      "message": "Inference preflight failed. Load test did not start. Check target access and endpoint configuration."
+    }
+  }
+}
+```
+
+The report displays the same safe error; probe prompts/responses/provider bodies
+are not error details. Use the probe `request_id` to inspect your agent's logs or
+correlated trace. Fix the target or server-owned connection and submit with
+a new idempotency key. Replaying the original key does not repeat inference.
+Old saved runs show `preflight.status: "not_run"`, not a retroactive success.
+
+This check is **one extra invocation** beyond `load.max_requests`, can execute
+tools/mutate memory/warm caches, and can incur provider cost. It has no retries
+or automatic provider/model adjustment. Captures stay in protected
+`preflights/{run_id}/` artifacts and are excluded from measured counts, timings,
+profiles, sampling, and judging. Passing proves only that this one request worked,
+not agent quality or capacity. Planning still occurs before preflight.
+
+Cancellation during preflight stops further dispatch and drains the active check;
+load does not start. Restart cancels abandoned workers and marks the run interrupted
+without replaying agent actions. See [ADR 0004](adr/0004-fail-fast-inference-preflight.md).
+
 ## Setup inspection and traces
 
 For an opt-in draft manifest:
@@ -110,7 +154,7 @@ registered-scorer contracts are in [the integration guide](PROFILING_AND_EVALUAT
 | `GET /v1/runs/{run_id}` | Phase statuses, metrics, and evaluation |
 | `GET /v1/runs/{run_id}/requests?offset=0&limit=50` | Captured responses |
 | `GET /v1/runs/{run_id}/report?offset=0&limit=25` | Performance, quality, and trace profiles |
-| `POST /v1/runs/{run_id}/cancel` | Stop new load dispatch and drain active requests |
+| `POST /v1/runs/{run_id}/cancel` | Stop preflight/load dispatch and drain active requests |
 
 Request/report pages are bounded to 100 records. Planning/submission can wait for
 the provider; choose a suitable client timeout. A reviewed `plan_id` avoids
@@ -129,7 +173,7 @@ contract; see [migration notes](API_REVIEW.md).
 
 One closed-loop load level uses sequential users, zero think time, round-robin
 cases, duration/request caps, and bounded drain. Throughput includes ramp-up,
-authentication, journaling, and drain; process startup, planning, and evaluation
+authentication, journaling, and drain; preflight, process startup, planning, and evaluation
 are outside the measurement window.
 
 Request latency and answer-text TTFT start after authentication at HTTP dispatch.
@@ -160,8 +204,9 @@ uv run python -m examples.framework_e2e \
   --live --profile YOUR_CONFIRMED_PROFILE --model YOUR_VERIFIED_ENDPOINT
 ```
 
-This sends two target requests per framework at concurrency two, one planner call
-per framework, and at most one captured answer per selected catalog scorer.
+This sends one preflight plus two measured target requests per framework at
+concurrency two, one planner call per framework, and at most one captured measured
+answer per selected catalog scorer.
 Use `--framework langgraph` or `--framework openai-agents` for one integration.
 Tools/references are synthetic; traces/reports stay local.
 
@@ -182,7 +227,7 @@ provider/model matches, not universal model settings. Review
 [model compatibility](MODEL_COMPATIBILITY.md) before changing them.
 
 The smaller `uv run python examples/locust_databricks_e2e.py` loads `.env` and
-uses one planner call, four target calls, and up to four assessments per selected
+uses one planner call, one preflight plus four measured target calls, and up to four assessments per selected
 scorer, with bounded judge retries. Both examples require explicit workspace
 configuration and authorization for the target traffic.
 

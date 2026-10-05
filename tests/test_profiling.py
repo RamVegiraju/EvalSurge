@@ -101,7 +101,7 @@ def test_actual_mlflow_correlation_scope_and_budget(tmp_path, monkeypatch):
     assert summary.traced_requests == 0 and summary.gaps == {"disabled": 1}
 
 
-def test_report_pagination_and_shell_auth(tmp_path, monkeypatch):
+def test_report_pagination_and_shell_auth(tmp_path, monkeypatch, successful_preflight):
     async def fake_load(*args, **kwargs):
         return [row("first"), row("second")], {"load_status": "completed"}
 

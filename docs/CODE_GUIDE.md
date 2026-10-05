@@ -14,8 +14,10 @@ this guide explains how those functions fit together.
 3. `planner.create_plan()` uses explicit scorer IDs or a constrained planner call.
    `validate_plan()` independently determines evidence readiness and freezes data
    hashes, installed rubric sources, judge configuration, and sampling settings.
-4. `execute()` calls `locust_runner.run_load()`, which persists configuration and starts
-   a separate Locust process. The API process never imports `locustfile.py`.
+4. `execute()` calls `locust_runner.run_preflight()` for one first-case invocation,
+   then `run_load()` only when it passes. Both use the same Locust subprocess path;
+   probe journals are separate and excluded from load/evaluation/report rows.
+   The API process never imports `locustfile.py`.
 5. Each `AgentUser.invoke()` journals its start, resolves authentication, sends one
    streaming request, and records completion. `streaming.consume()` interprets the
    answer events; `runner.summarize()` aggregates client measurements.
@@ -38,7 +40,7 @@ this guide explains how those functions fit together.
 | `connections.py` | `resolve_connection()` validates exact operator-owned destinations; `authentication()` returns a refreshable header source. Connection records contain credential references, not copied secrets. |
 | `providers.py` | `workspace_client()` requires explicit workspace configuration; `planner_client()` and `judge_client()` create caller-owned clients; `judge_endpoint()` resolves the server endpoint name. |
 | `planner.py` | `fingerprint()` binds canonical JSON; `has_reference()` checks candidate evidence; `validate_plan()` freezes deterministic readiness; `create_plan()` optionally performs paid planning. |
-| `locust_runner.py` | `run_load()` owns subprocess creation, cancellation markers, the outer deadline, and result recovery. |
+| `locust_runner.py` | `run_preflight()` reuses `run_load()` for one first-case invocation; `preflight_result()` reduces evidence to safe diagnostics. `run_load()` owns subprocess creation, cancellation markers, outer deadline, and recovery. |
 | `locustfile.py` | `start()` starts the measured window; `finish()` writes the aggregate snapshot; `AgentUser.invoke()` owns sequential request lifecycle and active counters. |
 | `streaming.py` | `consume()` mutates one measurement row from a supported single-line SSE data event. It does not open connections or measure its own clock. |
 | `runner.py` | `payload()` builds adapter envelopes; `percentile()` computes nearest-rank statistics; `summarize()` reports descriptive performance, not capacity or a quality verdict. |
@@ -65,6 +67,9 @@ this guide explains how those functions fit together.
   are closed there; each judge client is closed after its assessment.
 - Cancellation stops new load dispatch and drains active requests. It does not cancel
   evaluation or promise immediate termination.
+- Preflight uses identical target settings and one extra first-case invocation; it
+  can execute tools/change agent state. Failure skips load and judging. Historical
+  snapshots default to `not_run`; no target retries or model fallbacks are introduced.
 - TTFT and request latency begin after authentication, just before HTTP dispatch.
   The run window also includes ramp-up, authentication, journaling, and drain.
 - Failed attempts affect error rates. Successful-only percentiles and partial

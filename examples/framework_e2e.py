@@ -63,9 +63,10 @@ async def validate(
 ) -> list[dict[str, Any]]:
     """Exercise both real frameworks through the complete public API and Locust path.
 
-    Live mode requires an explicitly chosen profile. It sends two synthetic requests
-    per selected framework at concurrency two, one planner call per framework, and at most
-    one captured answer per selected catalog scorer. Model calls have no provider
+    Live mode requires an explicitly chosen profile. It sends one inference preflight
+    plus two measured synthetic requests per selected framework at concurrency two,
+    one planner call per framework, and at most one captured answer per selected
+    catalog scorer. Model calls have no provider
     retries in the demos; planning/judging use their documented bounded retries.
     All traces and reports remain in the selected local artifact directory.
     Optional planner/judge overrides keep role capabilities explicit; they do not
@@ -157,6 +158,8 @@ async def validate(
                     await asyncio.sleep(0.1)
                 if run["status"] not in {"completed", "completed_with_gaps"}:
                     raise AssertionError(f"Unexpected run outcome: {run}")
+                if run["preflight"]["status"] != "passed":
+                    raise AssertionError(f"Framework preflight failed: {run['preflight']}")
                 if run["metrics"]["successful_requests"] != 2:
                     raise AssertionError(f"Framework load failed: {run}")
                 if live and (
@@ -182,6 +185,7 @@ async def validate(
                     "model": model if live else "fixture",
                     "planner_model": plan["planner_model"],
                     "judge_model": plan["judge_model"],
+                    "preflight": run["preflight"],
                     "metrics": run["metrics"],
                     "evaluation": run["evaluation"],
                     "profiling": report["profiling"],

@@ -13,6 +13,13 @@ uses no-store, and is subject to the same single-tenant boundary. Keys stay in t
 page's memory, not query strings or persistent browser storage. Dynamic report text
 uses textContent rather than HTML injection and a same-origin CSP restricts scripts.
 
+Runs perform one extra first-case inference preflight through the same authorized
+connection before load. It can execute agent tools, mutate memory, warm caches, and
+incur spend; there is no retry or rollback. Failed checks skip load/judging and expose
+only fixed safe guidance, HTTP status, and correlation IDs. Raw probe captures remain
+protected artifacts, excluded from measured request pages, report profiles, and
+judging. Replays/restarts never automatically repeat that agent action.
+
 Interactive documentation uses pinned, self-hosted Swagger UI assets plus an external
 same-origin initializer. No CDN/inline-script policy exception is needed. Remote
 schema validation and persistent authorization are disabled. `/docs` redirects to

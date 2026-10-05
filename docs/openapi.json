@@ -480,6 +480,115 @@
         "title": "Plan",
         "type": "object"
       },
+      "PreflightError": {
+        "additionalProperties": false,
+        "description": "Safe inference-check failure; never includes provider bodies or exception text.",
+        "properties": {
+          "code": {
+            "description": "Machine-readable inference-check failure category.",
+            "enum": [
+              "authentication_failed",
+              "target_http_error",
+              "target_timeout",
+              "target_connection_error",
+              "invalid_stream",
+              "worker_failed"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Safe explanation and corrective guidance.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "PreflightError",
+        "type": "object"
+      },
+      "PreflightResult": {
+        "additionalProperties": false,
+        "description": "One extra first-case invocation, excluded from load metrics, profiles, and judging.",
+        "properties": {
+          "case_id": {
+            "default": 0,
+            "description": "The probe always uses workload case zero.",
+            "title": "Case Id",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreflightError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Safe failure details."
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "maximum": 599.0,
+                "minimum": 100.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Target HTTP status, when received.",
+            "title": "Http Status"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Probe client latency, not a benchmark measurement.",
+            "title": "Latency Ms"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Probe attempt correlation ID, when an attempt was recorded.",
+            "title": "Request Id"
+          },
+          "status": {
+            "default": "not_run",
+            "description": "not_run also identifies historical runs without a check.",
+            "enum": [
+              "not_run",
+              "pending",
+              "running",
+              "passed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PreflightResult",
+        "type": "object"
+      },
       "ProfilingSummary": {
         "additionalProperties": false,
         "description": "Trace coverage and descriptive span hotspots, never a causal critical-path claim.",
@@ -920,7 +1029,7 @@
       },
       "RunResponse": {
         "additionalProperties": false,
-        "description": "Run snapshot; inspect load_status and evaluation_status separately.",
+        "description": "Run snapshot; inspect preflight and independent phase outcomes separately.",
         "properties": {
           "config": {
             "$ref": "#/components/schemas/RunRequest"
@@ -966,14 +1075,15 @@
             "type": "string"
           },
           "load_status": {
-            "description": "Load phase: queued, running, completed, cancelled, interrupted, or failed.",
+            "description": "Load phase outcome; skipped when preflight does not pass.",
             "enum": [
               "queued",
               "running",
               "completed",
               "failed",
               "interrupted",
-              "cancelled"
+              "cancelled",
+              "skipped"
             ],
             "title": "Load Status",
             "type": "string"
@@ -987,13 +1097,18 @@
           "plan": {
             "$ref": "#/components/schemas/Plan"
           },
+          "preflight": {
+            "$ref": "#/components/schemas/PreflightResult",
+            "description": "Mandatory first-case inference check before measured load; historical runs use not_run."
+          },
           "profiling_status": {
             "default": "pending",
             "description": "Collection phase outcome; inspect trace coverage separately.",
             "enum": [
               "pending",
               "completed",
-              "failed"
+              "failed",
+              "skipped"
             ],
             "title": "Profiling Status",
             "type": "string"
@@ -1002,6 +1117,7 @@
             "description": "Lifecycle status, not a quality pass/fail verdict.",
             "enum": [
               "queued",
+              "preflighting",
               "running",
               "profiling",
               "evaluating",
@@ -1067,7 +1183,8 @@
               "completed",
               "failed",
               "interrupted",
-              "cancelled"
+              "cancelled",
+              "skipped"
             ],
             "title": "Load Status",
             "type": "string"
@@ -1076,6 +1193,7 @@
             "description": "Overall lifecycle status.",
             "enum": [
               "queued",
+              "preflighting",
               "running",
               "profiling",
               "evaluating",
@@ -1340,7 +1458,7 @@
       "name": "EvalSurge maintainers",
       "url": "https://github.com/RamVegiraju/EvalSurge"
     },
-    "description": "Benchmark one concurrency level, then evaluate captured answers with a frozen plan. Local, single-tenant prototype; not a maximum-capacity discovery service.",
+    "description": "Check inference once before benchmarking one concurrency level, then evaluate captured answers with a frozen plan. Local, single-tenant prototype; not a maximum-capacity discovery service.",
     "title": "EvalSurge",
     "version": "0.2.0"
   },
@@ -2657,7 +2775,7 @@
         ]
       },
       "post": {
-        "description": "Start a bounded benchmark. Idempotency-Key safely retries a submission with the same body.",
+        "description": "Check inference once, then start bounded load only if it passes.\n\nThe extra first-case request can execute tools and incur cost; it is excluded\nfrom load metrics, profiling, and judging. Poll the run's preflight result\nfor safe failure details. Idempotency-Key replays the same submission.",
         "operationId": "submit_v1_runs_post",
         "parameters": [
           {
@@ -3131,7 +3249,7 @@
     },
     "/v1/runs/{run_id}": {
       "get": {
-        "description": "Read separate load and evaluation statuses, metrics, and the frozen plan.",
+        "description": "Read the inference check, separate phase outcomes, metrics, and frozen plan.",
         "operationId": "get_run_v1_runs__run_id__get",
         "parameters": [
           {
@@ -3550,7 +3668,7 @@
     },
     "/v1/runs/{run_id}/cancel": {
       "post": {
-        "description": "Stop dispatching requests and drain in-flight work; evaluation cancellation is unsupported.",
+        "description": "Stop preflight/load dispatch and drain active requests; judging cancellation is unsupported.",
         "operationId": "cancel_v1_runs__run_id__cancel_post",
         "parameters": [
           {

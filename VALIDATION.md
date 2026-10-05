@@ -1,10 +1,68 @@
 # Validation — 0.2.0
 
-Validated locally on macOS/Python 3.12 on October 4, 2026. CI is configured for
+Validated locally on macOS/Python 3.12 on October 4–5, 2026. CI is configured for
 Linux/Python 3.11–3.14; remote CI and branch-protection settings have not been
 verified/enabled by this local work.
 
-## Current verification — October 4, 2026
+## Current verification — October 5, 2026 (UTC)
+
+Mandatory first-case inference preflight uses the existing Locust engine. Failed
+checks skip measured load, profiling, and judging, with safe API/report errors.
+The probe is one extra invocation; measured request pages, metrics, profiles, and
+judge inputs exclude it. No dependencies changed and no paid models were called.
+
+| Check | Actual result |
+| --- | --- |
+| `uv sync --locked --extra agents --group dev` | 190 resolved / 182 installed packages checked |
+| `uv run --no-sync ruff check .` | Passed |
+| `uv run --no-sync ruff format --check .` | 66 files already formatted |
+| `MLFLOW_MODEL_CATALOG_URI='' uv run --no-sync pytest -q --tb=short` | 119 passed, no skips; 78.21 seconds |
+| `uv run --no-sync python scripts/export_openapi.py --check` | Regenerated snapshot matches |
+| `uv run --no-sync openapi-spec-validator docs/openapi.json` | Valid OpenAPI |
+| `node --check benchmark_agents/static/report.js` | Passed |
+| `uv build --no-build-isolation` and `scripts/verify_wheel.py` | sdist/wheel built; API/report/docs assets verified |
+| `git diff --check` | Passed |
+
+The same four upstream SQLAlchemy/MLflow/pandas warnings remain. New coverage checks
+HTTP/auth errors, redirects, provider error events, empty/malformed/filtered/truncated
+streams, wrong content type, deadlines and connection failures, worker startup/kill,
+cancellation/drain, restart ownership/idempotency, safe failure reports, both wire
+adapters, first-case payload/usage preservation, and probe exclusion from judging.
+Existing real-framework regressions now also perform preflight before their measured
+requests and confirm exactly one rejected provider call during a failed probe.
+
+The first regression failed before implementation because load could start without
+the check. Focused implementation verification passed 49 tests. The initial full
+run caught an invalid union response annotation in the local fixture and a real
+worker cleanup defect: Locust's no-response object has no raw stream, so closing it
+lost the completed attempt and active counters. Explicit fixture response handling
+and guarding raw-stream closure fix these. A subsequent connection test observed a
+real ConnectTimeout on this platform's bound/unlistened port rather than refusal;
+coverage accepts either real transport outcome and separately verifies exact safe
+connection-versus-deadline classification. The final full result is recorded above.
+
+Full offline HTTP smoke:
+
+```bash
+MLFLOW_MODEL_CATALOG_URI='' uv run --no-sync python -m examples.framework_e2e \
+  --artifact-dir artifacts/preflight-offline-20261005 --agent-port 0 --api-port 0
+```
+
+| Framework | Run ID | Preflight | Measured successes / correlated traces | Spans |
+| --- | --- | --- | --- | --- |
+| LangGraph | `195324fd-0d05-423a-af1a-2ae5b9eb986c` | Passed | 2/2 and 2/2 | 24 |
+| OpenAI Agents | `18497bfa-fb64-45d5-ad50-15648ad905dc` | Passed | 2/2 and 2/2 | 16 |
+
+Both report JSON files were fetched over the real local API and rendered through
+the shipped JavaScript/DOM harness; the context shows passed preflight and exactly
+two measured attempts. The framework/model/tool/memory implementations are real;
+provider answers are fixtures and catalog judging is explicitly disabled. Separate
+tests exercise native MLflow evaluation. Smoke servers exited normally; existing
+saved-evidence previews were not stopped. Browser layout, paid inference, sustainable
+capacity, judge calibration, remote CI, and independent maintainer review are not
+established by this validation. ADR 0004 remains proposed for review.
+
+## Previous verification — October 4, 2026
 
 | Check | Actual result |
 | --- | --- |

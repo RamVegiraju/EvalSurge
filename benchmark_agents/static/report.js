@@ -293,12 +293,23 @@ function render() {
     ["Target", `${config.target.framework ?? "Endpoint only"} · ${config.target.url}`],
     ["Workload", `${config.evaluation.samples.length} cases · ${run.metrics.requests ?? 0} attempts`],
     ["Load", `${config.load.concurrency} closed-loop users · one load level`],
+    ["Inference preflight", humanize(run.preflight?.status ?? "not_run")],
     ["Phase outcomes", `Load: ${run.load_status ?? "unknown"} · traces: ${run.profiling_status ?? "unknown"} · eval: ${run.evaluation_status}`],
   ];
   for (const [label, value] of entries) {
     const block = element("div");
     block.append(element("div", label, "label"), element("div", value, "value"));
     context.append(block);
+  }
+  if (run.preflight?.error) {
+    const failure = element("div", undefined, "warning");
+    failure.append(
+      element("div", "Inference check failed — load did not start", "label"),
+      element("p", run.preflight.error.message),
+      element("code", run.preflight.error.code),
+      element("div", `HTTP ${run.preflight.http_status ?? "unknown"} · request ${run.preflight.request_id ?? "not recorded"}`, "detail")
+    );
+    context.append(failure);
   }
   drawSuggestions();
   drawJudges();
@@ -337,7 +348,8 @@ async function load() {
     if (!response.ok) throw new Error(data.error?.message ?? `HTTP ${response.status}`);
     report = data;
     render();
-    message.textContent = `Run ${report.run.id} · ${humanize(report.run.status)}. Refresh to see later phase results.`;
+    message.textContent = report.run.preflight?.error?.message ??
+      `Run ${report.run.id} · ${humanize(report.run.status)}. Refresh to see later phase results.`;
     history.replaceState(null, "", `?run=${encodeURIComponent(runId)}`);
   } catch (error) {
     report = undefined;

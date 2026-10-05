@@ -1,5 +1,14 @@
 # API and implementation review — 0.2.0
 
+New runs now include a mandatory first-case inference preflight. The 202 submission
+contract and request/hash/plan formats are unchanged; poll the run's `preflight`
+field for safe diagnostics. Failed checks terminate with skipped load, profiling,
+and evaluation, and remain reportable. Enum-aware clients must accept the new
+`preflighting` overall status and `skipped` load/profiling outcomes. Historical
+snapshots use `preflight.status=not_run`. The extra invocation can execute tools
+and incur cost but is excluded from measurements and judging. This material
+lifecycle change requires maintainer review of [ADR 0004](adr/0004-fail-fast-inference-preflight.md).
+
 This is a private alpha checkpoint, not a shared-service production sign-off. The six supplied implementation findings are addressed for the local single-run milestone:
 
 | Finding | Resolution | Validation |

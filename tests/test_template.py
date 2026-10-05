@@ -117,7 +117,7 @@ async def test_explicit_selection_does_not_need_planner(monkeypatch):
     assert result.source == "explicit"
 
 
-def test_api_lifecycle_and_persistence(tmp_path, monkeypatch):
+def test_api_lifecycle_and_persistence(tmp_path, monkeypatch, successful_preflight):
     monkeypatch.setattr(api, "ARTIFACTS", tmp_path)
 
     async def fake_load(request, run_id, cancel, **kwargs):

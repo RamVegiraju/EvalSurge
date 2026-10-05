@@ -16,9 +16,9 @@ async def main() -> None:
     """Run the opt-in REST-to-Locust-to-Databricks validation with a bounded workload.
 
     Uses the operator-selected profile in .env, makes paid inference and judge calls,
-    and stores the final report locally. Four requests verify integration, not stable
-    latency, maximum capacity, or general judge calibration. Server cleanup is always
-    requested after the validation phase.
+    and stores the final report locally. One inference preflight plus four measured
+    requests verify integration, not stable latency, maximum capacity, or general
+    judge calibration. Server cleanup is always requested after validation.
     """
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{Path('artifacts').resolve()}/locust-e2e.db"
@@ -96,6 +96,7 @@ async def main() -> None:
                     break
                 await asyncio.sleep(0.1)
             assert result["status"] == "completed", result
+            assert result["preflight"]["status"] == "passed", result["preflight"]
             assert result["metrics"]["engine"] == "locust"
             assert result["metrics"]["requests"] == 4, result
             assert result["metrics"]["error_rate"] == 0, result

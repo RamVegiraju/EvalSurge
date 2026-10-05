@@ -118,7 +118,7 @@ async def test_locust_killed_worker_preserves_partial_results(endpoint, tmp_path
     assert not summary["measurement_complete"]
 
 
-def test_plan_reuse_idempotency_and_evaluation_failure(tmp_path, monkeypatch):
+def test_plan_reuse_idempotency_and_evaluation_failure(tmp_path, monkeypatch, successful_preflight):
     async def fake_load(*args, **kwargs):
         return [], {"load_status": "completed"}
 

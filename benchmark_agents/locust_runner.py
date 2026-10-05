@@ -7,16 +7,128 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from .connections import resolve_connection
-from .models import RunRequest
+from .models import Load, PreflightError, PreflightResult, RunRequest
 from .runner import summarize
 from .storage import atomic_json, recover_rows
 
 
+def preflight_result(rows: list[dict[str, Any]], summary: dict[str, Any]) -> PreflightResult:
+    """Reduce one worker attempt to content-free, provider-independent diagnostics.
+
+    Args:
+        rows: Recovered probe journal; exactly one complete success is required.
+        summary: Worker lifecycle summary, including cancellation/completeness.
+
+    Returns:
+        Probe status and safe error guidance. Raw exception text, outputs, target
+        URLs, and credential values are never copied into this public result.
+    """
+    row = rows[0] if rows else {}
+    result = PreflightResult(
+        request_id=row.get("request_id"),
+        latency_ms=row.get("latency_ms"),
+        http_status=row.get("http_status"),
+    )
+    if summary.get("load_status") == "cancelled":
+        result.status = "cancelled"
+        return result
+    if summary.get("load_status") == "interrupted":
+        result.status = "interrupted"
+    elif (
+        len(rows) == 1
+        and row.get("success")
+        and summary.get("measurement_complete")
+        and summary.get("worker_exit_code") == 0
+    ):
+        result.status = "passed"
+        return result
+    else:
+        result.status = "failed"
+    error_type = row.get("error")
+    if result.status == "interrupted" or not row or summary.get("worker_exit_code") not in {0, 1}:
+        code, guidance = "worker_failed", "The inference-check worker did not finish."
+    elif row.get("error_phase") == "authentication":
+        code, guidance = "authentication_failed", "Check the server-owned target credentials."
+    elif row.get("http_status") is not None and not 200 <= row["http_status"] < 300:
+        code, guidance = "target_http_error", "Check target access and endpoint configuration."
+    elif row.get("deadline_exceeded") or error_type in {
+        "TimeoutError",
+        "Timeout",
+        "ReadTimeout",
+        "ConnectTimeout",
+    }:
+        code, guidance = "target_timeout", "The agent exceeded the request deadline."
+    elif error_type in {"ConnectionError", "SSLError"}:
+        code, guidance = "target_connection_error", "The agent connection failed."
+    elif row.get("error_phase") in {"request", "stream"}:
+        code, guidance = (
+            "invalid_stream",
+            "The agent did not return a complete, nonempty answer stream. Check agent/model configuration.",
+        )
+    else:
+        code, guidance = "worker_failed", "The inference-check worker failed."
+    result.error = PreflightError(
+        code=code, message=f"Inference preflight failed. Load test did not start. {guidance}"
+    )
+    return result
+
+
+async def run_preflight(
+    request: RunRequest, run_id: str, cancel: asyncio.Event, artifact_dir: Path
+) -> PreflightResult:
+    """Check the first case once using the production Locust engine before load.
+
+    Args:
+        request: Original target, workload, and per-request timeout.
+        run_id: Run correlation identifier; retained for the separate probe.
+        cancel: API-owned cancellation event; no retries or fallback are performed.
+        artifact_dir: Operator-owned root; probe journals live under preflights/.
+
+    Returns:
+        A safe result. Only passed permits measured load; cancellation/interruption
+        also stop the run. An already-cancelled check sends no request.
+
+    Raises:
+        OSError: Worker creation or artifact persistence fails.
+        ValueError: The operator-owned connection is invalid.
+
+    This is an extra invocation that can incur provider cost and execute agent tools.
+    Its captures are protected artifacts, never benchmark rows or judge inputs.
+    Worker startup has the same bounded grace as load; duration limits dispatch.
+    """
+    if cancel.is_set():
+        return PreflightResult(status="cancelled")
+    probe = request.model_copy(
+        update={
+            "evaluation": request.evaluation.model_copy(
+                update={"samples": request.evaluation.samples[:1]}
+            ),
+            "load": Load(
+                concurrency=1,
+                duration_seconds=5,
+                max_requests=1,
+                timeout_seconds=request.load.timeout_seconds,
+            ),
+        }
+    )
+    rows, summary = await run_load(
+        probe, run_id, cancel, artifact_dir=artifact_dir / "preflights", phase="preflight"
+    )
+    result = preflight_result(rows, summary)
+    atomic_json(artifact_dir / "preflights" / run_id / "preflight.json", result.model_dump())
+    return result
+
+
 async def run_load(
-    request: RunRequest, run_id: str, cancel: asyncio.Event, artifact_dir: Path | None = None
+    request: RunRequest,
+    run_id: str,
+    cancel: asyncio.Event,
+    artifact_dir: Path | None = None,
+    *,
+    phase: Literal["load", "preflight"] = "load",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Run the production Locust subprocess and recover its request measurements.
 
@@ -25,6 +137,7 @@ async def run_load(
         run_id: Unique identifier used for a new artifact subdirectory.
         cancel: API-owned event; setting it requests dispatch stop and active drain.
         artifact_dir: Storage root, defaulting to BENCHMARK_ARTIFACT_DIR or artifacts.
+        phase: Worker ownership label; preflight uses a separate artifact root.
 
     Returns:
         Recovered request rows and a summary with independent load status,
@@ -48,6 +161,8 @@ async def run_load(
     ]
     atomic_json(config_path, request.model_dump(mode="json"))
     atomic_json(root / "connection.json", resolve_connection(request.target).model_dump())
+    if cancel.is_set():
+        cancel_path.touch(exist_ok=True)
     environment = {
         **os.environ,
         "BENCHMARK_LOCUST_CONFIG": str(config_path),
@@ -78,7 +193,7 @@ async def run_load(
             stdout=log,
             stderr=asyncio.subprocess.STDOUT,
         )
-        atomic_json(root / "worker.json", {"pid": process.pid, "phase": "load"})
+        atomic_json(root / "worker.json", {"pid": process.pid, "phase": phase})
         deadline = started + request.load.duration_seconds + request.load.timeout_seconds + 45
         expired = False
         try:

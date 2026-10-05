@@ -11,7 +11,7 @@ import mlflow
 import pytest
 import uvicorn
 
-from benchmark_agents.locust_runner import run_load
+from benchmark_agents.locust_runner import run_load, run_preflight
 from benchmark_agents.models import TraceSource
 from benchmark_agents.profiling import collect_profiles
 from benchmark_agents.providers import DEFAULT_FM_ENDPOINT
@@ -126,6 +126,8 @@ async def test_real_framework_stream_tools_memory_and_correlation(
     config.target.framework = framework
     config.target.request_usage = False
     run_id = str(uuid4())
+    probe = await run_preflight(config, run_id, asyncio.Event(), tmp_path)
+    assert probe.status == "passed", probe
     rows, metrics = await run_load(config, run_id, asyncio.Event(), tmp_path)
     assert len(rows) == metrics["successful_requests"] == 2, rows
     assert all(row["ttft_ms"] > row["first_event_ms"] for row in rows)
@@ -161,6 +163,10 @@ async def test_should_not_retry_or_switch_models_when_provider_rejects(
     provider_control["reject"] = True
     config = configuration(concurrency=2, max_requests=2, timeout_seconds=10, duration_seconds=3)
     config.target.url = f"{framework_endpoint}/{framework}/chat"
+    probe = await run_preflight(config, str(uuid4()), asyncio.Event(), tmp_path)
+    assert probe.status == "failed" and probe.error.code == "invalid_stream"
+    assert len(provider_requests) == 1
+    provider_requests.clear()
     rows, metrics = await run_load(config, str(uuid4()), asyncio.Event(), tmp_path)
     assert len(rows) == 2 and metrics["successful_requests"] == 0
     assert len(provider_requests) == 2

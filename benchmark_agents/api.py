@@ -22,13 +22,15 @@ from starlette.staticfiles import StaticFiles
 
 from .connections import resolve_connection
 from .evaluator import evaluate
-from .locust_runner import run_load
+from .locust_runner import preflight_result, run_load, run_preflight
 from .middleware import BodyLimitMiddleware
 from .models import (
     Accepted,
     ErrorResponse,
     Evaluation,
     Plan,
+    PreflightError,
+    PreflightResult,
     ProfilingSummary,
     RequestPage,
     RequestProfile,
@@ -155,13 +157,18 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
                         "request_hash",
                     )
                 }
-                if index[key]["status"] in {"queued", "running", "profiling", "evaluating"}:
+                if index[key]["status"] == "preflighting":
+                    index[key].update(
+                        status="interrupted", load_status="skipped", evaluation_status="skipped"
+                    )
+                elif index[key]["status"] in {"queued", "running", "profiling", "evaluating"}:
                     index[key]["status"] = "interrupted"
                     for phase in ("load_status", "evaluation_status"):
                         if index[key][phase] in {"queued", "running", "pending"}:
                             index[key][phase] = "interrupted"
                 atomic_json(summary_path, index[key])
-            for worker_file in root.glob("*/worker.json"):
+            worker_files = [*root.glob("*/worker.json"), *root.glob("preflights/*/worker.json")]
+            for worker_file in worker_files:
                 directory = worker_file.parent
                 if not (directory / "result.json").exists():
                     (directory / "cancel").touch(exist_ok=True)
@@ -190,7 +197,8 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="EvalSurge",
         version="0.2.0",
-        description="Benchmark one concurrency level, then evaluate captured answers with a frozen plan. "
+        description="Check inference once before benchmarking one concurrency level, "
+        "then evaluate captured answers with a frozen plan. "
         "Local, single-tenant prototype; not a maximum-capacity discovery service.",
         contact={
             "name": "EvalSurge maintainers",
@@ -313,7 +321,26 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
         if not path.exists():
             raise HTTPException(404, "Unknown run")
         result = json.loads(path.read_text())
-        if result["status"] in {"queued", "running", "profiling", "evaluating"}:
+        if result["status"] == "preflighting":
+            probe_root = root / "preflights" / key
+            if probe_root.exists():
+                (probe_root / "cancel").touch(exist_ok=True)
+            probe_path = probe_root / "preflight.json"
+            probe = (
+                PreflightResult.model_validate_json(probe_path.read_text())
+                if probe_path.exists()
+                else preflight_result(recover_rows(probe_root)[0], {"load_status": "interrupted"})
+            )
+            result.update(
+                status="interrupted",
+                load_status="skipped",
+                evaluation_status="skipped",
+                profiling_status="skipped",
+                preflight=probe.model_dump(),
+                requests=[],
+                trace_coverage="No measured load requests; inference preflight did not permit load.",
+            )
+        elif result["status"] in {"queued", "running", "profiling", "evaluating"}:
             result["status"] = "interrupted"
             if result["load_status"] in {"queued", "running"}:
                 result["load_status"] = "interrupted"
@@ -330,20 +357,68 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
                 result["metrics"]["measurement_complete"] = False
         return result
 
+    def skip_load(run_id: str, status: str) -> None:
+        """Retain a terminal zero-load report without collecting or judging probe data.
+
+        Args:
+            run_id: API-owned run whose preflight did not permit load.
+            status: Overall failed, cancelled, or interrupted outcome.
+
+        The run owns no measured attempts. No metric values are invented, and a
+        bounded report snapshot keeps the preflight failure visible in the UI.
+        """
+        run = runs[run_id]
+        run.update(
+            status=status,
+            load_status="skipped",
+            evaluation_status="skipped",
+            profiling_status="skipped",
+            requests=[],
+            trace_coverage="No measured load requests; inference preflight did not permit load.",
+        )
+        profiling = ProfilingSummary(
+            total_requests=0,
+            traced_requests=0,
+            coverage=0,
+            notes=[
+                "No load test was started. Preflight is excluded from metrics, profiles, and judging."
+            ],
+        )
+        atomic_json(root / run_id / "profiling.json", profiling.model_dump())
+
     async def execute(run_id: str, request: RunRequest, plan: Plan) -> None:
-        """Advance an admitted run through load, optional evaluation, and final cleanup.
+        """Advance an admitted run through preflight, load, evaluation, and cleanup.
 
         Args:
             run_id: Identifier already registered in run and cancellation state.
             request: Validated endpoint and workload configuration.
             plan: Persisted evaluation policy frozen before load dispatch.
 
-        Phase snapshots retain measurements when evaluation fails. Cancellation or
-        interrupted load skips judging. Job-boundary failures become run statuses;
-        task ownership is released after the final snapshot is written.
+        Only a passed first-case inference check allows load. Its independent
+        captures never enter metrics or judging. Phase snapshots retain measurements
+        when evaluation fails. Cancellation/interruption skips judging. Job-boundary
+        failures become safe statuses; final persistence releases task ownership.
         """
         run = runs[run_id]
         try:
+            run.update(
+                status="preflighting", preflight=PreflightResult(status="running").model_dump()
+            )
+            persist(run_id)
+            probe = await run_preflight(request, run_id, cancellations[run_id], artifact_dir=root)
+            run["preflight"] = probe.model_dump()
+            if probe.status != "passed" or cancellations[run_id].is_set():
+                status = (
+                    "cancelled"
+                    if cancellations[run_id].is_set() or probe.status == "cancelled"
+                    else "interrupted"
+                    if probe.status == "interrupted"
+                    else "failed"
+                )
+                if status == "failed":
+                    run["error_type"] = "PreflightFailed"
+                skip_load(run_id, status)
+                return
             run.update(status="running", load_status="running")
             persist(run_id)
             rows, summary = await run_load(
@@ -395,6 +470,15 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
                 )
         except Exception as error:  # noqa: BLE001 - persist failures at background job boundary
             run.update(status="failed", error_type=type(error).__name__)
+            if run["preflight"]["status"] == "running":
+                run["preflight"] = PreflightResult(
+                    status="failed",
+                    error=PreflightError(
+                        code="worker_failed",
+                        message="Inference preflight failed. Load test did not start. Check server worker configuration.",
+                    ),
+                ).model_dump()
+                skip_load(run_id, "failed")
             if run["load_status"] == "running":
                 run["load_status"] = "failed"
                 run["requests"], _ = recover_rows(root / run_id)
@@ -455,7 +539,11 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
         response: Response,
         idempotency_key: Annotated[str | None, Header(max_length=128)] = None,
     ) -> Accepted:
-        """Start a bounded benchmark. Idempotency-Key safely retries a submission with the same body.
+        """Check inference once, then start bounded load only if it passes.
+
+        The extra first-case request can execute tools and incur cost; it is excluded
+        from load metrics, profiling, and judging. Poll the run's preflight result
+        for safe failure details. Idempotency-Key replays the same submission.
 
         \f
         Args:
@@ -549,6 +637,7 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
                 "status": "queued",
                 "load_status": "queued",
                 "evaluation_status": "pending",
+                "preflight": PreflightResult(status="pending").model_dump(),
                 "config": request.model_dump(mode="json"),
                 "plan": plan.model_dump(),
                 "trace_coverage": "Internal spans are collected after load when explicitly configured.",
@@ -601,7 +690,7 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
 
     @app.get("/v1/runs/{run_id}", response_model=RunResponse, tags=["Runs"])
     async def get_run(run_id: UUID) -> RunResponse:
-        """Read separate load and evaluation statuses, metrics, and the frozen plan.
+        """Read the inference check, separate phase outcomes, metrics, and frozen plan.
 
         \f
         Args:
@@ -664,9 +753,19 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
         """
         run = read_run(run_id)
         path = root / str(run_id) / "profiling.json"
-        if not path.exists():
+        if run["load_status"] == "skipped":
+            profiling = ProfilingSummary(
+                total_requests=0,
+                traced_requests=0,
+                coverage=0,
+                notes=[
+                    "No load test was started. Preflight is excluded from metrics, profiles, and judging."
+                ],
+            )
+        elif not path.exists():
             raise HTTPException(409, "Report profiling is not ready", headers={"Retry-After": "1"})
-        profiling = ProfilingSummary.model_validate_json(path.read_text())
+        else:
+            profiling = ProfilingSummary.model_validate_json(path.read_text())
         order = root / str(run_id) / "profile-order.json"
         profiles = []
         if order.exists():
@@ -701,11 +800,11 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
 
     @app.post("/v1/runs/{run_id}/cancel", response_model=Accepted, tags=["Runs"])
     async def cancel(run_id: UUID) -> Accepted:
-        """Stop dispatching requests and drain in-flight work; evaluation cancellation is unsupported.
+        """Stop preflight/load dispatch and drain active requests; judging cancellation is unsupported.
 
         \f
         Args:
-            run_id: Identifier of an API-owned run still in its load phase.
+            run_id: Identifier of an API-owned run queued, preflighting, or loading.
 
         Returns:
             A cancellation_requested acknowledgment, not proof that drain is complete.
@@ -715,7 +814,7 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
         """
         run = read_run(run_id)
         key = str(run_id)
-        if key not in cancellations or run["status"] not in {"queued", "running"}:
+        if key not in cancellations or run["status"] not in {"queued", "preflighting", "running"}:
             raise HTTPException(409, "Run is not in a cancellable load phase")
         cancellations[key].set()
         return Accepted(id=key, status="cancellation_requested", url=f"/v1/runs/{key}")

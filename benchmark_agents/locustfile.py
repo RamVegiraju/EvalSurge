@@ -118,6 +118,7 @@ class AgentUser(HttpUser):
             "output_tokens": None,
             "trace_id": None,
             "error": None,
+            "http_status": None,
         }
         lifecycle_start = time.perf_counter()
         row["start_offset_ms"] = (lifecycle_start - started) * 1000
@@ -157,12 +158,14 @@ class AgentUser(HttpUser):
                     name="agent_transaction",
                 ) as response:
                     try:
+                        row["http_status"] = response.status_code or None
                         response.raise_for_status()
                         if not 200 <= response.status_code < 300:
                             raise ValueError("Target returned a non-success HTTP status")
                         row["trace_id"] = response.headers.get("X-MLflow-Trace-ID")
                         if "text/event-stream" not in response.headers.get("content-type", ""):
                             raise ValueError("Expected text/event-stream response")
+                        phase = "stream"
                         response.encoding = "utf-8"
                         terminal = False
                         # Requests' default line buffer can delay small SSE deltas.
@@ -192,6 +195,7 @@ class AgentUser(HttpUser):
                         IndexError,
                     ) as error:
                         row["error"] = type(error).__name__
+                        row["error_phase"] = phase
                         row["error_detail"] = str(error)[:300]
                         response.failure(row["error"])
                     finally:
@@ -203,10 +207,13 @@ class AgentUser(HttpUser):
             row["error"] = type(error).__name__
             row["error_phase"] = phase
         finally:
-            if response is not None:
+            if response is not None and response.raw is not None:
                 response.close()
             row["latency_ms"] = (time.perf_counter() - sent) * 1000 if sent else None
             row["lifecycle_ms"] = (time.perf_counter() - lifecycle_start) * 1000
+            row["deadline_exceeded"] = (
+                not row["success"] and row["lifecycle_ms"] >= config.load.timeout_seconds * 1000
+            )
             if sent is not None:
                 http_active -= 1
             row["end_offset_ms"] = (time.perf_counter() - started) * 1000

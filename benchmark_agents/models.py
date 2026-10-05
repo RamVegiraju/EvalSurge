@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 RunStatus = Literal[
     "queued",
+    "preflighting",
     "running",
     "profiling",
     "evaluating",
@@ -16,7 +17,9 @@ RunStatus = Literal[
     "interrupted",
     "cancelled",
 ]
-LoadStatus = Literal["queued", "running", "completed", "failed", "interrupted", "cancelled"]
+LoadStatus = Literal[
+    "queued", "running", "completed", "failed", "interrupted", "cancelled", "skipped"
+]
 EvaluationStatus = Literal[
     "pending",
     "running",
@@ -291,20 +294,59 @@ class ErrorResponse(Model):
     error: ErrorDetail = Field(description="Error details without echoed request data.")
 
 
+class PreflightError(Model):
+    """Safe inference-check failure; never includes provider bodies or exception text."""
+
+    code: Literal[
+        "authentication_failed",
+        "target_http_error",
+        "target_timeout",
+        "target_connection_error",
+        "invalid_stream",
+        "worker_failed",
+    ] = Field(description="Machine-readable inference-check failure category.")
+    message: str = Field(description="Safe explanation and corrective guidance.")
+
+
+class PreflightResult(Model):
+    """One extra first-case invocation, excluded from load metrics, profiles, and judging."""
+
+    status: Literal[
+        "not_run", "pending", "running", "passed", "failed", "cancelled", "interrupted"
+    ] = Field(
+        default="not_run", description="not_run also identifies historical runs without a check."
+    )
+    request_id: str | None = Field(
+        default=None, description="Probe attempt correlation ID, when an attempt was recorded."
+    )
+    case_id: int = Field(default=0, description="The probe always uses workload case zero.")
+    latency_ms: float | None = Field(
+        default=None, ge=0, description="Probe client latency, not a benchmark measurement."
+    )
+    http_status: int | None = Field(
+        default=None, ge=100, le=599, description="Target HTTP status, when received."
+    )
+    error: PreflightError | None = Field(default=None, description="Safe failure details.")
+
+
 class RunResponse(Model):
-    """Run snapshot; inspect load_status and evaluation_status separately."""
+    """Run snapshot; inspect preflight and independent phase outcomes separately."""
 
     id: str = Field(description="Resource UUID.")
     status: RunStatus = Field(description="Lifecycle status, not a quality pass/fail verdict.")
     load_status: LoadStatus = Field(
-        description="Load phase: queued, running, completed, cancelled, interrupted, or failed."
+        description="Load phase outcome; skipped when preflight does not pass."
     )
     evaluation_status: EvaluationStatus = Field(
         description="Evaluation phase outcome; completed only when selected assessments succeed."
     )
-    profiling_status: Literal["pending", "completed", "failed"] = Field(
+    profiling_status: Literal["pending", "completed", "failed", "skipped"] = Field(
         default="pending",
         description="Collection phase outcome; inspect trace coverage separately.",
+    )
+    preflight: PreflightResult = Field(
+        default_factory=PreflightResult,
+        description="Mandatory first-case inference check before measured load; historical runs use not_run.",
     )
     config: RunRequest
     plan: Plan
