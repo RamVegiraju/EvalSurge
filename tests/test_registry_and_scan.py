@@ -77,6 +77,26 @@ async def test_exact_registered_version_and_expectation_coverage(tmp_path, monke
     assert result["results"][0]["scored"] == 1
     assert result["results"][0]["pass_rate"] == 1
     assert result["results"][0]["eligible"] == 1
+    from mlflow.entities import AssessmentError
+
+    monkeypatch.setattr(
+        judges,
+        "is_correct",
+        lambda **kwargs: Feedback(
+            name=kwargs["name"],
+            error=AssessmentError(
+                error_code="judge_rate_limited", error_message="private registered error"
+            ),
+            rationale="private registered error",
+        ),
+    )
+    errored = evaluate(rows, plan)
+    assessment = errored["results"][0]["assessments"][0]
+    assert assessment["request_id"] == "yes"
+    assert assessment["status"] == "error"
+    assert assessment["error"]["code"] == "evaluation_backend_error"
+    assert assessment["rationale"] is None
+    assert "private registered error" not in json.dumps(errored)
     plan.registered_scorers[0].definition_hash = "changed"
     assert evaluate(rows, plan)["results"][0]["status"] == "configuration_changed"
     with pytest.raises(ValueError, match="allowlisted"):

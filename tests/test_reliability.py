@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from benchmark_agents import api
+from benchmark_agents import api, coordinator
 from benchmark_agents.connections import resolve_connection
 from benchmark_agents.locust_runner import run_load
 from benchmark_agents.models import Evaluation, Target
@@ -122,8 +122,8 @@ def test_plan_reuse_idempotency_and_evaluation_failure(tmp_path, monkeypatch, su
     async def fake_load(*args, **kwargs):
         return [], {"load_status": "completed"}
 
-    monkeypatch.setattr(api, "run_load", fake_load)
-    monkeypatch.setattr(api, "evaluate", lambda *args: {"status": "failed"})
+    monkeypatch.setattr(coordinator, "run_load", fake_load)
+    monkeypatch.setattr(coordinator, "evaluate", lambda *args: {"status": "failed"})
     monkeypatch.setenv("BENCHMARK_API_KEY", "test-key")
     monkeypatch.setenv("BENCHMARK_JUDGE_MODEL", "frozen-model")
     app = api.create_app(tmp_path)

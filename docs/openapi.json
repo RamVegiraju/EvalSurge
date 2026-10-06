@@ -255,6 +255,99 @@
         "title": "Evaluation",
         "type": "object"
       },
+      "EvaluationError": {
+        "additionalProperties": false,
+        "description": "Content-free evaluation failure with corrective guidance, never provider text.",
+        "properties": {
+          "code": {
+            "description": "Machine-readable evaluation failure category.",
+            "title": "Code",
+            "type": "string"
+          },
+          "guidance": {
+            "description": "Action the operator can take before another run.",
+            "title": "Guidance",
+            "type": "string"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "maximum": 599.0,
+                "minimum": 100.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "message": {
+            "description": "Safe explanation, not an exception or provider body.",
+            "title": "Message",
+            "type": "string"
+          },
+          "scorer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Frozen criterion that failed.",
+            "title": "Scorer"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "guidance"
+        ],
+        "title": "EvaluationError",
+        "type": "object"
+      },
+      "EvaluationPreflight": {
+        "additionalProperties": false,
+        "description": "One readiness assessment per criterion, outside measured load and quality results.",
+        "properties": {
+          "checked_scorers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checked Scorers",
+            "type": "array"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "default": "not_run",
+            "enum": [
+              "not_run",
+              "pending",
+              "running",
+              "skipped",
+              "passed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "EvaluationPreflight",
+        "type": "object"
+      },
       "Load": {
         "additionalProperties": false,
         "description": "Closed-loop users at one concurrency level; duration limits dispatch, then requests drain.",
@@ -293,6 +386,74 @@
           }
         },
         "title": "Load",
+        "type": "object"
+      },
+      "LoadError": {
+        "additionalProperties": false,
+        "description": "Safe worker failure without process output, paths, credentials, or prompts.",
+        "properties": {
+          "code": {
+            "enum": [
+              "worker_start_failed",
+              "worker_failed",
+              "worker_timeout"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "guidance": {
+            "title": "Guidance",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "guidance"
+        ],
+        "title": "LoadError",
+        "type": "object"
+      },
+      "MLflowExperimentLink": {
+        "additionalProperties": false,
+        "description": "Credential-free browser destination for a recorded MLflow experiment.",
+        "properties": {
+          "experiment_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Experiment Id",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "enum": [
+                "traces",
+                "evaluation"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "url": {
+            "description": "Operator-owned UI destination, never containing API credentials.",
+            "maxLength": 4096,
+            "pattern": "^https?://",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "url",
+          "scopes"
+        ],
+        "title": "MLflowExperimentLink",
         "type": "object"
       },
       "Plan": {
@@ -492,6 +653,7 @@
               "target_timeout",
               "target_connection_error",
               "invalid_stream",
+              "invalid_response",
               "worker_failed"
             ],
             "title": "Code",
@@ -512,7 +674,7 @@
       },
       "PreflightResult": {
         "additionalProperties": false,
-        "description": "One extra first-case invocation, excluded from load metrics, profiles, and judging.",
+        "description": "Extra first-case invocation, excluded from measured metrics, profiles, and quality.",
         "properties": {
           "case_id": {
             "default": 0,
@@ -953,6 +1115,15 @@
             "title": "Limit",
             "type": "integer"
           },
+          "mlflow_experiments": {
+            "description": "Available trace/evaluation experiment UI links; historical or unconfigured destinations are omitted.",
+            "items": {
+              "$ref": "#/components/schemas/MLflowExperimentLink"
+            },
+            "maxItems": 20,
+            "title": "Mlflow Experiments",
+            "type": "array"
+          },
           "offset": {
             "description": "Zero-based offset into request profiles.",
             "title": "Offset",
@@ -1047,9 +1218,13 @@
           },
           "evaluation": {
             "additionalProperties": true,
-            "description": "Per-scorer MLflow run IDs, scores, errors, and sampling coverage.",
+            "description": "Per-scorer MLflow run IDs, scores, safe execution errors, sampling coverage, and bounded request-correlated assessments. Judge rationales can contain protected evaluation content.",
             "title": "Evaluation",
             "type": "object"
+          },
+          "evaluation_preflight": {
+            "$ref": "#/components/schemas/EvaluationPreflight",
+            "description": "Selected judges must assess the inference probe before load; historical runs use not_run."
           },
           "evaluation_status": {
             "description": "Evaluation phase outcome; completed only when selected assessments succeed.",
@@ -1073,6 +1248,17 @@
             "description": "Resource UUID.",
             "title": "Id",
             "type": "string"
+          },
+          "load_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoadError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Safe load-worker failure details."
           },
           "load_status": {
             "description": "Load phase outcome; skipped when preflight does not pass.",
@@ -1234,7 +1420,7 @@
           },
           "inputs": {
             "additionalProperties": true,
-            "description": "A query string or a nonempty messages array.",
+            "description": "For http-json, the raw nonempty object sent as the POST body. For SSE adapters, query or a nonempty messages array.",
             "examples": [
               {
                 "query": "Can I refund?"
@@ -1334,13 +1520,14 @@
       },
       "Target": {
         "additionalProperties": false,
-        "description": "Hosted streaming endpoint and an optional server-owned connection reference.",
+        "description": "Hosted HTTP endpoint and an optional server-owned connection reference.",
         "properties": {
           "adapter": {
             "default": "openai-chat",
             "enum": [
               "openai-chat",
-              "mlflow-agent-server"
+              "mlflow-agent-server",
+              "http-json"
             ],
             "title": "Adapter",
             "type": "string"
@@ -1374,17 +1561,18 @@
           },
           "model": {
             "default": "agent",
+            "description": "Model name sent only by openai-chat; ignored by mlflow-agent-server and http-json.",
             "title": "Model",
             "type": "string"
           },
           "request_usage": {
             "default": true,
-            "description": "Request streamed token usage for openai-chat. Disable when the endpoint rejects stream_options; absent usage stays unknown. Ignored by mlflow-agent-server.",
+            "description": "Request streamed token usage for openai-chat. Disable when the endpoint rejects stream_options; absent usage stays unknown. Ignored by mlflow-agent-server and http-json.",
             "title": "Request Usage",
             "type": "boolean"
           },
           "url": {
-            "description": "Exact streaming URL authorized by server target policy.",
+            "description": "Exact HTTP endpoint URL (SSE or JSON) authorized by server target policy.",
             "examples": [
               "http://127.0.0.1:9001/chat"
             ],
@@ -2775,7 +2963,7 @@
         ]
       },
       "post": {
-        "description": "Check inference once, then start bounded load only if it passes.\n\nThe extra first-case request can execute tools and incur cost; it is excluded\nfrom load metrics, profiling, and judging. Poll the run's preflight result\nfor safe failure details. Idempotency-Key replays the same submission.",
+        "description": "Check inference and selected judges before starting bounded load.\n\nThe extra first-case request can execute tools and incur cost; it is excluded\nfrom load metrics, profiles, and benchmark quality scores. Selected criteria\nalso assess that captured answer once with zero catalog SDK retries.\nPoll preflight/evaluation_preflight for safe corrective guidance; worker\nfailures appear in load_error. Idempotency-Key replays the same submission.",
         "operationId": "submit_v1_runs_post",
         "parameters": [
           {

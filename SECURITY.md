@@ -4,6 +4,12 @@ EvalSurge 0.2 is a local, single-tenant prototype. Bind to loopback with proxy h
 
 Configure destination credentials only through server-owned `BENCHMARK_CONNECTIONS`. Each connection binds an authentication method to one exact URL. Unauthenticated remote targets need an exact allowlist entry. Redirects, URL credentials, fragments, and query strings are rejected. Databricks credentials are restricted to the configured HTTPS workspace. The load worker disables environment proxy and netrc credential discovery.
 
+For local Python, the caller is the operator and may pass an explicit `Connection`
+bound to the exact authorized URL. This is not a new REST request field. Neither
+client temporarily mutates global connection configuration or serializes tokens;
+workers receive detached credential references. JSON response decoding is capped
+at two million decoded bytes and does not infer tool timings or TTFT.
+
 These controls do not make a general public load-testing service safe. Multi-tenant deployment additionally requires connection ACLs, network egress enforcement (including DNS rebinding controls), quotas, audit logging, request-body limits at the gateway, secret management, and durable job ownership. Only benchmark endpoints and agent actions you are authorized to exercise; load retries are intentionally disabled.
 
 The API limits decoded request bodies to 8 MB, including chunked bodies. Admission
@@ -13,12 +19,36 @@ uses no-store, and is subject to the same single-tenant boundary. Keys stay in t
 page's memory, not query strings or persistent browser storage. Dynamic report text
 uses textContent rather than HTML injection and a same-origin CSP restricts scripts.
 
+MLflow experiment links use recorded experiment IDs and their frozen tracking
+destinations, not the agent/model provider's host. Operator UI overrides apply
+only to the exact currently configured store. Destinations reject credentials,
+queries, unsafe schemes, and non-loopback plain HTTP. The browser checks links
+again and opens them with no opener or referrer; API keys are never forwarded.
+Links make no automatic tracking-store requests and grant no MLflow permissions.
+The operator must bind a configured UI to the correct store. Full MLflow evidence
+may contain protected content beyond the report's content-free profiling.
+
+Per-assessment judge rationales are protected evaluation evidence, not sanitized
+telemetry: they can quote prompts, answers, references, or sensitive source content.
+Authenticated run/report JSON includes bounded rationales; protect exported reports
+and the artifact directory accordingly. Rationales are text-only in the UI and are
+not interpreted as links, HTML, or instructions. Native execution errors never
+export raw messages, stack traces, or error-associated rationales. Only catalog-owned
+error codes map to specific fixed guidance; registered scorer errors get a generic
+safe diagnostic. Truncation is a size bound, not secret redaction.
+
 Runs perform one extra first-case inference preflight through the same authorized
 connection before load. It can execute agent tools, mutate memory, warm caches, and
 incur spend; there is no retry or rollback. Failed checks skip load/judging and expose
 only fixed safe guidance, HTTP status, and correlation IDs. Raw probe captures remain
 protected artifacts, excluded from measured request pages, report profiles, and
-judging. Replays/restarts never automatically repeat that agent action.
+quality samples. Selected judges reuse the captured probe for one readiness
+assessment each before load; these extra calls can incur spend and disclose the
+same inputs/outputs/references as quality judging to the configured provider.
+Static setup failures avoid target traffic; catalog readiness has zero SDK retries
+and no additional MLflow retry layer. Errors expose fixed guidance only. Trusted
+registered scorer transports/retries remain operator-owned. Replays/restarts
+never automatically repeat agent or readiness actions.
 
 Interactive documentation uses pinned, self-hosted Swagger UI assets plus an external
 same-origin initializer. No CDN/inline-script policy exception is needed. Remote

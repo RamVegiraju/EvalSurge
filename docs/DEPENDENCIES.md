@@ -53,8 +53,13 @@ is 0.12.23 (official releases checked October 4, 2026).
 
 Required checks and CODEOWNERS need repository rulesets/branch protection enabled
 by a maintainer. Configuration files alone do not enforce review or prove CI passed.
-The current mirror-backed lock is a portability gate for public release and can
-also prevent Dependabot from reaching package metadata; test bot access after setup.
+A mirror-backed lock blocks public CI installation and public release.
+CI checks registry and artifact origins before installation with the stdlib-only
+`python3 scripts/check_ci_prerequisites.py` (Python 3.11+). Registry packages must
+use public PyPI and its HTTPS artifact host; local editable packages are excluded.
+This checks source suitability, not network reachability or resolver provenance.
+CI explicitly uses `UV_DEFAULT_INDEX=https://pypi.org/simple` for fresh resolution;
+that setting alone does not replace mirror artifact URLs already in a lockfile.
 
 The CI test job also pins setup-node v7.0.0 to its official commit, with Node.js 24
 for JavaScript report/docs contracts. Node is not an API runtime dependency.
@@ -94,6 +99,9 @@ than force an inconsistent transitive graph.
 
 ## Index limitation — October 4, 2026
 
+This is historical evidence. The mirror lock is replaced by the validated public
+recovery below; fresh latest-compatible resolution remains blocked locally.
+
 Public PyPI connections from the installer fail even outside the sandbox. The
 configured Databricks mirror is reachable, but is behind upstream. Official
 upstream releases confirmed today include:
@@ -109,10 +117,103 @@ latest. A public-index offline resolution also failed because required Databrick
 SDK metadata was not cached. Do not rewrite registry/download URLs or hashes to
 pretend the mirror lock was resolved from public PyPI.
 
-Before OSS release, regenerate with `uv lock --upgrade --default-index
+For the next latest-compatible update and OSS release, resolve with `uv lock --upgrade --default-index
 https://pypi.org/simple` from an environment with authorized public-index access,
 install it in clean supported-version CI, and rerun the full validation and audit.
 Repeat the upstream version check; this table is a dated snapshot, not a live list.
+
+### CI diagnosis — October 5, 2026
+
+Read-only GitHub inspection confirmed runs `37311757111` (main `d83ef4a`) and
+`37322866817` (docs merge on main `fb8ce89`) failed all eight Python 3.11–3.14
+test/security jobs during `uv sync --locked --extra agents --group dev`.
+Each download failure timed out against `pypi-proxy.cloud.databricks.com`;
+tests, schema/build checks, and the advisory audit did not run. This is an
+installation failure, not evidence of eight code regressions or vulnerabilities.
+The affected `d83ef4a` lock has 211 registry entries pointing at that mirror.
+
+Checkout v7.0.1, setup-node v7.0.0, setup-uv v10.2.0, and uv 0.12.23 matched
+official latest release metadata on October 5; the action tags matched the pinned
+commit hashes. Setup steps succeeded, so changing pins or extending timeouts is
+not the evidenced fix.
+
+Dependabot PR #1 (`d81e435`) already contains public-PyPI registry sources.
+Its PR run `37242520002` on October 4 passed all eight jobs, including installation,
+tests, builds, and audits. That PR is based on `e245ae6`, before preflight changes;
+review its dependency updates and validate against current code before applying
+it. Neither the lockfile nor dependency ranges were changed by this CI diagnosis.
+The early prerequisite check detects nonpublic origins; it does not repair a lock
+or establish that current remote CI passes. No workflows were rerun and no remote
+settings were changed.
+
+### Adopted public-lock recovery — October 5, 2026
+
+The exact PR #1 files were fetched through the authorized GitHub API at commit
+`d81e43531ffa1f1ee6e8890304f3fa3a5a3861b2`. The lock's Git blob is
+`89c0f7ad5c56629a4c27d8246eca0a22f4b366b7`; its SHA-256 is
+`468ac9fe28395d9a61cc30c3248c92cf530615c24a8a06c4ff1d87aa91efc93a`.
+Neither registry URLs nor artifact hashes were rewritten. PR #1 changes only
+the lock; its dependency ranges, extras, development group, and build requirements
+match the current project.
+
+| Package | Mirror lock | Adopted public lock |
+| --- | --- | --- |
+| FastAPI | 0.141.1 | 0.142.2 |
+| LangChain Core | 1.6.5 | 1.6.6 |
+| LangChain OpenAI | 1.6.6 | 1.6.7 |
+| OpenAI SDK | 3.19.2 | 3.22.1 |
+| python-dotenv | 1.2.3 | 1.2.4 |
+| Ruff | 0.16.9 | 0.16.10 |
+
+All declared runtime/framework/development/build constraints accept the adopted lock.
+MLflow, MLflow Skinny, and MLflow Tracing remain at 3.16.1, with unchanged
+distribution hashes. Installed correctness, relevance, and safety private prompt
+functions import and render successfully with the current callers; the combined
+rubric hash is unchanged. Keep the `<3.17` exception. Initial current-code verification
+against the separate public environment passed 272 tests with no skips. Final root
+verification passes 277 tests with no skips, including native scoring, tracing,
+serialization, both frameworks, actual Locust HTTP traffic, and storage-fault and
+editable-build regressions. See `VALIDATION.md` for exact commands and scope.
+
+`uv sync --locked --extra agents --group dev --no-install-project` installed 181
+packages into a separate artifact environment on macOS/Python 3.12.13 using uv
+0.11.28. The exact candidate lock hash remained unchanged. An OSV audit of its
+hashed agents/dev/build export checked 181 applicable dependencies and found zero
+known advisories; OSV enforces hash presence, while uv verifies artifact integrity.
+This is not a security review or a current Linux matrix result.
+
+Generated provenance, constraints, installed versions, prompt signatures, and audit
+evidence are under `artifacts/ci-public-lock/`. The root `uv.lock` adopts the exact
+verified file byte-for-byte after full current-code validation. CI explicitly uses
+public PyPI and checks registry/artifact origins before installation. This addresses
+the observed mirror-download cause; no new remote CI run or current Linux matrix is
+claimed. This is a reviewed recovery graph, not a newly resolved latest graph.
+
+### Latest-upstream gap — October 5, 2026
+
+Fresh official GitHub stable-release metadata identifies these newer releases,
+all within the existing declared ranges:
+
+| Package | Recovery candidate | Observed upstream stable release |
+| --- | --- | --- |
+| OpenAI SDK | 3.22.1 | 3.24.0 |
+| OpenAI Agents SDK | 0.22.3 | 0.23.1 |
+| Locust | 2.46.6 | 2.46.7 |
+
+These are release observations, not proof of package-index availability or
+compatibility. Metadata for direct dependencies is saved separately from the
+candidate; gevent's GitHub latest-release endpoint is stale, so its observed
+26.9.0 tag is not treated as a global latest-version guarantee. No claim is made
+that every transitive package is upstream-latest.
+
+Authorized fresh resolution with unchanged ranges and explicit
+`--default-index https://pypi.org/simple` failed with TCP connection refused.
+Public PyPI metadata/index access remains unavailable here even though locked
+`files.pythonhosted.org` artifact downloads succeeded. The generated
+`artifacts/ci-public-lock/fresh-20261005/` contains the project input and failure
+log, not a fresh lock or environment. Finish the reviewed upgrade workflow from
+an authorized environment with working public-index access; do not disguise this
+gap by rewriting the authentic candidate's URLs, hashes, or version records.
 
 ## Primary guidance
 

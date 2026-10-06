@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from benchmark_agents import api
+from benchmark_agents import api, coordinator
 from benchmark_agents.models import Evaluation, RunRequest, Selection
 from benchmark_agents.planner import create_plan, validate_plan
 
@@ -123,7 +123,7 @@ def test_api_lifecycle_and_persistence(tmp_path, monkeypatch, successful_preflig
     async def fake_load(request, run_id, cancel, **kwargs):
         return [], {"requests": 0}
 
-    monkeypatch.setattr(api, "run_load", fake_load)
+    monkeypatch.setattr(coordinator, "run_load", fake_load)
     with TestClient(api.create_app(tmp_path), client=("127.0.0.1", 50000)) as client:
         planned = client.post(
             "/v1/evaluation-plans", json={"description": "refund", "scorers": ["correctness"]}

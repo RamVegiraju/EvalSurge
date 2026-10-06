@@ -7,7 +7,7 @@ import mlflow
 import pytest
 from fastapi.testclient import TestClient
 
-from benchmark_agents import api
+from benchmark_agents import api, coordinator
 from benchmark_agents.models import Evaluation, TraceSource
 from benchmark_agents.planner import create_plan
 from benchmark_agents.profiling import collect_profiles, normalize_trace
@@ -105,7 +105,7 @@ def test_report_pagination_and_shell_auth(tmp_path, monkeypatch, successful_pref
     async def fake_load(*args, **kwargs):
         return [row("first"), row("second")], {"load_status": "completed"}
 
-    monkeypatch.setattr(api, "run_load", fake_load)
+    monkeypatch.setattr(coordinator, "run_load", fake_load)
     monkeypatch.setenv("BENCHMARK_API_KEY", "test-key")
     app = api.create_app(tmp_path)
     with TestClient(app, client=("127.0.0.1", 50000)) as client:

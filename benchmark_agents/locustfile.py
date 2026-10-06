@@ -10,11 +10,11 @@ import gevent
 import requests
 from locust import HttpUser, constant, events, task
 
+from benchmark_agents.adapters import get_adapter
 from benchmark_agents.connections import Connection, authentication
 from benchmark_agents.models import RunRequest
 from benchmark_agents.runner import payload, summarize
 from benchmark_agents.storage import append_event, atomic_json
-from benchmark_agents.streaming import consume
 
 config = RunRequest.model_validate_json(Path(os.environ["BENCHMARK_LOCUST_CONFIG"]).read_text())
 destination = Path(os.environ["BENCHMARK_LOCUST_RESULT"])
@@ -30,6 +30,7 @@ auth_headers = None
 http_active = 0
 journal = destination.parent / "requests.jsonl"
 connection = Connection.model_validate_json((destination.parent / "connection.json").read_text())
+adapter = get_adapter(config.target.adapter)
 
 
 @events.test_start.add_listener
@@ -71,7 +72,7 @@ def finish(environment: Any, **kwargs: Any) -> None:
 
 
 class AgentUser(HttpUser):
-    """One sequential streamed transaction per user, with no think time."""
+    """One sequential HTTP transaction per user, with no think time."""
 
     wait_time = constant(0)
 
@@ -81,15 +82,15 @@ class AgentUser(HttpUser):
 
     @task
     def invoke(self) -> None:
-        """Execute one sequential, journaled streaming attempt for this Locust user.
+        """Execute one sequential, journaled HTTP attempt for this Locust user.
 
         Cases are assigned round-robin across users. Count, duration, and cancellation
         limits stop new attempts while existing work drains. Authentication and
-        streaming share one deadline; TTFT starts only after authentication at HTTP
-        dispatch and ignores non-answer events.
+        response reading/parsing share one deadline. SSE TTFT starts after auth at
+        HTTP dispatch and ignores non-answer events; JSON TTFT stays unavailable.
 
         Each attempt releases its active counters and records completion in cleanup,
-        including failed authentication, invalid streams, and target errors. Target
+        including failed authentication, invalid responses, and target errors. Target
         requests are never retried, because agent actions may have side effects.
         """
         global issued, active, peak, last_dispatch, auth_headers, http_active
@@ -162,29 +163,10 @@ class AgentUser(HttpUser):
                         response.raise_for_status()
                         if not 200 <= response.status_code < 300:
                             raise ValueError("Target returned a non-success HTTP status")
-                        row["trace_id"] = response.headers.get("X-MLflow-Trace-ID")
-                        if "text/event-stream" not in response.headers.get("content-type", ""):
-                            raise ValueError("Expected text/event-stream response")
-                        phase = "stream"
-                        response.encoding = "utf-8"
-                        terminal = False
-                        # Requests' default line buffer can delay small SSE deltas.
-                        for line in response.iter_lines(chunk_size=1, decode_unicode=True):
-                            if not line.startswith("data:") or not line[5:].strip():
-                                continue
-                            terminal = consume(
-                                row, line[5:].strip(), (time.perf_counter() - sent) * 1000
-                            )
-                            if len(row["outputs"]) > 2_000_000:
-                                raise ValueError(
-                                    "Response exceeded the two-million-character limit"
-                                )
-                            if terminal:
-                                break
-                        if not terminal and row.get("completion_reason") != "stop":
-                            raise ValueError("Stream ended without a terminal event")
-                        if not row["outputs"].strip():
-                            raise ValueError("Agent produced no answer text")
+                        phase = "response" if config.target.adapter == "http-json" else "stream"
+                        adapter.decode(response, row, sent)
+                        if time.perf_counter() - lifecycle_start >= config.load.timeout_seconds:
+                            raise TimeoutError("Request deadline exceeded")
                         row["success"] = True
                     except (
                         requests.RequestException,

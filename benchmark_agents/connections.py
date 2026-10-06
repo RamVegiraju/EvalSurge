@@ -19,6 +19,34 @@ class Connection(Model):
     token_env: str | None = None
 
 
+def validate_connection(target: Target, connection: Connection) -> Connection:
+    """Copy an operator binding after exact URL and credential transport validation.
+
+    Args:
+        target: Authorized endpoint; credentials/query/fragment are forbidden.
+        connection: Local operator configuration, never caller-supplied REST data.
+
+    Returns:
+        A detached binding with no resolved secret values.
+
+    Raises:
+        ValueError: Destination differs or remote credential transport is not HTTPS.
+    """
+    url = str(target.url)
+    parsed = urlsplit(url)
+    if parsed.username or parsed.password or parsed.fragment or parsed.query:
+        raise ValueError("Target URL must not contain credentials, query parameters, or fragments")
+    try:
+        bound_url = str(Target(url=connection.url).url)
+    except ValueError:
+        raise ValueError("Invalid operator connection configuration") from None
+    if url != bound_url:
+        raise ValueError("Target URL does not match the authorized connection")
+    if parsed.scheme != "https" and parsed.hostname not in {"127.0.0.1", "::1", "localhost"}:
+        raise ValueError("Remote credential connections require HTTPS")
+    return connection.model_copy(deep=True)
+
+
 def resolve_connection(target: Target) -> Connection:
     """Resolve an endpoint against the operator's destination policy.
 
@@ -38,15 +66,16 @@ def resolve_connection(target: Target) -> Connection:
     if parsed.username or parsed.password or parsed.fragment or parsed.query:
         raise ValueError("Target URL must not contain credentials, query parameters, or fragments")
     if target.connection_id:
-        connections = json.loads(os.getenv("BENCHMARK_CONNECTIONS", "{}"))
-        if target.connection_id not in connections:
-            raise ValueError("Unknown server connection_id")
-        connection = Connection.model_validate(connections[target.connection_id])
-        if url != str(Target(url=connection.url).url):
-            raise ValueError("Target URL does not match the authorized connection")
-        if parsed.scheme != "https" and parsed.hostname not in {"127.0.0.1", "::1", "localhost"}:
-            raise ValueError("Remote credential connections require HTTPS")
-        return connection
+        try:
+            connections = json.loads(os.getenv("BENCHMARK_CONNECTIONS", "{}"))
+            if not isinstance(connections, dict):
+                raise ValueError
+            if target.connection_id not in connections:
+                raise ValueError("Unknown server connection_id")
+            connection = Connection.model_validate(connections[target.connection_id])
+        except ValueError:
+            raise ValueError("Invalid operator connection configuration") from None
+        return validate_connection(target, connection)
     allowed = json.loads(os.getenv("BENCHMARK_ALLOWED_TARGETS", "[]"))
     if parsed.hostname not in {"127.0.0.1", "::1", "localhost"} and url not in allowed:
         raise ValueError("Target requires a server connection or BENCHMARK_ALLOWED_TARGETS entry")

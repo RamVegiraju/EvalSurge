@@ -58,6 +58,124 @@ def render(report: dict[str, Any], **actions: Any) -> dict[str, Any]:
     return json.loads(result.stdout)
 
 
+def test_report_shows_safe_mlflow_experiment_links(evidence) -> None:
+    evidence["mlflow_experiments"] = [
+        {
+            "experiment_id": "123",
+            "url": "https://workspace.example/ml/experiments/123",
+            "scopes": ["traces", "evaluation"],
+        },
+        {
+            "experiment_id": "456",
+            "url": "http://127.0.0.1:5000/#/experiments/456",
+            "scopes": ["evaluation"],
+        },
+    ]
+    output = render(evidence)
+    links = output["nodes"]["mlflow-links"]["children"]
+    assert len(links) == 2
+    assert "123" in links[0]["text"]
+    assert "traces" in links[0]["text"].lower()
+    assert "evaluation" in links[0]["text"].lower()
+    assert links[0]["attributes"] == {
+        "href": "https://workspace.example/ml/experiments/123",
+        "target": "_blank",
+        "rel": "noopener noreferrer",
+        "referrerpolicy": "no-referrer",
+    }
+    assert len(output["calls"]) == 1
+    assert "private-test-key" not in json.dumps(links)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "javascript:alert(1)",
+        "data:text/html,secret",
+        "//tracking.example",
+        "https://user:secret@tracking.example",
+        "http://remote.example/#/experiments/1",
+        "https://tracking.example?token=secret",
+        "https://tracking.example\\@other.example",
+    ],
+)
+def test_report_never_links_unsafe_mlflow_destinations(evidence, url) -> None:
+    evidence["mlflow_experiments"] = [{"experiment_id": "123", "url": url, "scopes": ["traces"]}]
+    output = render(evidence)
+    links = output["nodes"]["mlflow-links"]
+    assert all(child["tag"] != "a" for child in links["children"])
+    assert "not configured" in links["text"].lower()
+
+
+def test_historical_report_without_mlflow_links_remains_renderable(evidence) -> None:
+    output = render(evidence)
+    assert "not configured" in output["nodes"]["mlflow-links"]["text"].lower()
+    assert "1.20req/s" in output["nodes"]["metrics"]["text"]
+
+
+def test_report_shows_each_failed_quality_reason_and_safe_execution_error(evidence) -> None:
+    result = evidence["run"]["evaluation"]["results"][0]
+    result["assessments"] = [
+        {
+            "request_id": "failed-request",
+            "case_id": 2,
+            "status": "failed",
+            "value": False,
+            "rationale": "<img src=x onerror=alert(1)> Missed the deadline.",
+            "rationale_truncated": False,
+            "error": None,
+        },
+        {
+            "request_id": "errored-request",
+            "case_id": 3,
+            "status": "error",
+            "value": None,
+            "rationale": None,
+            "error": {
+                "code": "judge_rate_limited",
+                "message": "The judge provider rate-limited the assessment.",
+                "guidance": "Check provider quotas.",
+            },
+        },
+        {
+            "request_id": "passed-request",
+            "status": "passed",
+            "rationale": "Accurate.",
+        },
+    ]
+    output = render(evidence)
+    text = output["nodes"]["assessment-details"]["text"]
+    assert "failed-request" in text
+    assert "Case 2" in text
+    assert "Quality failed" in text
+    assert "<img src=x onerror=alert(1)> Missed the deadline." in text
+    assert "Judge error" in text
+    assert "errored-request" in text
+    assert "judge_rate_limited" in text
+    assert "passed-request" not in text
+
+
+def test_report_explains_missing_and_truncated_rationales(evidence) -> None:
+    result = evidence["run"]["evaluation"]["results"][0]
+    result["assessments"] = [
+        {"request_id": "first", "status": "failed", "rationale": None},
+        {
+            "request_id": "second",
+            "status": "failed",
+            "rationale": "Bounded reason",
+            "rationale_truncated": True,
+        },
+    ]
+    text = render(evidence)["nodes"]["assessment-details"]["text"]
+    assert "did not record a rationale" in text
+    assert "truncated" in text
+
+
+def test_historical_report_does_not_invent_per_request_reasons(evidence) -> None:
+    text = render(evidence)["nodes"]["assessment-details"]["text"]
+    assert "not recorded" in text
+
+
 def test_failed_preflight_report_shows_error_instead_of_benchmark_success(evidence) -> None:
     evidence["run"].update(
         status="failed",
@@ -286,6 +404,279 @@ def test_no_assessment_statuses_are_not_passes(evidence: dict[str, Any], status:
     assert "—" in output["nodes"]["judges"]["text"]
     assert "0.0% boolean pass rate" not in output["nodes"]["judges"]["text"]
     assert status.replace("_", " ").capitalize() in output["nodes"]["evaluation-status"]["text"]
+
+
+@pytest.mark.parametrize(
+    "status",
+    ["not_run", "skipped", "pending", "running", "passed", "failed", "cancelled", "interrupted"],
+)
+def test_evaluation_preflight_checks_are_excluded_from_quality_scores(
+    evidence: dict[str, Any], status: str
+) -> None:
+    evidence["run"]["evaluation_preflight"] = {
+        "status": status,
+        "checked_scorers": ["relevance", "registered:grounding"],
+    }
+    evidence["run"]["evaluation"] = {"status": "pending", "results": []}
+    evidence["run"]["evaluation_status"] = "pending"
+    output = render(evidence)
+    context = output["nodes"]["context"]["text"]
+    assert f"Evaluation preflight{status.replace('_', ' ').capitalize()}" in context
+    assert "Checked scorers: relevance, registered:grounding" in context
+    assert "readiness checks, excluded from quality scores" in context
+    assert "Criteria with assessments0 / 2" in output["nodes"]["evaluation-summary"]["text"]
+    assert "Distinct answers selected—" in output["nodes"]["evaluation-summary"]["text"]
+    assert "No assessments" in output["nodes"]["judges"]["text"]
+    assert "boolean pass rate" not in output["nodes"]["judges"]["text"]
+    assert "1.20req/s" in output["nodes"]["metrics"]["text"]
+
+
+@pytest.mark.parametrize("metrics", [{}, {"requests": 0, "successful_requests": 0}])
+def test_failed_evaluation_preflight_report_preserves_zero_load(
+    evidence: dict[str, Any], metrics: dict[str, Any]
+) -> None:
+    diagnostic = {
+        "code": "judge_access_denied",
+        "message": "The configured judge could not be accessed.",
+        "guidance": "Ask the operator to grant access to the frozen judge endpoint.",
+        "scorer": "relevance",
+        "http_status": 403,
+    }
+    evidence["run"].update(
+        status="failed",
+        load_status="skipped",
+        profiling_status="skipped",
+        evaluation_status="skipped",
+        metrics=metrics,
+        evaluation={},
+        evaluation_preflight={
+            "status": "failed",
+            "error": diagnostic,
+            "checked_scorers": ["relevance"],
+        },
+    )
+    evidence["requests"] = []
+    evidence["total"] = 0
+    evidence["profiling"].update(
+        total_requests=0, traced_requests=0, coverage=0, hotspots=[], gaps={}
+    )
+    output = render(evidence)
+    assert not output["nodes"]["report"]["hidden"]
+    assert "Evaluation preflight failed — load never started" in output["nodes"]["message"]["text"]
+    context = output["nodes"]["context"]["text"]
+    assert "Evaluation preflight failed — load never started" in context
+    for field in ("code", "message", "guidance"):
+        assert diagnostic[field] in context
+    assert "Scorer: relevance" in context and "HTTP 403" in context
+    assert "Inference check failed" not in context
+    assert "Criteria with assessments0 / 2" in output["nodes"]["evaluation-summary"]["text"]
+    assert "Skipped" in output["nodes"]["judges"]["text"]
+    assert "boolean pass rate" not in output["nodes"]["judges"]["text"]
+    assert "0 successful / 0 attempts" in output["nodes"]["metrics"]["text"]
+    assert "Successful throughput—req/s" in output["nodes"]["metrics"]["text"]
+    assert output["nodes"]["page"]["text"] == "0–0 of 0 attempts"
+    assert not output["nodes"]["waterfall"]["children"]
+    assert "No internal hotspot evidence" in output["nodes"]["hotspots"]["text"]
+
+
+def test_runtime_evaluation_failure_keeps_load_metrics(evidence: dict[str, Any]) -> None:
+    diagnostic = {
+        "code": "judge_unavailable",
+        "message": "The configured judge is unavailable.",
+        "guidance": "Ask the operator to check judge availability before a new run.",
+        "http_status": 503,
+    }
+    evidence["run"]["evaluation_status"] = "failed"
+    evidence["run"]["evaluation"] = {"status": "failed", "error": diagnostic, "results": []}
+    output = render(evidence)
+    assert "Evaluation failed" in output["nodes"]["message"]["text"]
+    context = output["nodes"]["context"]["text"]
+    assert "Evaluation failed" in context and "HTTP 503" in context
+    for field in ("code", "message", "guidance"):
+        assert diagnostic[field] in context
+    assert "load did not start" not in context.lower()
+    assert "1.20req/s" in output["nodes"]["metrics"]["text"]
+    assert "100ms" in output["nodes"]["metrics"]["text"]
+    assert "2 successful / 2 attempts" in output["nodes"]["metrics"]["text"]
+    assert "Criteria with assessments0 / 2" in output["nodes"]["evaluation-summary"]["text"]
+    assert "boolean pass rate" not in output["nodes"]["judges"]["text"]
+
+
+@pytest.mark.parametrize(
+    "code,status,title",
+    [
+        ("worker_start_failed", "failed", "Load worker could not start"),
+        ("worker_failed", "failed", "Load worker failed"),
+        ("worker_timeout", "interrupted", "Load worker timed out"),
+    ],
+)
+def test_load_worker_failure_is_actionable_without_changing_measurements(
+    evidence: dict[str, Any], code: str, status: str, title: str
+) -> None:
+    diagnostic = {
+        "code": code,
+        "message": "The load worker could not complete this run.",
+        "guidance": "Check the runner environment and protected worker logs before retrying.",
+    }
+    evidence["run"].update(
+        status=status,
+        load_status=status,
+        load_error=diagnostic,
+        preflight={"status": "passed"},
+        evaluation_preflight={"status": "passed", "checked_scorers": ["relevance"]},
+        evaluation_status="skipped",
+        evaluation={"status": "skipped", "results": []},
+    )
+    if code == "worker_start_failed":
+        evidence["run"].update(metrics={}, profiling_status="skipped")
+        evidence["requests"] = []
+        evidence["total"] = 0
+        evidence["profiling"].update(
+            total_requests=0, traced_requests=0, coverage=0, hotspots=[], gaps={}
+        )
+    output = render(evidence)
+    assert not output["nodes"]["report"]["hidden"]
+    assert title in output["nodes"]["message"]["text"]
+    context = output["nodes"]["context"]["text"]
+    assert f"{title}{status.capitalize()}" in context
+    for field in ("code", "message", "guidance"):
+        assert diagnostic[field] in context
+    assert "Inference preflightPassed" in context and "Evaluation preflightPassed" in context
+    assert "Inference check failed" not in context and "Evaluation failed" not in context
+    assert "Criteria with assessments0 / 2" in output["nodes"]["evaluation-summary"]["text"]
+    assert "Skipped" in output["nodes"]["judges"]["text"]
+    assert "boolean pass rate" not in output["nodes"]["judges"]["text"]
+    metrics = output["nodes"]["metrics"]["text"]
+    if code == "worker_start_failed":
+        assert "Successful throughput—req/s" in metrics
+        assert "0 successful / 0 attempts" in metrics
+        assert output["nodes"]["page"]["text"] == "0–0 of 0 attempts"
+        assert not output["nodes"]["waterfall"]["children"]
+    else:
+        assert "1.20req/s" in metrics and "100ms" in metrics
+        assert "2 successful / 2 attempts" in metrics
+        assert output["nodes"]["page"]["text"] == "1–2 of 2 attempts"
+        assert "Generation" in output["nodes"]["waterfall"]["text"]
+
+
+def test_load_worker_diagnostics_are_text_only(evidence: dict[str, Any]) -> None:
+    diagnostic = {
+        "code": "worker_failed",
+        "message": "<img src=x onerror=alert('worker')>",
+        "guidance": "<a href=javascript:alert('guidance')>fix</a>",
+    }
+    evidence["run"].update(status="failed", load_status="failed", load_error=diagnostic)
+    output = render(evidence)
+    context = output["nodes"]["context"]
+    assert "Load worker failed" in output["nodes"]["message"]["text"]
+    for field in ("code", "message", "guidance"):
+        assert diagnostic[field] in context["text"]
+    pending = [context]
+    while pending:
+        node = pending.pop()
+        assert node["tag"] not in {"script", "img", "a", "svg"}
+        assert not node["attributes"]
+        pending.extend(node["children"])
+    assert len(output["calls"]) == 1
+    assert "private-test-key" not in json.dumps(output["history"])
+
+
+def test_incomplete_load_worker_diagnostic_uses_safe_fallback(evidence: dict[str, Any]) -> None:
+    evidence["run"].update(
+        status="failed",
+        load_status="failed",
+        load_error={"code": "worker_failed", "message": "private exception details"},
+    )
+    output = render(evidence)
+    context = output["nodes"]["context"]["text"]
+    assert "Load worker failed" in context
+    assert "Safe load diagnostic details were not recorded." in context
+    assert "Ask the operator to review load-worker configuration and protected logs" in context
+    assert "private exception details" not in json.dumps(output["nodes"])
+
+
+@pytest.mark.parametrize("status,scored", [("failed", 0), ("partial", 1)])
+def test_criterion_diagnostics_preserve_recorded_outcomes(
+    evidence: dict[str, Any], status: str, scored: int
+) -> None:
+    diagnostic = {
+        "code": "judge_timeout",
+        "message": "A judge assessment did not finish within its deadline.",
+        "guidance": "Review the frozen judge timeout and endpoint health.",
+        "scorer": "relevance",
+    }
+    result = evidence["run"]["evaluation"]["results"][0]
+    result.update(
+        status=status,
+        attempted=2,
+        scored=scored,
+        judge_errors=2 - scored,
+        pass_rate=0 if scored else None,
+        metrics={"relevance/mean": 0} if scored else {},
+        error=diagnostic,
+    )
+    output = render(evidence)
+    context = output["nodes"]["context"]["text"]
+    assert "Evaluation criterion error: Relevance" in context
+    assert status.capitalize() in context
+    text = output["nodes"]["judges"]["text"]
+    for field in ("code", "message", "guidance"):
+        assert diagnostic[field] in context and diagnostic[field] in text
+    assert f"{scored} / 2 selected scored" in text
+    assert f"{2 - scored} judge error" in text
+    assert ("boolean pass rate" in text) == bool(scored)
+    assert ("0.0%" if scored else "No assessments") in text
+    assert "1.20req/s" in output["nodes"]["metrics"]["text"]
+
+
+def test_legacy_evaluation_failure_uses_fixed_safe_fallback(evidence: dict[str, Any]) -> None:
+    evidence["run"]["evaluation_status"] = "failed"
+    evidence["run"]["evaluation"] = {
+        "status": "failed",
+        "error_type": "RuntimeError: private exception <script>alert(1)</script>",
+        "message": "private exception message",
+    }
+    output = render(evidence)
+    assert "Evaluation failed" in output["nodes"]["message"]["text"]
+    context = output["nodes"]["context"]["text"]
+    assert "diagnostic_unavailable" in context
+    assert "Safe evaluation diagnostic details were not recorded." in context
+    assert "Ask the operator to review judge configuration and protected logs" in context
+    assert "private exception" not in json.dumps(output["nodes"])
+    assert "Criteria with assessments0 / 2" in output["nodes"]["evaluation-summary"]["text"]
+    assert "No assessments" in output["nodes"]["judges"]["text"]
+    assert "Evaluation preflightNot run" in context
+
+
+def test_evaluation_diagnostics_are_text_only(evidence: dict[str, Any]) -> None:
+    diagnostic = {
+        "code": "<script>alert('code')</script>",
+        "message": "<img src=x onerror=alert('message')>",
+        "guidance": "<a href=javascript:alert('guidance')>fix</a>",
+        "scorer": "<svg onload=alert('scorer')>",
+        "http_status": 403,
+    }
+    evidence["run"]["evaluation_preflight"] = {
+        "status": "failed",
+        "checked_scorers": [diagnostic["scorer"]],
+        "error": diagnostic,
+    }
+    evidence["run"]["evaluation"].update(status="failed", error=diagnostic)
+    evidence["run"]["evaluation"]["results"][0].update(status="partial", error=diagnostic)
+    output = render(evidence)
+    context = output["nodes"]["context"]
+    judges = output["nodes"]["judges"]
+    for field in ("code", "message", "guidance", "scorer"):
+        assert diagnostic[field] in context["text"]
+        assert diagnostic[field] in judges["text"]
+    pending = [context, judges]
+    while pending:
+        node = pending.pop()
+        assert node["tag"] not in {"script", "img", "a", "svg"}
+        assert not node["attributes"]
+        pending.extend(node["children"])
+    assert len(output["calls"]) == 1
+    assert "private-test-key" not in json.dumps(output["history"])
 
 
 def test_empty_report_clears_evidence(evidence: dict[str, Any]) -> None:

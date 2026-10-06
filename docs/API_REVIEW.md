@@ -1,5 +1,13 @@
 # API and implementation review — 0.2.0
 
+Each evaluated criterion now includes an additive `assessments` array in run and
+report responses, available identically through Python and REST. Exact request
+tags associate bounded judge rationales with case/request IDs; quality failures,
+execution errors, and unavailable evidence remain distinct. Rationales can quote
+protected evaluation content; profiles and fixed execution diagnostics remain
+content-free. Old reports are not re-judged or silently backfilled. This response/
+disclosure change requires maintainer review of [ADR 0008](adr/0008-request-assessment-reasons.md).
+
 New runs now include a mandatory first-case inference preflight. The 202 submission
 contract and request/hash/plan formats are unchanged; poll the run's `preflight`
 field for safe diagnostics. Failed checks terminate with skipped load, profiling,
@@ -106,3 +114,27 @@ potentially breaking change. The earlier local 0.2 snapshot comparison reports n
 explicit breaking changes; both detectors are heuristic, not compatibility proof.
 Native OpenAPI validation, wire-level framework tests, recovery regressions, and
 the full test/build results are recorded in [VALIDATION.md](../VALIDATION.md).
+
+## Shared Python/REST coordinator — October 5, 2026
+
+REST routes, acknowledgment codes, authentication, pagination, error envelopes,
+legacy usage hashes, and plan format 3 remain. Python uses the same coordinator
+and Locust engine. New `http-json` request-adapter and `invalid_response`
+preflight-error enum values require exhaustive enum clients to update; JSON TTFT
+and first-event timing are unavailable, not zero.
+
+The schema review versus `d83ef4a` reports zero explicit/potential breaking changes,
+zero lint errors, 74 warnings, and 28 informational findings. The design score is
+77.31/100 (C), not a B-grade or production sign-off. The installed tools require
+`--output`; the skill quickstart's `-o` invocation failed before rerunning with the
+supported option. Heuristic compatibility tools do not establish behavioral
+compatibility; local REST/Python/Locust, recovery, and framework tests do.
+
+Storage regressions tighten partial admission, repeated shutdown cancellation,
+subprocess cleanup, safe configuration errors, and terminal reports. The shared
+serialized input bound also protects local Python before planning. Snapshot/summary
+writes are not transactional; truthful in-process terminal receipts may be lost on
+restart after persistence failure. New admission fails closed until storage is
+restored and the runner reopened. Startup rebuilds history from authoritative
+snapshots once, trading cold-start I/O for correct recovery metadata.
+See [ADR 0005](adr/0005-shared-coordinator-python-json.md); maintainer review is pending.

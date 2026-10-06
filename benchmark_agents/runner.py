@@ -4,51 +4,28 @@ import math
 from collections import Counter
 from typing import Any
 
+from .adapters import get_adapter
 from .models import RunRequest, Sample
 
 
 def payload(request: RunRequest, sample: Sample) -> dict[str, Any]:
-    """Convert one workload case into the selected streaming wire contract.
+    """Convert one workload case into a fixed hosted-agent wire contract.
 
     Args:
         request: Target adapter and model settings for this run.
-        sample: A nonempty query or messages array; messages take precedence.
+        sample: Nonempty raw inputs for http-json; query or messages for SSE.
 
     Returns:
-        A streaming OpenAI Chat Completions or MLflow agent-server request body.
-        Additional sample input keys remain evaluation metadata, not target fields.
-        No reasoning, tool, or sampling settings are injected. Streamed token usage
-        is requested only when target.request_usage is enabled for openai-chat.
+        The raw inputs object for http-json, or a streaming OpenAI Chat Completions
+        or MLflow agent-server envelope. Extra SSE input keys remain evaluation
+        metadata. No reasoning, tool, or sampling settings are injected. Streamed
+        usage is requested only when target.request_usage is enabled for openai-chat.
 
     Raises:
-        ValueError: A query is missing or messages are not nonempty role-bearing
-            objects. This validates the supported envelope, not all provider fields.
+        ValueError: JSON inputs are empty, or SSE inputs lack a query or valid messages.
+            This validates the supported envelope, not all provider fields.
     """
-    messages = sample.inputs.get("messages")
-    if messages is None:
-        query = sample.inputs.get("query")
-        if not isinstance(query, str) or not query:
-            raise ValueError("Each sample needs inputs.query or inputs.messages.")
-        messages = [{"role": "user", "content": query}]
-    if (
-        not isinstance(messages, list)
-        or not messages
-        or any(
-            not isinstance(message, dict) or not isinstance(message.get("role"), str)
-            for message in messages
-        )
-    ):
-        raise ValueError("inputs.messages must be a nonempty array of objects with a role")
-    if request.target.adapter == "mlflow-agent-server":
-        return {"input": messages, "stream": True}
-    body = {
-        "model": request.target.model,
-        "messages": messages,
-        "stream": True,
-    }
-    if request.target.request_usage:
-        body["stream_options"] = {"include_usage": True}
-    return body
+    return get_adapter(request.target.adapter).encode(request.target, sample)
 
 
 def percentile(values: list[float], quantile: float) -> float | None:

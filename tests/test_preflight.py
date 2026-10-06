@@ -13,7 +13,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from benchmark_agents import api
+from benchmark_agents import api, coordinator
 from benchmark_agents.locust_runner import preflight_result, run_load, run_preflight
 from benchmark_agents.storage import append_event, atomic_json
 from tests.test_template import configuration
@@ -77,8 +77,10 @@ async def test_failed_inference_stops_before_load_and_returns_safe_report(
     code: str,
 ) -> None:
     base_url, server = endpoint
-    monkeypatch.setattr(api, "evaluate", lambda *args: pytest.fail("Judging must not run"))
-    monkeypatch.setattr(api, "run_load", lambda *args, **kwargs: pytest.fail("Load must not run"))
+    monkeypatch.setattr(coordinator, "evaluate", lambda *args: pytest.fail("Judging must not run"))
+    monkeypatch.setattr(
+        coordinator, "run_load", lambda *args, **kwargs: pytest.fail("Load must not run")
+    )
     body = configuration(timeout_seconds=timeout).model_dump(mode="json")
     body["target"]["url"] = base_url + "/" + mode
     app = api.create_app(tmp_path)
@@ -130,7 +132,7 @@ async def test_passed_preflight_is_one_extra_first_case_and_excluded_from_measur
         evaluated.append(rows)
         return {"status": "completed"}
 
-    monkeypatch.setattr(api, "evaluate", evaluate)
+    monkeypatch.setattr(coordinator, "evaluate", evaluate)
     body = configuration(duration_seconds=5, max_requests=3).model_dump(mode="json")
     body["target"]["url"] = base_url + "/" + mode
     body["target"]["adapter"] = adapter
@@ -273,8 +275,10 @@ async def test_preflight_worker_start_error_surfaces_safe_failure_and_report(
     async def broken_worker(*args: Any, **kwargs: Any) -> None:
         raise OSError("private worker details")
 
-    monkeypatch.setattr(api, "run_preflight", broken_worker)
-    monkeypatch.setattr(api, "run_load", lambda *args, **kwargs: pytest.fail("Load must not run"))
+    monkeypatch.setattr(coordinator, "run_preflight", broken_worker)
+    monkeypatch.setattr(
+        coordinator, "run_load", lambda *args, **kwargs: pytest.fail("Load must not run")
+    )
     app = api.create_app(tmp_path)
     async with (
         app.router.lifespan_context(app),
@@ -295,7 +299,9 @@ async def test_killed_preflight_worker_never_starts_load(
     endpoint: tuple[str, dict[str, Any]], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     base_url, server = endpoint
-    monkeypatch.setattr(api, "run_load", lambda *args, **kwargs: pytest.fail("Load must not run"))
+    monkeypatch.setattr(
+        coordinator, "run_load", lambda *args, **kwargs: pytest.fail("Load must not run")
+    )
     body = configuration(timeout_seconds=4).model_dump(mode="json")
     body["target"]["url"] = base_url + "/slow"
     app = api.create_app(tmp_path)

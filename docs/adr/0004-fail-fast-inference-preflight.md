@@ -4,6 +4,9 @@
 - Status: Proposed for maintainer review; implemented for the local alpha
 - Review owner: repository maintainer
 
+ADR 0006 extends this decision: selected judges reuse the excluded probe for
+readiness before load. The probe remains excluded from benchmark quality results.
+
 ## Context and assumptions
 
 A valid target URL or HTTP 200 does not establish working inference. Authentication,

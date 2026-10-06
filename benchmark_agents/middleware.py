@@ -3,11 +3,13 @@
 from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .limits import MAX_REQUEST_BYTES
+
 
 class BodyLimitMiddleware:
     """Bound decoded HTTP body bytes, including chunked requests without Content-Length."""
 
-    def __init__(self, app: ASGIApp, max_bytes: int = 8_000_000) -> None:
+    def __init__(self, app: ASGIApp, max_bytes: int = MAX_REQUEST_BYTES) -> None:
         """Wrap an application with an eight-megabyte default submission limit."""
         self.app = app
         self.max_bytes = max_bytes

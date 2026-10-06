@@ -45,7 +45,7 @@ class Sample(Model):
     """One workload case and optional authoritative reference evidence."""
 
     inputs: dict[str, Any] = Field(
-        description="A query string or a nonempty messages array.",
+        description="For http-json, the raw nonempty object sent as the POST body. For SSE adapters, query or a nonempty messages array.",
         examples=[{"query": "Can I refund?"}],
     )
     expectations: dict[str, Any] = Field(
@@ -118,18 +118,21 @@ class Evaluation(Model):
 
 
 class Target(Model):
-    """Hosted streaming endpoint and an optional server-owned connection reference."""
+    """Hosted HTTP endpoint and an optional server-owned connection reference."""
 
     url: HttpUrl = Field(
-        description="Exact streaming URL authorized by server target policy.",
+        description="Exact HTTP endpoint URL (SSE or JSON) authorized by server target policy.",
         examples=["http://127.0.0.1:9001/chat"],
     )
-    adapter: Literal["openai-chat", "mlflow-agent-server"] = "openai-chat"
+    adapter: Literal["openai-chat", "mlflow-agent-server", "http-json"] = "openai-chat"
     framework: Literal["langgraph", "openai-agents"] | None = None
-    model: str = "agent"
+    model: str = Field(
+        default="agent",
+        description="Model name sent only by openai-chat; ignored by mlflow-agent-server and http-json.",
+    )
     request_usage: bool = Field(
         default=True,
-        description="Request streamed token usage for openai-chat. Disable when the endpoint rejects stream_options; absent usage stays unknown. Ignored by mlflow-agent-server.",
+        description="Request streamed token usage for openai-chat. Disable when the endpoint rejects stream_options; absent usage stays unknown. Ignored by mlflow-agent-server and http-json.",
     )
     connection_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,64}$")
 
@@ -303,13 +306,14 @@ class PreflightError(Model):
         "target_timeout",
         "target_connection_error",
         "invalid_stream",
+        "invalid_response",
         "worker_failed",
     ] = Field(description="Machine-readable inference-check failure category.")
     message: str = Field(description="Safe explanation and corrective guidance.")
 
 
 class PreflightResult(Model):
-    """One extra first-case invocation, excluded from load metrics, profiles, and judging."""
+    """Extra first-case invocation, excluded from measured metrics, profiles, and quality."""
 
     status: Literal[
         "not_run", "pending", "running", "passed", "failed", "cancelled", "interrupted"
@@ -327,6 +331,34 @@ class PreflightResult(Model):
         default=None, ge=100, le=599, description="Target HTTP status, when received."
     )
     error: PreflightError | None = Field(default=None, description="Safe failure details.")
+
+
+class EvaluationError(Model):
+    """Content-free evaluation failure with corrective guidance, never provider text."""
+
+    code: str = Field(description="Machine-readable evaluation failure category.")
+    message: str = Field(description="Safe explanation, not an exception or provider body.")
+    guidance: str = Field(description="Action the operator can take before another run.")
+    scorer: str | None = Field(default=None, description="Frozen criterion that failed.")
+    http_status: int | None = Field(default=None, ge=100, le=599)
+
+
+class EvaluationPreflight(Model):
+    """One readiness assessment per criterion, outside measured load and quality results."""
+
+    status: Literal[
+        "not_run", "pending", "running", "skipped", "passed", "failed", "cancelled", "interrupted"
+    ] = "not_run"
+    checked_scorers: list[str] = Field(default_factory=list)
+    error: EvaluationError | None = None
+
+
+class LoadError(Model):
+    """Safe worker failure without process output, paths, credentials, or prompts."""
+
+    code: Literal["worker_start_failed", "worker_failed", "worker_timeout"]
+    message: str
+    guidance: str
 
 
 class RunResponse(Model):
@@ -348,6 +380,13 @@ class RunResponse(Model):
         default_factory=PreflightResult,
         description="Mandatory first-case inference check before measured load; historical runs use not_run.",
     )
+    evaluation_preflight: EvaluationPreflight = Field(
+        default_factory=EvaluationPreflight,
+        description="Selected judges must assess the inference probe before load; historical runs use not_run.",
+    )
+    load_error: LoadError | None = Field(
+        default=None, description="Safe load-worker failure details."
+    )
     config: RunRequest
     plan: Plan
     trace_coverage: str = Field(
@@ -359,7 +398,7 @@ class RunResponse(Model):
     )
     evaluation: dict[str, Any] = Field(
         default_factory=dict,
-        description="Per-scorer MLflow run IDs, scores, errors, and sampling coverage.",
+        description="Per-scorer MLflow run IDs, scores, safe execution errors, sampling coverage, and bounded request-correlated assessments. Judge rationales can contain protected evaluation content.",
     )
     error_type: str | None = None
 
@@ -434,6 +473,18 @@ class ProfilingSummary(Model):
     )
 
 
+class MLflowExperimentLink(Model):
+    """Credential-free browser destination for a recorded MLflow experiment."""
+
+    experiment_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    url: str = Field(
+        max_length=4096,
+        pattern=r"^https?://",
+        description="Operator-owned UI destination, never containing API credentials.",
+    )
+    scopes: list[Literal["traces", "evaluation"]] = Field(min_length=1, max_length=2)
+
+
 class RunReport(Model):
     """One bounded report page joining performance, profiling, and quality evidence."""
 
@@ -447,6 +498,11 @@ class RunReport(Model):
     offset: int = Field(description="Zero-based offset into request profiles.")
     limit: int = Field(description="Maximum returned profiles, at most 100.")
     total: int = Field(description="Total request profiles, including explicit evidence gaps.")
+    mlflow_experiments: list[MLflowExperimentLink] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Available trace/evaluation experiment UI links; historical or unconfigured destinations are omitted.",
+    )
 
 
 class RequestPage(Model):

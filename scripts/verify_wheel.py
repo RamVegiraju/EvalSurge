@@ -1,11 +1,20 @@
-"""Verify that the built wheel contains the API, report, and self-hosted docs."""
+"""Verify the built wheel's public Python API, coordinator, report, and docs."""
 
 from pathlib import Path
 from zipfile import ZipFile
 
 REQUIRED_FILES = {
+    "evalsurge/__init__.py",
+    "evalsurge/client.py",
     "benchmark_agents/__init__.py",
     "benchmark_agents/api.py",
+    "benchmark_agents/coordinator.py",
+    "benchmark_agents/adapters.py",
+    "benchmark_agents/limits.py",
+    "benchmark_agents/evaluation_errors.py",
+    "benchmark_agents/evaluation_details.py",
+    "benchmark_agents/evaluation_preflight.py",
+    "benchmark_agents/report_links.py",
     "benchmark_agents/static/index.html",
     "benchmark_agents/static/report.css",
     "benchmark_agents/static/report.js",
@@ -47,7 +56,7 @@ def main() -> None:
             "Expected exactly one EvalSurge wheel in dist; use a clean build directory"
         )
     verify(wheels[0])
-    print(f"Verified API package, report, and self-hosted docs assets in {wheels[0].name}")
+    print(f"Verified Python/REST API, report, and self-hosted docs assets in {wheels[0].name}")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
-from .connections import resolve_connection
+from .connections import Connection, resolve_connection, validate_connection
 from .models import Load, PreflightError, PreflightResult, RunRequest
 from .runner import summarize
 from .storage import atomic_json, recover_rows
@@ -63,6 +63,11 @@ def preflight_result(rows: list[dict[str, Any]], summary: dict[str, Any]) -> Pre
         code, guidance = "target_timeout", "The agent exceeded the request deadline."
     elif error_type in {"ConnectionError", "SSLError"}:
         code, guidance = "target_connection_error", "The agent connection failed."
+    elif row.get("error_phase") == "response":
+        code, guidance = (
+            "invalid_response",
+            "The agent did not return a valid, nonempty JSON answer. Check the endpoint contract.",
+        )
     elif row.get("error_phase") in {"request", "stream"}:
         code, guidance = (
             "invalid_stream",
@@ -77,7 +82,12 @@ def preflight_result(rows: list[dict[str, Any]], summary: dict[str, Any]) -> Pre
 
 
 async def run_preflight(
-    request: RunRequest, run_id: str, cancel: asyncio.Event, artifact_dir: Path
+    request: RunRequest,
+    run_id: str,
+    cancel: asyncio.Event,
+    artifact_dir: Path,
+    *,
+    connection: Connection | None = None,
 ) -> PreflightResult:
     """Check the first case once using the production Locust engine before load.
 
@@ -86,6 +96,7 @@ async def run_preflight(
         run_id: Run correlation identifier; retained for the separate probe.
         cancel: API-owned cancellation event; no retries or fallback are performed.
         artifact_dir: Operator-owned root; probe journals live under preflights/.
+        connection: Optional prevalidated operator binding shared with measured load.
 
     Returns:
         A safe result. Only passed permits measured load; cancellation/interruption
@@ -96,7 +107,8 @@ async def run_preflight(
         ValueError: The operator-owned connection is invalid.
 
     This is an extra invocation that can incur provider cost and execute agent tools.
-    Its captures are protected artifacts, never benchmark rows or judge inputs.
+    Its captures are protected artifacts, never benchmark rows or quality samples.
+    Selected judges may reuse the capture for excluded readiness assessments.
     Worker startup has the same bounded grace as load; duration limits dispatch.
     """
     if cancel.is_set():
@@ -115,7 +127,12 @@ async def run_preflight(
         }
     )
     rows, summary = await run_load(
-        probe, run_id, cancel, artifact_dir=artifact_dir / "preflights", phase="preflight"
+        probe,
+        run_id,
+        cancel,
+        artifact_dir=artifact_dir / "preflights",
+        phase="preflight",
+        connection=connection,
     )
     result = preflight_result(rows, summary)
     atomic_json(artifact_dir / "preflights" / run_id / "preflight.json", result.model_dump())
@@ -129,6 +146,7 @@ async def run_load(
     artifact_dir: Path | None = None,
     *,
     phase: Literal["load", "preflight"] = "load",
+    connection: Connection | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Run the production Locust subprocess and recover its request measurements.
 
@@ -138,6 +156,7 @@ async def run_load(
         cancel: API-owned event; setting it requests dispatch stop and active drain.
         artifact_dir: Storage root, defaulting to BENCHMARK_ARTIFACT_DIR or artifacts.
         phase: Worker ownership label; preflight uses a separate artifact root.
+        connection: Optional trusted exact binding; never a resolved secret.
 
     Returns:
         Recovered request rows and a summary with independent load status,
@@ -160,7 +179,12 @@ async def run_load(
         root / name for name in ("config.json", "result.json", "cancel")
     ]
     atomic_json(config_path, request.model_dump(mode="json"))
-    atomic_json(root / "connection.json", resolve_connection(request.target).model_dump())
+    binding = (
+        validate_connection(request.target, connection)
+        if connection is not None
+        else resolve_connection(request.target)
+    )
+    atomic_json(root / "connection.json", binding.model_dump())
     if cancel.is_set():
         cancel_path.touch(exist_ok=True)
     environment = {
@@ -193,10 +217,10 @@ async def run_load(
             stdout=log,
             stderr=asyncio.subprocess.STDOUT,
         )
-        atomic_json(root / "worker.json", {"pid": process.pid, "phase": phase})
         deadline = started + request.load.duration_seconds + request.load.timeout_seconds + 45
         expired = False
         try:
+            atomic_json(root / "worker.json", {"pid": process.pid, "phase": phase})
             while process.returncode is None:
                 if cancel.is_set():
                     cancel_path.touch(exist_ok=True)
@@ -223,14 +247,20 @@ async def run_load(
             observed_peak_in_flight=None,
             dispatched_requests=len(rows),
         )
-    summary.update(incomplete_measurements=incomplete, worker_exit_code=process.returncode)
+    summary.update(
+        incomplete_measurements=incomplete,
+        worker_exit_code=process.returncode,
+        worker_timed_out=expired,
+    )
     summary["load_status"] = (
         "interrupted"
-        if expired or incomplete or not result_path.exists()
+        if expired or incomplete or not result_path.exists() or process.returncode not in {0, 1}
         else "cancelled"
         if cancel.is_set()
         else "completed"
     )
-    summary["measurement_complete"] = result_path.exists() and not incomplete and not expired
+    summary["measurement_complete"] = (
+        result_path.exists() and not incomplete and not expired and process.returncode in {0, 1}
+    )
     atomic_json(root / "recovered.json", {"rows": rows, "summary": summary})
     return rows, summary

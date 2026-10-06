@@ -53,6 +53,32 @@ function scorerSource(recommendation, result) {
   return `MLflow catalog · ${result?.version ?? report.run.plan.rubric_version}`;
 }
 
+function drawMLflowLinks() {
+  const container = document.getElementById("mlflow-links");
+  container.replaceChildren();
+  for (const link of (report.mlflow_experiments ?? []).slice(0, 20)) {
+    if (typeof link.url !== "string" || /[\s\\]/.test(link.url)) continue;
+    let destination;
+    try {
+      destination = new URL(link.url);
+    } catch {
+      continue;
+    }
+    if (!["http:", "https:"].includes(destination.protocol) ||
+        destination.username || destination.password || destination.search ||
+        (destination.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(destination.hostname))) continue;
+    const scopes = (link.scopes ?? []).filter(scope => ["traces", "evaluation"].includes(scope)).join(" + ");
+    const anchor = element("a", `Open MLflow experiment ${link.experiment_id} · ${scopes || "evidence"} ↗`);
+    anchor.setAttribute("href", destination.href);
+    anchor.setAttribute("target", "_blank");
+    anchor.setAttribute("rel", "noopener noreferrer");
+    anchor.setAttribute("referrerpolicy", "no-referrer");
+    container.append(anchor);
+  }
+  if (!container.children.length) container.append(element("p",
+    "MLflow experiment links are not configured for this stored run. Local/file and Databricks stores need an operator-configured MLflow UI URL; historical evaluation IDs may be unavailable.", "detail"));
+}
+
 function drawSuggestions() {
   const plan = report.run.plan;
   document.getElementById("plan-source").textContent = `${plan.source === "llm" ? "LLM-suggested" : "Explicit selection"} · frozen plan ${plan.id.slice(0, 8)}`;
@@ -85,11 +111,63 @@ function summary(title, value, detail) {
   return block;
 }
 
+function failureDiagnostic(error, phase = "evaluation") {
+  const diagnostic = error && typeof error === "object" &&
+    ["code", "message", "guidance"].every(field => typeof error[field] === "string") ? error : {
+      code: "diagnostic_unavailable",
+      message: `Safe ${phase} diagnostic details were not recorded.`,
+      guidance: `Ask the operator to review ${phase === "load" ? "load-worker" : "judge"} configuration and protected logs before starting a new run.`,
+    };
+  const details = element("div", undefined, "detail warning");
+  details.append(
+    element("p", diagnostic.message),
+    element("code", diagnostic.code),
+    element("p", `Guidance: ${diagnostic.guidance}`)
+  );
+  if (typeof diagnostic.scorer === "string") details.append(element("div", `Scorer: ${diagnostic.scorer}`));
+  if (Number.isInteger(diagnostic.http_status)) details.append(element("div", `HTTP ${diagnostic.http_status}`));
+  return details;
+}
+
+function runFailures(run) {
+  const failures = [];
+  const preflight = run.evaluation_preflight;
+  if (preflight?.status === "failed" || preflight?.error) failures.push({
+    title: preflight.status === "failed" ? "Evaluation preflight failed — load never started" :
+      `Evaluation preflight ${humanize(preflight.status).toLowerCase()}`,
+    status: preflight.status,
+    error: preflight.error,
+  });
+  if (run.load_error) failures.push({
+    title: run.load_error.code === "worker_start_failed" ? "Load worker could not start" :
+      run.load_error.code === "worker_timeout" ? "Load worker timed out" : "Load worker failed",
+    status: run.load_status,
+    error: run.load_error,
+    phase: "load",
+  });
+  const evaluation = run.evaluation ?? {};
+  const status = evaluation.status ?? run.evaluation_status;
+  if (evaluation.error || evaluation.error_type || status === "failed") failures.push({
+    title: "Evaluation failed",
+    status,
+    error: evaluation.error,
+  });
+  for (const result of evaluation.results ?? []) {
+    if (result.error || result.status === "failed" || result.judge_errors > 0) failures.push({
+      title: `Evaluation criterion error: ${scorerName(result)}`,
+      status: result.status,
+      error: result.error,
+    });
+  }
+  return failures;
+}
+
 function drawJudges() {
   const run = report.run;
-  const results = run.evaluation.results ?? [];
+  const evaluation = run.evaluation ?? {};
+  const results = evaluation.results ?? [];
   const recommendations = run.plan.recommendations;
-  const status = run.evaluation.status ?? run.evaluation_status;
+  const status = evaluation.status ?? run.evaluation_status;
   document.getElementById("evaluation-status").replaceChildren(badge(status));
   const selectedAnswers = new Set(results.flatMap(result => result.request_ids ?? [])).size;
   const selectionsKnown = results.some(result => Array.isArray(result.request_ids));
@@ -140,6 +218,7 @@ function drawJudges() {
       status === "completed" || status === "completed_with_gaps" ? "not_assessed" : status;
     state.append(badge(result?.status ?? absentStatus));
     if (typeof result?.judge_errors === "number") state.append(element("div", `${result.judge_errors} judge error${result.judge_errors === 1 ? "" : "s"}`, result.judge_errors ? "detail warning" : "detail"));
+    if (result && (result.error || result.status === "failed" || result.judge_errors > 0)) state.append(failureDiagnostic(result.error));
     if (!result && recommendation.status === "needs_data") state.append(element("div", `Required: ${recommendation.required_fields.join(", ")}`, "detail"));
     row.append(criterion, outcome, coverage, state, element("td", scorerSource(recommendation, result), "detail"));
     body.append(row);
@@ -148,6 +227,63 @@ function drawJudges() {
   const container = document.getElementById("judges");
   container.replaceChildren(recommendations.length ? table : element("p", "No evaluation was requested. Performance measurements remain available.", "muted"));
   document.getElementById("sampling-note").textContent = `Sampling: ${run.plan.sampling_policy ?? "not recorded"} · at most ${run.plan.max_scored_requests ?? "—"} answers per criterion. Rates describe scored samples only, not the full workload. Catalog judge model: ${run.plan.judge_model ?? "not configured"}; registered judges use operator configuration.`;
+  drawAssessmentDetails(results);
+}
+
+function drawAssessmentDetails(results) {
+  const container = document.getElementById("assessment-details");
+  container.replaceChildren();
+  if (!results.length) return;
+  container.append(
+    element("h3", "Failed assessment details"),
+    element("p", "Judge explanations can quote private inputs, answers, or references. Quality failures are not judge execution errors.", "muted")
+  );
+  if (results.some(result => !Array.isArray(result.assessments))) container.append(
+    element("p", "Per-request reasons were not recorded for some criteria. Historical reports and criteria that did not run have no inferred explanations; open MLflow for retained evidence.", "muted")
+  );
+  let count = 0;
+  for (const result of results) {
+    const failures = (result.assessments ?? []).filter(item => ["failed", "error", "unavailable"].includes(item.status));
+    if (!failures.length) continue;
+    count += failures.length;
+    const group = element("details");
+    group.open = true;
+    group.append(element("summary", `${scorerName(result)} · ${failures.length} assessment${failures.length === 1 ? "" : "s"}`));
+    const scroll = element("div", undefined, "table-scroll");
+    const table = element("table", undefined, "judge-table assessment-table");
+    const head = element("thead");
+    const heading = element("tr");
+    for (const label of ["Request / case", "Outcome", "Reason / next step"]) {
+      const cell = element("th", label);
+      cell.scope = "col";
+      heading.append(cell);
+    }
+    head.append(heading);
+    const body = element("tbody");
+    for (const assessment of failures) {
+      const row = element("tr");
+      const identity = element("td");
+      identity.append(element("code", assessment.request_id ?? "Request not recorded"));
+      if (Number.isInteger(assessment.case_id)) identity.append(element("div", `Case ${assessment.case_id} (zero-based)`, "detail"));
+      const reason = element("td");
+      if (assessment.status === "failed") {
+        reason.append(element("p", typeof assessment.rationale === "string" && assessment.rationale.trim() ? assessment.rationale : "The judge did not record a rationale.", "assessment-rationale"));
+        if (assessment.rationale_truncated) reason.append(element("div", "Rationale truncated; open MLflow for the full recorded explanation.", "detail"));
+      } else {
+        reason.append(failureDiagnostic(assessment.error));
+      }
+      const label = assessment.status === "failed" ? "Quality failed" : assessment.status === "error" ? "Judge error" : "Assessment unavailable";
+      row.append(identity, element("td", label, "warning"), reason);
+      body.append(row);
+    }
+    table.append(head, body);
+    scroll.append(table);
+    group.append(scroll);
+    container.append(group);
+  }
+  if (!count && results.every(result => Array.isArray(result.assessments))) container.append(
+    element("p", "No failed boolean assessments or judge errors were recorded. Numeric/categorical scores have no inferred pass/fail threshold.", "muted")
+  );
 }
 
 function focusedSpans(profile) {
@@ -294,6 +430,7 @@ function render() {
     ["Workload", `${config.evaluation.samples.length} cases · ${run.metrics.requests ?? 0} attempts`],
     ["Load", `${config.load.concurrency} closed-loop users · one load level`],
     ["Inference preflight", humanize(run.preflight?.status ?? "not_run")],
+    ["Evaluation preflight", humanize(run.evaluation_preflight?.status ?? "not_run")],
     ["Phase outcomes", `Load: ${run.load_status ?? "unknown"} · traces: ${run.profiling_status ?? "unknown"} · eval: ${run.evaluation_status}`],
   ];
   for (const [label, value] of entries) {
@@ -301,6 +438,9 @@ function render() {
     block.append(element("div", label, "label"), element("div", value, "value"));
     context.append(block);
   }
+  if (Array.isArray(run.evaluation_preflight?.checked_scorers)) context.append(
+    element("div", `Checked scorers: ${run.evaluation_preflight.checked_scorers.join(", ") || "none recorded"} · readiness checks, excluded from quality scores`, "detail")
+  );
   if (run.preflight?.error) {
     const failure = element("div", undefined, "warning");
     failure.append(
@@ -311,6 +451,15 @@ function render() {
     );
     context.append(failure);
   }
+  for (const diagnostic of runFailures(run)) {
+    const failure = element("section", undefined, "warning");
+    failure.style.gridColumn = "1 / -1";
+    const heading = element("div", undefined, "section-heading");
+    heading.append(element("h3", diagnostic.title), badge(diagnostic.status));
+    failure.append(heading, failureDiagnostic(diagnostic.error, diagnostic.phase));
+    context.append(failure);
+  }
+  drawMLflowLinks();
   drawSuggestions();
   drawJudges();
   drawPerformance();
@@ -348,8 +497,10 @@ async function load() {
     if (!response.ok) throw new Error(data.error?.message ?? `HTTP ${response.status}`);
     report = data;
     render();
+    const failure = runFailures(report.run)[0];
     message.textContent = report.run.preflight?.error?.message ??
-      `Run ${report.run.id} · ${humanize(report.run.status)}. Refresh to see later phase results.`;
+      (failure ? `${failure.title}. See failure diagnostics below.` :
+        `Run ${report.run.id} · ${humanize(report.run.status)}. Refresh to see later phase results.`);
     history.replaceState(null, "", `?run=${encodeURIComponent(runId)}`);
   } catch (error) {
     report = undefined;

@@ -2,7 +2,45 @@
 
 Start with the [README quickstart](../README.md). This guide covers hosted
 connections, evaluation planning, API behavior, and bounded live examples.
-The Python import package is `benchmark_agents`; the distribution is `evalsurge`.
+The public Python import and distribution are `evalsurge`; existing
+`benchmark_agents` modules remain supported. See [local Python usage](PYTHON_API.md)
+for benchmarking without starting the REST server and the supported JSON contract.
+
+## MLflow experiment links
+
+Reports link to the agent's authorized trace experiments and the actual experiment
+used for post-load evaluations. The stores can be different; the judge/model
+workspace is never assumed to be the tracking workspace. Older reports without
+recorded evaluation experiment IDs omit those links rather than guessing.
+
+For a local SQLite store, configure the API's `.env`:
+
+```dotenv
+MLFLOW_TRACKING_URI=sqlite:///mlflow.db
+BENCHMARK_MLFLOW_UI_URL=http://127.0.0.1:5000
+```
+
+Start the UI against the **same database**, from the same working directory:
+
+```bash
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --host 127.0.0.1 --port 5000
+```
+
+For Databricks tracking, explicitly set the selected profile and its UI workspace:
+
+```dotenv
+MLFLOW_TRACKING_URI=databricks://YOUR_CONFIRMED_PROFILE
+BENCHMARK_MLFLOW_UI_URL=https://YOUR-WORKSPACE.cloud.databricks.com
+```
+
+HTTP(S) tracking stores default to their tracking URL; set the UI override when
+the browser UI has a different base or reverse-proxy prefix. The override only
+applies when the current `MLFLOW_TRACKING_URI` matches the run's frozen store.
+Remote UI destinations require HTTPS; plain HTTP is allowed only for loopback.
+Credentials, query strings, fragments, and unsafe URLs are omitted. Clicking a
+link opens a new tab without forwarding the API key or referrer. MLflow's own
+permissions still apply, and links do not imply that an experiment is reachable
+or public. Link creation performs no MLflow lookup or model call.
 
 ## Connections and authentication
 
@@ -69,10 +107,17 @@ samples, scorers, and budgets must match exactly; target/load settings may chang
 Old plan formats may need recreation. Plans bind trace scope, rubric/data hashes,
 registered scorer versions, sampling settings, and judge budgets.
 
-Evaluation scores captured answers **after load**, without calling the target
-again. Sampling balances randomized case/time strata with a frozen seed and
+Benchmark quality scores captured answers **after load**, without calling the target
+again. Before load, each selected criterion must complete one excluded readiness
+assessment of the inference probe. Sampling balances randomized case/time strata with a frozen seed and
 per-scorer budget. Read `eligible`, `attempted`, `scored`, `judge_errors`, selected
 request IDs, and coverage together. Completion is not a quality verdict.
+
+Expand **Failed assessment details** in the report to see each failed boolean
+verdict's judge rationale and request/case ID. Python and REST expose the same
+entries at `run.evaluation["results"][...]["assessments"]`. Judge execution errors
+show safe codes and next steps instead; no explanation is invented when missing.
+Rationales are bounded protected content and may quote private inputs or answers.
 
 Relevance and safety need outputs; correctness also needs authoritative
 `expected_response` or `expected_facts`. The direct catalog groundedness wrapper
@@ -80,13 +125,20 @@ is not implemented and remains `needs_data`. Brought trace-aware MLflow judges
 can be operator-allowlisted; missing evidence never becomes a passing assessment.
 See [judges and dataset integration](PROFILING_AND_EVALUATION.md).
 
-## Fail-fast inference check
+## Fail-fast readiness checks
+
+Before any agent invocation, the service validates the frozen evaluation setup:
+all selected criteria must be ready, catalog judges need a configured provider,
+and the first sample needs references required by correctness or a brought scorer.
+A selected `needs_data` criterion blocks load; remove it or supply its evidence.
+Use `scorers: []` and `registered_scorers: []` for performance only.
 
 Every new run checks the first workload sample once, at concurrency one, before
 measured load. The same target/model, adapter, usage setting, operator-owned
 credentials, and `load.timeout_seconds` apply. HTTP 200 alone is insufficient:
-the SSE response must finish normally with nonempty answer text. Redirects,
-provider error events, malformed/empty/truncated streams, and deadlines fail.
+the supported SSE response must finish normally with nonempty answer text, or
+`http-json` must return a complete valid nonempty answer object. Redirects,
+provider error events, malformed/empty/truncated responses, and deadlines fail.
 
 Submission still returns 202; poll `GET /v1/runs/{run_id}`. A failed check returns
 `status: "failed"`, skipped load/profiling/evaluation, and diagnostics such as:
@@ -113,16 +165,125 @@ correlated trace. Fix the target or server-owned connection and submit with
 a new idempotency key. Replaying the original key does not repeat inference.
 Old saved runs show `preflight.status: "not_run"`, not a retroactive success.
 
-This check is **one extra invocation** beyond `load.max_requests`, can execute
+This check is **one extra agent invocation** beyond `load.max_requests`, can execute
 tools/mutate memory/warm caches, and can incur provider cost. It has no retries
 or automatic provider/model adjustment. Captures stay in protected
 `preflights/{run_id}/` artifacts and are excluded from measured counts, timings,
-profiles, sampling, and judging. Passing proves only that this one request worked,
-not agent quality or capacity. Planning still occurs before preflight.
+profiles, quality sampling, and benchmark scores. Planning still occurs before preflight.
+
+If judging is selected, the service reuses that answer for **one readiness
+assessment per criterion** before spawning measured load. A false/zero verdict is
+valid; an execution failure or missing assessment is not. Catalog readiness uses
+the frozen timeout/token cap, zero SDK retries, and no additional MLflow rate-limit
+retries. Brought scorers retain their operator-owned transport/retry behavior.
+Trace-required scorers also need a verified, correctly correlated probe trace.
+
+Judge failure returns `status: "failed"`, `load_status: "skipped"`, and
+`evaluation_preflight.error` with `code`, `message`, `guidance`, and the failed
+`scorer`. Errors distinguish authentication, rate limits, connection/timeouts,
+invalid verdicts, missing evidence, and evaluation-backend failures without exposing
+provider text. A worker launch/exit/deadline failure instead exposes `load_error`.
+The report shows both. Passing readiness does not guarantee later provider
+availability, valid answers for every case, or quality under load.
+
+Post-load evaluation stops starting further criteria after an execution failure.
+Native MLflow may already have dispatched multiple assessments within the current
+criterion; those are not retractable. Measured latency/throughput remains readable
+if later evaluation fails; inspect `evaluation.error` or per-criterion errors and
+the `completed_with_gaps` outcome instead of treating completion as success.
 
 Cancellation during preflight stops further dispatch and drains the active check;
 load does not start. Restart cancels abandoned workers and marks the run interrupted
-without replaying agent actions. See [ADR 0004](adr/0004-fail-fast-inference-preflight.md).
+without replaying agent actions. See [ADR 0006](adr/0006-evaluation-readiness.md).
+
+## Python requests client
+
+With the API and authorized agent running:
+
+```bash
+uv run --no-sync python -m examples.python_requests_benchmark \
+  --api-url http://127.0.0.1:8000 \
+  --target-url http://127.0.0.1:9001/chat \
+  --concurrency 5 --duration 300 --max-requests 5000 --wait-timeout 600
+```
+
+The [example source](../examples/python_requests_benchmark.py) uses a normal
+`requests.Session`: one `POST /v1/runs`, status polling, and a printed report URL.
+For report JSON, use `GET /v1/runs/{run_id}/report`. The client
+disables ambient credentials/proxies, redirects, and retries, and uses one
+idempotency key. Set `BENCHMARK_API_KEY` if the API requires it.
+The default is performance-only; the sample mock does not call an LLM.
+
+For real evaluation, save a full run request with your reviewed target/model,
+cases/references, load settings, and scorer or `plan_id` selection, then use
+`--request-file request.json` instead of `--target-url`. Credentials and trace
+destinations remain server-owned. The request file is sent without load overrides.
+Submission can perform planning before 202; set `--http-read-timeout` accordingly.
+
+The client prints the terminal status and safe failure guidance. Failed/cancelled/
+interrupted runs exit nonzero; `completed_with_gaps` returns a report with a warning,
+not a passing evaluation. A client timeout or Ctrl-C stops waiting, not the server.
+Do not blindly resubmit an uncertain POST: reconcile its printed idempotency key
+with server history. A new CLI invocation uses a new key and can duplicate actions.
+
+The submitted body looks like this; `samples` is the actual workload, not a health check:
+
+```python
+body = {
+    "target": {"url": "http://127.0.0.1:9001/chat"},
+    "evaluation": {
+        "description": "Performance-only benchmark; no quality judging requested.",
+        "scorers": [],
+        "registered_scorers": [],
+        "samples": [{"inputs": {"query": "Reply with a short greeting."}}],
+    },
+    "load": {"concurrency": 5, "duration_seconds": 300, "max_requests": 5000},
+}
+```
+
+Send it as `session.post(api_url + "/v1/runs", json=body, ...)`, including one
+`Idempotency-Key` and appropriate network timeouts, as in the tested example.
+
+## How long does a run take?
+
+`duration_seconds` limits **new load dispatch**, not time until the final report:
+
+```text
+total ≈ planning + setup checks + worker startup + one agent probe
+      + judge readiness + load window + active-request drain
+      + trace collection + sampled quality evaluation
+```
+
+- Dispatch stops at duration **or** `max_requests`, whichever comes first. With
+  five users and a 300-second window, the test can issue thousands of requests:
+  concurrency is simultaneous users, not total calls. At steady state with no
+  think time, approximate calls are `concurrency × duration / mean request latency`.
+  This estimate excludes startup, ramp-up, auth/journal overhead, and the request cap.
+- A five-minute performance-only run usually needs the five-minute window plus
+  two worker startups, one probe, and drain. A fast mock may hit its cap much
+  sooner. It is not a promised completion SLA.
+- Each selected judge adds one readiness assessment, then at most
+  `max_scored_requests` measured answers **per scorer**. More criteria/answers,
+  slow models, provider rate limits/retries, tracking writes, and trace-export lag
+  can add seconds or minutes. Scoring begins after load; it is not included in
+  request latency. Readiness assessments are extra and excluded from quality scores.
+- `load.timeout_seconds` is the per-target-request deadline. Locust's parent
+  watchdog allows the dispatch duration plus that timeout plus 45 seconds of
+  startup/cleanup grace, then up to five seconds for termination before kill.
+  There is no hard overall report deadline.
+- `--wait-timeout` or Python `run.wait(timeout=...)` bounds caller waiting only.
+  HTTP connect/read timeouts are separate inactivity limits, not job deadlines
+  or hard wall-clock limits on a peer that continuously sends bytes.
+- Catalog `judge_timeout_seconds` configures SDK transport timeouts, not a hard
+  whole-phase deadline. Readiness has zero catalog SDK retries; post-load scoring
+  uses the frozen retry cap. Authentication, native MLflow setup/tracking writes,
+  and retry backoff can add time beyond one model request.
+
+Native scorer code runs in a thread, not a hard execution sandbox. Registered
+scorer transports/retries are operator-owned. Trace collection's 60-second
+fetch-admission budget does not interrupt an already-stalled remote call. Configure
+transport limits and use the phase statuses to locate delay; hard phase isolation
+remains a [shared-hosting gate](PRODUCTION_READINESS.md).
 
 ## Setup inspection and traces
 
@@ -206,7 +367,7 @@ uv run python -m examples.framework_e2e \
 
 This sends one preflight plus two measured target requests per framework at
 concurrency two, one planner call per framework, and at most one captured measured
-answer per selected catalog scorer.
+answer plus one readiness assessment per selected catalog scorer.
 Use `--framework langgraph` or `--framework openai-agents` for one integration.
 Tools/references are synthetic; traces/reports stay local.
 
@@ -227,8 +388,9 @@ provider/model matches, not universal model settings. Review
 [model compatibility](MODEL_COMPATIBILITY.md) before changing them.
 
 The smaller `uv run python examples/locust_databricks_e2e.py` loads `.env` and
-uses one planner call, one preflight plus four measured target calls, and up to four assessments per selected
-scorer, with bounded judge retries. Both examples require explicit workspace
+uses one planner call, one preflight plus four measured target calls, and up to four
+quality assessments plus one readiness assessment per selected scorer, with bounded
+catalog judge retries. Both examples require explicit workspace
 configuration and authorization for the target traffic.
 
 For contributing checks and recorded results, see

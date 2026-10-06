@@ -7,10 +7,14 @@ flowchart LR
     C[API client] --> A[FastAPI validation and connection policy]
     A --> P[Catalog planner or explicit scorers]
     P --> F[Persist frozen evaluation plan]
-    F --> V[Single inference preflight via Locust]
-    V -->|passed| L[Locust subprocess]
+    F --> Q[Static evaluation readiness]
+    Q -->|ready| V[Single inference preflight via Locust]
+    Q -->|failed| R
+    V -->|passed| B[Judge readiness on captured probe]
+    B -->|passed or performance-only| L[Locust subprocess]
+    B -->|failed| R
     V -->|failed| R
-    L --> T[Hosted streaming agent]
+    L --> T[Hosted HTTP agent]
     L --> J[Append-only request journal]
     T --> M[Agent-side MLflow spans and correlation metadata]
     J --> I[Post-load scoped trace collector]
@@ -25,7 +29,9 @@ flowchart LR
 
 ## Responsibility boundaries
 
-- `api.py`: application factory, admission control, authorization, idempotency, phase transitions, persisted plans, paginated results, safe HTTP errors.
+- `api.py`: REST authorization, validation, response metadata, safe HTTP errors, and presentation over the shared coordinator.
+- `coordinator.py`: single-owner storage, admission, idempotency/recovery, frozen plans, task/phase transitions, paginated results, cancellation, and drain.
+- `evalsurge/`: public sync/async local Python facade over the same coordinator and Locust engine; explicit URL-bound operator connections.
 - `connections.py`: operator-owned credential references bound to exact target URLs. API callers cannot select arbitrary environment secrets.
 - `planner.py`: bounded optional LLM selection from catalog IDs and operator-allowlisted aliases, using opt-in manifests. Deterministic validation decides readiness. The model cannot change load limits, destinations, credentials, rubric implementations, or evidence requirements.
 - `models.py`: strict request contracts with unknown fields rejected and bounded workloads.
@@ -33,9 +39,12 @@ flowchart LR
 - `locustfile.py`: sequential users, round-robin cases, protected authentication/request lifecycle, bounded streams, per-request measurement.
 - `streaming.py`: shared event semantics for OpenAI Chat Completions and Responses-style SSE. Supported adapters expect JSON in single-line `data:` events. `[DONE]`, a normal chat finish followed by EOF, or `response.completed` terminates a response. Missing terminal events, filtered/truncated output, invalid JSON, empty output, and deadlines are failures.
 - `runner.py`: payload construction and descriptive metrics only. There is no alternate async load engine.
+- `adapters.py`: bounded supported wire decoding, including the explicit `http-json` contract; JSON TTFT/first-event timing is unavailable.
 - `storage.py`: fsync'd request events, atomic snapshots, and recovery of interrupted attempts. A killed writer's incomplete final line is ignored.
 - `sampling.py`: fixed-seed randomized case/time strata over the observed dispatch window. The seed reproduces selection from identical records; it does not make model responses deterministic.
-- `evaluator.py` / `judges.py`: evaluate captured answers after load, preserve assessment coverage/errors, and call Databricks directly using MLflow-shipped rubrics. MLflow stores evaluation runs and assessments locally by default; inference uses the configured workspace.
+- `evaluation_preflight.py`: validates frozen setup and checks one captured probe assessment per criterion before load, with no target reinvocation.
+- `evaluator.py` / `judges.py`: score captured answers through native MLflow, preserve assessment coverage/errors, and call Databricks directly using MLflow-shipped rubrics. Readiness is tagged separately from post-load quality; provider failures become content-free native assessment errors without extra MLflow retry layering.
+- `evaluation_details.py`: request-tag correlation and bounded per-assessment quality explanations. Judge rationales are protected content, separate from sanitized profiling and fixed safe execution diagnostics; see ADR 0008.
 - `scorer_registry.py`: exact-version trusted scorer resolution, public serialization hashes, and frozen operator-owned MLflow/trace scope.
 - `profiling.py`: post-load correlation validation, bounded content-free normalization, union-based self time, wall occupancy with explicit parallel work, and descriptive per-name hotspots.
 - `middleware.py`: incremental body-size enforcement, including chunked HTTP.
@@ -55,13 +64,13 @@ or target retry is introduced.
 
 A run persists its config and frozen plan before load. The plan records the model endpoint, workspace/profile, installed rubric hash, dataset and policy hashes, sampling settings, maximum responses per scorer, judge output-token limit, timeout, and retry cap. Reusing a plan rejects changed evaluation inputs. Rubric drift is checked before judging. Endpoint names are not immutable model versions; the operator must pin a served revision where supported.
 
-The overall state progresses `queued → preflighting → running → profiling → evaluating → completed | completed_with_gaps`. Only a passed first-case inference check starts measured load. Preflight failures expose safe error guidance and skip load, profiling, and evaluation; the report remains readable with no measured rows. The extra probe can execute tools/incur cost and is excluded from performance, profiling, and judging. Historical snapshots use `not_run`. See [ADR 0004](docs/adr/0004-fail-fast-inference-preflight.md).
+The overall state progresses `queued → preflighting → running → profiling → evaluating → completed | completed_with_gaps`. Static setup, first-case inference, and selected-judge readiness must pass before measured load. Failure exposes safe corrective guidance and a readable report with no measured rows. The extra probe can execute tools/incur cost; its captured answer is reused for readiness but excluded from benchmark metrics, profiles, and quality results. Historical checks use `not_run`; performance-only skips judge readiness. See [ADR 0006](docs/adr/0006-evaluation-readiness.md).
 
-Load failure, cancellation, or interruption terminates separately and skips evaluation. Profiling still exposes partial observations when available. `preflight`, `load_status`, `profiling_status`, and `evaluation_status` are retained independently. Evaluation or trace-collection failure never discards measurements. A quality score of zero is a valid completed assessment, not a transport failure.
+Load failure, cancellation, or interruption terminates separately and skips evaluation. Profiling still exposes partial observations when available. `preflight`, `evaluation_preflight`, `load_status`, `load_error`, `profiling_status`, and `evaluation_status` are retained independently. Evaluation or trace-collection failure never discards measurements. A quality score of zero is a valid completed assessment, not a transport failure.
 
 Per-attempt journals record starts before authentication and flush completions in the request cleanup path. Authentication exceptions decrement active counts and become infrastructure failures. HTTP in-flight counters exclude authentication. A worker kill recovers completed rows, marks remaining starts interrupted, and marks aggregate completeness false. Interrupted-run rates use parent-observed elapsed time and are diagnostic, not comparable benchmark results. In-memory job ownership is not resumed after restart.
 
-The process lock enforces one API owner on local POSIX storage. Compact summaries feed a history/idempotency index; finished payloads are evicted from API memory. Startup migrates missing compact summaries once. Persisted active phases read as interrupted, including idempotency replay. Restart recovery requests cancellation of abandoned preflight/load workers. There is no automatic retry of agent traffic: retries can duplicate external actions and distort metrics. A future distributed implementation needs a durable queue, leases with fencing, heartbeat recovery, explicit retry semantics, and transactional admission/idempotency.
+The process lock enforces one coordinator owner on local POSIX storage. Compact summaries feed a history/idempotency index; durably finished payloads are evicted from memory. Startup rebuilds metadata from authoritative snapshots once, because snapshot/summary writes are not a transaction. Persistence failures stop new admission and may retain a warned in-process terminal receipt that can be lost on restart. Persisted active phases read as interrupted, including idempotency replay. Restart recovery requests cancellation of abandoned preflight/load workers. There is no automatic retry of agent traffic: retries can duplicate external actions and distort metrics. A future distributed implementation needs a durable queue, leases with fencing, heartbeat recovery, explicit retry semantics, and transactional admission/idempotency.
 
 ## Measurement contract
 
@@ -88,6 +97,11 @@ The quality-first report and documentation delivery decisions are recorded in
 and assessment results remain separate evidence. A reversible focused waterfall
 view hides enclosing spans for readability without changing persisted spans,
 occupancy calculations, or hotspot summaries.
+
+The shared coordinator, Python facade, and JSON transport are recorded in
+[ADR 0005](docs/adr/0005-shared-coordinator-python-json.md). Local Python runs Locust
+on the caller's machine; REST runs it on the API host. Both still require exclusive
+ownership of the artifact directory.
 
 1. Capacity discovery: concurrency stages, excluded warmup, repeated measurement windows, explicit latency/error/quality thresholds, and generator saturation checks.
 2. Harden framework integrations for deployment, add the catalog retrieval-groundedness wrapper, and calibrate trace-aware quality criteria.

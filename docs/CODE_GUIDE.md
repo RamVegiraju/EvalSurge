@@ -6,21 +6,24 @@ this guide explains how those functions fit together.
 
 ## Request-to-report flow
 
-1. `api.create_app()` creates per-process state and installs authentication, error
-   handling, response metadata, and the local-storage lifespan.
-2. `submit()` validates a target through `connections.resolve_connection()` and each
+1. `api.create_app()` installs HTTP authentication/error handling/metadata over
+   `RunCoordinator`; `evalsurge.EvalSurge` provides local sync/async ownership without
+   a web server. Both acquire the same exclusive local-storage lock.
+2. `RunCoordinator.submit()` validates a target through `connections.resolve_connection()` and each
    workload envelope through `runner.payload()`. It checks idempotency and admission,
    then creates or reuses a persisted plan before scheduling background work.
 3. `planner.create_plan()` uses explicit scorer IDs or a constrained planner call.
    `validate_plan()` independently determines evidence readiness and freezes data
    hashes, installed rubric sources, judge configuration, and sampling settings.
-4. `execute()` calls `locust_runner.run_preflight()` for one first-case invocation,
-   then `run_load()` only when it passes. Both use the same Locust subprocess path;
-   probe journals are separate and excluded from load/evaluation/report rows.
+4. `RunCoordinator._execute()` validates frozen evaluation setup before invoking the
+   target, calls `locust_runner.run_preflight()` once, and reuses its answer in
+   `run_evaluation_preflight()` before `run_load()`. Only completed readiness
+   assessments permit load; performance-only skips judging. Workers share one
+   Locust path; probes/readiness are excluded from measured/quality/report rows.
    The API process never imports `locustfile.py`.
 5. Each `AgentUser.invoke()` journals its start, resolves authentication, sends one
-   streaming request, and records completion. `streaming.consume()` interprets the
-   answer events; `runner.summarize()` aggregates client measurements.
+   HTTP request, and records completion. Shared adapters interpret SSE or the bounded
+   JSON contract; `runner.summarize()` aggregates client measurements.
 6. `profiling.collect_profiles()` validates exact trace correlation and scope after
    load, persists bounded content-free profiles, and retains actual Trace objects
    transiently for native trace-aware judging.
@@ -35,7 +38,10 @@ this guide explains how those functions fit together.
 
 | Module | Functions and responsibilities |
 | --- | --- |
-| `api.py` | `authorize()` enforces inbound service access; `plan_or_error()` translates recognized planner failures; factory-local handlers own admission, phase transitions, persistence, reads, and cancellation. |
+| `api.py` | `authorize()` enforces inbound service access; HTTP handlers delegate to the coordinator and translate domain errors to the existing envelope. |
+| `coordinator.py` | `RunCoordinator.open()/close()` own storage and drain; `submit()` freezes and schedules; `_execute()` advances phases; reads, reports, wait, and cancellation share one lifecycle. |
+| `evalsurge/` | `Agent.http()` separates protocol and connection; `EvalSurge.local()/local_async()` expose run handles without starting a server or nesting event loops. |
+| `adapters.py` | Supported response decoders bound input and validate completion/answer/usage/trace IDs; JSON never fabricates TTFT. |
 | `models.py` | Request and response contracts reject unknown model fields and bound load and assessment counts. Nested workload metadata remains flexible. |
 | `connections.py` | `resolve_connection()` validates exact operator-owned destinations; `authentication()` returns a refreshable header source. Connection records contain credential references, not copied secrets. |
 | `providers.py` | `workspace_client()` requires explicit workspace configuration; `planner_client()` and `judge_client()` create caller-owned clients; `judge_endpoint()` resolves the server endpoint name. |
@@ -48,7 +54,11 @@ this guide explains how those functions fit together.
 | `sampling.py` | `select_rows()` balances shuffled case/time strata using the frozen seed and assessment budget; it preserves input rows. |
 | `judges.py` | `rubric_hash()` detects prompt-source drift; `build_prompt()` renders installed rubrics; `direct_scorer()` requires a plan and returns a native MLflow scorer. |
 | `evaluator.py` | `evaluate()` uses captured outputs and the plan as the sole evaluation configuration, retaining assessment IDs, coverage, and MLflow result references. |
+| `evaluation_preflight.py` | `configuration_error()` validates frozen criteria/evidence before agent traffic; `run_evaluation_preflight()` checks one native assessment per criterion without reinvoking the target. |
+| `evaluation_errors.py` | `evaluation_error()` maps exception type/status to fixed safe guidance, never provider messages or bodies. |
+| `evaluation_details.py` | `assessment_details()` joins native result rows by exact request tags, bounds protected judge rationales, separates boolean quality failures from execution errors, and rejects ambiguous correlation. |
 | `scorer_registry.py` | `catalog()` validates trusted references; `freeze()` binds exact versions and `definition_hash()` canonicalizes public serialization; `trace_source()` freezes operator scope. |
+| `report_links.py` | `experiment_links()` builds bounded browser-only experiment links from frozen tracking stores and recorded IDs; operator UI overrides require exact store matching and no network or credential resolution. |
 | `profiling.py` | `normalize_trace()` checks complete tree timing/ancestry; `union_duration()` avoids nested overlap; `collect_profiles()` validates correlation and persists profiles; `summarize_profiles()` reports coverage/hotspots. |
 | `middleware.py` | `BodyLimitMiddleware` counts ASGI body chunks before parsing accepts excess data. |
 | `static/` | Report UI uses text-only DOM updates, same-origin authenticated fetches, and bounded report pages; no keys enter URLs or persistent browser storage. |
@@ -68,8 +78,13 @@ this guide explains how those functions fit together.
 - Cancellation stops new load dispatch and drains active requests. It does not cancel
   evaluation or promise immediate termination.
 - Preflight uses identical target settings and one extra first-case invocation; it
-  can execute tools/change agent state. Failure skips load and judging. Historical
-  snapshots default to `not_run`; no target retries or model fallbacks are introduced.
+  can execute tools/change agent state. Failure skips load; selected judges reuse
+  its captured answer for excluded readiness only. Historical checks default to
+  `not_run`; no target retries or model fallbacks are introduced.
+- Catalog provider errors return native errored Feedback without a value, avoiding
+  MLflow's hidden rate-limit retry layer. Readiness uses zero SDK retries; quality
+  uses the frozen SDK cap. Only explicitly trace-required registered scorers
+  receive a homogeneous native Trace column, never missing traces converted to NaN.
 - TTFT and request latency begin after authentication, just before HTTP dispatch.
   The run window also includes ramp-up, authentication, journaling, and drain.
 - Failed attempts affect error rates. Successful-only percentiles and partial
@@ -85,6 +100,11 @@ this guide explains how those functions fit together.
 ## Examples and retained history
 
 - `examples/mock_agent.py` serves deterministic local SSE without model credentials.
+- `examples/python_benchmark.py` uses the public Python facade, defaults to a
+  three-minute bounded performance-only run, and saves a report even on preflight failure.
+- `examples/python_requests_benchmark.py` submits one REST request with Requests,
+  polls independent phase outcomes, and prints the report URL without replaying
+  uncertain submissions or cancelling on client timeout.
 - `examples/smoke_test.py` exercises the actual REST and Locust path with that mock
   target. It can still use a paid judge when judge credentials are configured.
 - `examples/databricks_validation.py` checks direct planning, inference, and judge

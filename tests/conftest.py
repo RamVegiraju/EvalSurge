@@ -10,20 +10,43 @@ from typing import Any
 import pytest
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from benchmark_agents import api
-from benchmark_agents.models import PreflightResult
+from benchmark_agents import coordinator
+from benchmark_agents.models import EvaluationPreflight, PreflightResult
+from benchmark_agents.storage import append_event
 
 
 @pytest.fixture
 def successful_preflight(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep phase-unit tests at their existing controlled load boundary."""
 
-    async def passed(*args: Any, **kwargs: Any) -> PreflightResult:
-        return PreflightResult(status="passed")
+    async def passed(request: Any, run_id: str, *args: Any, **kwargs: Any) -> PreflightResult:
+        directory = kwargs["artifact_dir"] / "preflights" / run_id
+        directory.mkdir(parents=True, exist_ok=True)
+        append_event(
+            directory / "requests.jsonl",
+            {
+                "kind": "completed",
+                "row": {
+                    "request_id": "controlled-probe",
+                    "case_id": 0,
+                    "success": True,
+                    "inputs": request.evaluation.samples[0].inputs,
+                    "expectations": request.evaluation.samples[0].expectations,
+                    "outputs": "Controlled probe",
+                },
+            },
+        )
+        return PreflightResult(status="passed", request_id="controlled-probe")
 
-    monkeypatch.setattr(api, "run_preflight", passed)
+    monkeypatch.setattr(coordinator, "run_preflight", passed)
+    monkeypatch.setattr(coordinator, "configuration_error", lambda *args: None)
+    monkeypatch.setattr(
+        coordinator,
+        "run_evaluation_preflight",
+        lambda *args: EvaluationPreflight(status="passed"),
+    )
 
 
 @pytest.fixture
@@ -36,7 +59,7 @@ async def endpoint(
     measurements = {"active": 0, "peak": 0, "received": 0, "bodies": [], "request_ids": []}
 
     @app.post("/{mode}", response_model=None)
-    async def chat(mode: str, request: Request) -> JSONResponse | StreamingResponse:
+    async def chat(mode: str, request: Request) -> Response:
         measurements["received"] += 1
         measurements["bodies"].append(await request.json())
         measurements["request_ids"].append(request.headers.get("X-Benchmark-Request-ID"))
@@ -48,6 +71,22 @@ async def endpoint(
             )
         if mode == "wrong_content_type":
             return JSONResponse({"answer": "private answer"})
+        if mode.startswith("json"):
+            if mode == "json-slow":
+                await asyncio.sleep(1)
+            if mode == "json-malformed":
+                return Response("private-invalid-json", media_type="application/json")
+            if mode == "json-large":
+                return Response(b" " * 2_000_001, media_type="application/json")
+            if mode == "json-list":
+                return JSONResponse(["private answer"])
+            outputs = (
+                "" if mode == "json-empty" else ["bad"] if mode == "json-type" else "Answer—yes"
+            )
+            body = {"outputs": outputs}
+            if mode != "json-no-usage":
+                body["usage"] = {"output_tokens": -1 if mode == "json-bad-usage" else 3}
+            return JSONResponse(body, headers={"X-MLflow-Trace-ID": "tr-local-json"})
 
         async def stream() -> AsyncIterator[str]:
             measurements["active"] += 1

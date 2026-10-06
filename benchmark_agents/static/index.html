@@ -23,6 +23,7 @@
     <section id="report" hidden>
       <div class="intro"><div><p class="eyebrow">HOSTED AGENT / BENCHMARK REPORT</p><h1 id="title"></h1><p id="subtitle"></p></div><span id="status"></span></div>
       <div id="context" class="card context"></div>
+      <div id="mlflow-links" class="experiment-links" aria-label="MLflow experiments"></div>
       <nav class="section-nav" aria-label="Report sections"><a href="#quality">Judges & evaluations</a><a href="#performance">Performance</a><a href="#traces">Request traces</a><a href="#evidence">Evidence notes</a></nav>
       <section id="quality" aria-labelledby="quality-title">
         <div class="section-heading"><div><p class="eyebrow">QUALITY / FROZEN PLAN</p><h2 id="quality-title">Suggested judges</h2><p class="muted">Why each criterion was selected and what evidence it needs. Suggestions are not calibrated verdicts.</p></div><span id="plan-source" class="badge"></span></div>
@@ -33,6 +34,7 @@
           <div id="evaluation-summary" class="evaluation-summary"></div>
           <div id="judges" class="table-scroll"></div>
           <p id="sampling-note" class="muted"></p>
+          <div id="assessment-details"></div>
         </section>
       </section>
       <section id="performance" aria-labelledby="performance-title">

@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from benchmark_agents import api
+from benchmark_agents import api, coordinator
 from benchmark_agents.models import RunRequest
 from benchmark_agents.planner import PlannerResponseError, fingerprint
 from benchmark_agents.storage import append_event, atomic_json, recover_rows
@@ -40,7 +40,7 @@ def test_common_errors_and_headers(tmp_path, monkeypatch):
     async def invalid_plan(*args):
         raise PlannerResponseError("private-upstream-output")
 
-    monkeypatch.setattr(api, "create_plan", invalid_plan)
+    monkeypatch.setattr(coordinator, "create_plan", invalid_plan)
     app = api.create_app(tmp_path)
 
     @app.get("/crash")

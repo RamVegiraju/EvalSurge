@@ -2,7 +2,7 @@
 
 ## Minimum and optional evidence
 
-Minimum: an authorized streaming URL exposing the selected wire adapter, workload
+Minimum: an authorized HTTP URL exposing a supported SSE or JSON adapter, workload
 samples, and load limits. Tools/memory may exist internally, but endpoint-only access
 cannot reveal their timing. Without instrumentation the report remains client-only.
 `framework` is descriptive; it does not cause the benchmark server to import a remote
@@ -91,7 +91,15 @@ retrieves the **exact** version via `mlflow.genai.scorers.get_scorer`, freezes p
 serialized-definition hashes, and rechecks them before scoring. No source uploads or
 caller-selected store URLs are accepted. Registered scorers run through native
 `mlflow.genai.evaluate`; trace-aware data includes actual correlated **Trace objects**,
-not a bare `trace_id` column.
+not a bare `trace_id` column. Only scorers explicitly requiring `trace` receive that
+column, and every selected record has a verified Trace. Output-only scoring never
+mixes traced records with nullable/missing traces.
+
+Before load, selected judges assess the captured first-case probe once. Missing
+required evidence/trace, provider errors, or absent assessments block load with
+safe guidance; a negative quality verdict does not. These native readiness runs
+are tagged `evalsurge.phase=evaluation-preflight`, separate from benchmark scores.
+See [readiness and time budgets](USAGE.md#fail-fast-readiness-checks).
 
 MLflow 3.16 permits built-in and `make_judge` registrations on OSS stores. Decorator
 `@scorer` registration is restricted to Databricks tracking for security; this API
@@ -106,6 +114,36 @@ Read each criterion's `eligible`, `attempted`, `scored`, `judge_errors`, selecte
 IDs, native MLflow metrics, and run ID. A boolean-only scorer exposes a descriptive
 sample pass rate; numeric/categorical scores do not get reinterpreted as pass/fail.
 No overall aggregate pass rate is manufactured.
+
+Each criterion also records `assessments`, one entry per selected request, joined
+by exact request-ID tags rather than prompt equality or completion order:
+
+```json
+{
+  "request_id": "request-123",
+  "case_id": 0,
+  "status": "failed",
+  "value": false,
+  "rationale": "The answer allows a refund after the policy deadline.",
+  "rationale_truncated": false,
+  "error": null
+}
+```
+
+`passed`/`failed` describe boolean quality verdicts; `scored` has no inferred
+threshold. `error` means judge execution failed and includes fixed safe
+`error.code`, `message`, and corrective `guidance`, not raw provider/scorer text.
+`unavailable` means missing/ambiguous request-correlated evidence. Case IDs are
+zero-based. Scalar values are previews; strings and rationales are bounded to
+2,000 characters, non-scalar values are omitted, and `rationale_truncated` marks
+shortened explanations. Full values remain in MLflow. The sample budget bounds
+detail count (at most 1,000 per criterion). Missing rationales remain null.
+
+The report's **Failed assessment details** section shows every recorded negative
+boolean verdict and its judge rationale, separately from execution errors.
+Rationales may quote private evaluation content; protect reports and do not treat
+these explanations as calibrated truth or content-free profiling. Historical
+reports without details are not silently backfilled or re-judged.
 
 The GPT-5.4 mini demo uses `reasoning_effort="none"` for tool-enabled Chat
 Completions. Its endpoint rejects reasoning-enabled function tools on that wire
