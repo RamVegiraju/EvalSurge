@@ -20,7 +20,7 @@ async def main() -> None:
     requests verify integration, not stable latency, maximum capacity, or general
     judge calibration. Server cleanup is always requested after validation.
     """
-    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{Path('artifacts').resolve()}/locust-e2e.db"
     workspace = await asyncio.to_thread(workspace_client)
     os.environ["BENCHMARK_CONNECTIONS"] = json.dumps(

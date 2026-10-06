@@ -82,7 +82,8 @@ statuses. Open `http://127.0.0.1:8000/reports/?run=YOUR_RUN_ID` with the returne
 For JSON, use `GET /v1/runs/{run_id}/report`.
 
 The mock makes no LLM calls and has no internal traces. For **LangGraph and OpenAI
-Agents** with tools, memory, and tracing, see the [framework demos](docs/USAGE.md).
+Agents** with tools, memory, and tracing, see the
+[framework agent benchmarks](examples/README.md#framework-agent-benchmarks).
 
 ## Benchmark your agent
 
@@ -131,6 +132,13 @@ The default is performance-only; enable judging explicitly. `wait()` raises
 async applications. See [Python usage and the JSON contract](docs/PYTHON_API.md).
 Local Python runs generate load on this machine; REST runs generate load on the API host.
 
+Start with the credential-free [mock Python quickstart](examples/python_benchmark.py).
+For load plus explicit relevance/correctness evaluation of framework agents, use
+[LangGraph](examples/langgraph_benchmark.py) or
+[OpenAI Agents](examples/openai_agents_benchmark.py); see the
+[example guide](examples/README.md#framework-agent-benchmarks) for agent startup,
+judge configuration, and costs. Advanced CLI and integration runners live
+separately under `scripts/validation/`.
 For a three-minute run and report UI, see [the Python example](docs/PYTHON_API.md#three-minute-example).
 For an existing REST server, use the [Python Requests example](docs/USAGE.md#python-requests-client).
 Duration limits dispatch, not total runtime; the request cap may stop it sooner.

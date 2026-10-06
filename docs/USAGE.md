@@ -244,19 +244,50 @@ Cancellation during preflight stops further dispatch and drains the active check
 load does not start. Restart cancels abandoned workers and marks the run interrupted
 without replaying agent actions. See [ADR 0006](adr/0006-evaluation-readiness.md).
 
+## Framework agent benchmarks
+
+The agent-oriented [LangGraph](../examples/langgraph_benchmark.py) and
+[OpenAI Agents](../examples/openai_agents_benchmark.py) samples use the public
+Python facade, not REST polling. They call the existing instrumented
+`examples/framework_agent.py` endpoints at `/langgraph/chat` and
+`/openai-agents/chat`, respectively.
+
+Each combines two-user load, a ten-second dispatch window, at most ten measured
+requests, and explicit relevance/correctness judges with authoritative references.
+Post-load scoring is capped at five answers per judge. Configuration and the
+excluded inference/judge-readiness checks must pass before measured load starts.
+
+Follow the [framework example guide](../examples/README.md#framework-agent-benchmarks)
+to start the agent server and configure the benchmark process's judge/tracking
+environment, then run one sample at a time:
+
+```bash
+uv run --no-sync python -m examples.langgraph_benchmark
+uv run --no-sync python -m examples.openai_agents_benchmark
+```
+
+The server defaults to fixture model responses, but configured judge calls can
+incur costs. Internal heatmaps additionally require authorized trace collection.
+Local tests exercise real framework/Locust/MLflow APIs with controlled provider
+boundaries; this is not a paid/live validation claim. For the credential-free,
+performance-only mock quickstart, use
+[python_benchmark.py](../examples/python_benchmark.py).
+
 ## Python requests client
 
 With the API and authorized agent running:
 
 ```bash
-uv run --no-sync python -m examples.python_requests_benchmark \
+uv run --no-sync python -m scripts.validation.python_requests_benchmark \
   --api-url http://127.0.0.1:8000 \
   --target-url http://127.0.0.1:9001/chat \
   --concurrency 5 --duration 300 --max-requests 5000 --wait-timeout 600
 ```
 
-The [example source](../examples/python_requests_benchmark.py) uses a normal
+This advanced [REST helper](../scripts/validation/python_requests_benchmark.py) uses a normal
 `requests.Session`: one `POST /v1/runs`, status polling, and a printed report URL.
+For local benchmarking without REST or polling, start with the
+[minimal Python examples](../examples/README.md).
 For report JSON, use `GET /v1/runs/{run_id}/report`. The client
 disables ambient credentials/proxies, redirects, and retries, and uses one
 idempotency key. Set `BENCHMARK_API_KEY` if the API requires it.
@@ -409,7 +440,7 @@ Live examples are **paid**, opt-in, and require your explicitly selected
 Databricks profile and verified endpoint:
 
 ```bash
-uv run python -m examples.framework_e2e \
+uv run --no-sync python -m scripts.validation.framework_e2e \
   --live --profile YOUR_CONFIRMED_PROFILE --model YOUR_VERIFIED_ENDPOINT
 ```
 
@@ -435,7 +466,7 @@ planner/judge retries have separate limits. Compatibility presets are exact
 provider/model matches, not universal model settings. Review
 [model compatibility](MODEL_COMPATIBILITY.md) before changing them.
 
-The smaller `uv run python examples/locust_databricks_e2e.py` loads `.env` and
+The smaller `uv run --no-sync python -m scripts.validation.locust_databricks_e2e` loads `.env` and
 uses one planner call, one preflight plus four measured target calls, and up to four
 quality assessments plus one readiness assessment per selected scorer, with bounded
 catalog judge retries. Both examples require explicit workspace

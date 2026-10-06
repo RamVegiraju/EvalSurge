@@ -24,7 +24,7 @@ async def main() -> None:
     paid planner, inference, and judge calls, including a deliberately wrong answer
     to check discrimination; it does not run Locust or establish calibration.
     """
-    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
     directory = Path("artifacts")
     directory.mkdir(exist_ok=True)
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{directory.resolve()}/live-validation.db"

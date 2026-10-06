@@ -100,16 +100,26 @@ this guide explains how those functions fit together.
 ## Examples and retained history
 
 - `examples/mock_agent.py` serves deterministic local SSE without model credentials.
-- `examples/python_benchmark.py` uses the public Python facade, defaults to a
-  three-minute bounded performance-only run, and saves a report even on preflight failure.
-- `examples/python_requests_benchmark.py` submits one REST request with Requests,
+- `examples/python_benchmark.py` is a minimal public Python request: five concurrent
+  users, a three-minute bounded performance-only run, and printed report JSON
+  against the credential-free mock agent.
+- `examples/langgraph_benchmark.py` and `examples/openai_agents_benchmark.py` use
+  the public facade against the corresponding `examples/framework_agent.py`
+  endpoints. Both combine load, authoritative references, and explicit
+  relevance/correctness evaluation. Provider/tracking setup remains operator-owned
+  and opt-in; local integration tests control provider boundaries rather than
+  establishing paid/live validation.
+- `scripts/validation/python_benchmark.py` retains the advanced CLI and saves a
+  report even on preflight failure; it is not the beginner tutorial.
+- `scripts/validation/python_requests_benchmark.py` submits one REST request with Requests,
   polls independent phase outcomes, and prints the report URL without replaying
   uncertain submissions or cancelling on client timeout.
-- `examples/smoke_test.py` exercises the actual REST and Locust path with that mock
-  target. It can still use a paid judge when judge credentials are configured.
-- `examples/databricks_validation.py` checks direct planning, inference, and judge
+- The obsolete `smoke_test.py` and its request fixture were removed after checking
+  callers: their missing correctness reference conflicts with fail-fast readiness.
+  Actual REST/Locust tests and the framework harness retain integration coverage.
+- `scripts/validation/databricks_validation.py` checks direct planning, inference, and judge
   discrimination with an intentionally incorrect answer; it is not a load test.
-- `examples/locust_databricks_e2e.py` checks the full bounded hosted integration.
+- `scripts/validation/locust_databricks_e2e.py` checks the full bounded hosted integration.
   Both Databricks examples require an explicitly configured workspace and are opt-in.
 - `examples/framework_agent.py` owns real compiled LangGraph and OpenAI Agent streaming,
   traced memory, synthetic tools/retrieval, provider clients, and their lifecycles.
@@ -117,7 +127,7 @@ this guide explains how those functions fit together.
   explicit overrides are demo-only. `demo_request_usage()` validates usage opt-out;
   `TracedChatModel.stream_response()` wraps the public SDK hook in one MLflow span
   without reconstructing provider IDs. `runner.payload()` never applies those presets.
-- `examples/framework_e2e.py` validates both frameworks through actual REST, Locust,
+- `scripts/validation/framework_e2e.py` validates both frameworks through actual REST, Locust,
   MLflow, judging, and report retrieval; `--live` and explicit profile opt in to paid calls.
   `configure_live_models()` selects independent target/planner/judge roles before
   startup, with no runtime fallback or capability-probing calls.

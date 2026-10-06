@@ -1,11 +1,11 @@
 """Submit one benchmark with requests; the server owns Locust, storage, and judging.
 
-Start the local mock and API in separate terminals, then run this checkout example:
+Start the local mock and API in separate terminals, then run this validation helper:
 
     uv run --no-sync uvicorn examples.mock_agent:app --host 127.0.0.1 --port 9001
     uv run --no-sync uvicorn benchmark_agents.api:app --host 127.0.0.1 \
         --port 8000 --no-proxy-headers
-    uv run --no-sync python -m examples.python_requests_benchmark \
+    uv run --no-sync python -m scripts.validation.python_requests_benchmark \
         --target-url http://127.0.0.1:9001/chat
 
 The generated request is performance-only: one prompt, no planning or scorers, a

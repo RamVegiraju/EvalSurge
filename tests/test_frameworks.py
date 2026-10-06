@@ -19,8 +19,9 @@ from tests.test_template import configuration
 
 pytest.importorskip("agents")
 pytest.importorskip("langgraph")
-from examples import framework_agent, framework_e2e
+from examples import framework_agent
 from examples.framework_agent import create_app
+from scripts.validation import framework_e2e
 
 
 @pytest.fixture
@@ -45,8 +46,10 @@ def provider_control():
     ]
 )
 async def framework_endpoint(tmp_path, monkeypatch, request, provider_requests, provider_control):
+    """Serve real frameworks with fixture inference and no remote model-catalog lookup."""
     monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path}/mlflow.db")
     monkeypatch.setenv("MLFLOW_ENABLE_ASYNC_TRACE_LOGGING", "false")
+    monkeypatch.setenv("MLFLOW_MODEL_CATALOG_URI", "")
     monkeypatch.delenv("MLFLOW_EXPERIMENT_ID", raising=False)
     monkeypatch.delenv("EVALSURGE_DEMO_TOKEN_PARAMETER", raising=False)
     monkeypatch.delenv("EVALSURGE_DEMO_REASONING_EFFORT", raising=False)

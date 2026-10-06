@@ -70,18 +70,20 @@ From this checkout, start the sample agent in one terminal:
 uv run --no-sync uvicorn examples.mock_agent:app --host 127.0.0.1 --port 9001 --no-proxy-headers
 ```
 
-In another terminal, run the Python example:
+In another terminal, run the [minimal Python example](../examples/python_benchmark.py):
 
 ```bash
-MLFLOW_MODEL_CATALOG_URI='' uv run --no-sync python -m examples.python_benchmark --duration 180
+uv run --no-sync python -m examples.python_benchmark
 ```
 
-It uses two concurrent users and at most 10,000 measured requests, plus one excluded
+It uses five concurrent users and at most 10,000 measured requests, plus one excluded
 preflight. Dispatch ends when duration or the request cap is reached, whichever
 comes first; startup and drain add time. Judging is off, the mock makes no model
 calls, and an endpoint without traces cannot show internal tool/model timings.
-The command prints metrics and the saved report's path under `artifacts/python-benchmark/`.
-That JSON contains the first bounded request page; journals retain all attempts.
+The command prints report JSON, including `run.id` and `run.metrics`, and retains
+the run under `artifacts/python-benchmark/`. That JSON contains the first bounded
+request page; journals retain all attempts. Edit the endpoint, cases, and `Load`
+directly in the example; there is no EvalSurge server setup or polling code to copy.
 
 To view the existing report UI after the Python command exits:
 
@@ -90,11 +92,22 @@ BENCHMARK_ARTIFACT_DIR=artifacts/python-benchmark uv run --no-sync uvicorn \
   benchmark_agents.api:app --host 127.0.0.1 --port 9002 --no-proxy-headers
 ```
 
-Open `http://127.0.0.1:9002/reports/?run=YOUR_RUN_ID` with the printed `run_id`.
+Open `http://127.0.0.1:9002/reports/?run=YOUR_RUN_ID` with the printed `run.id`.
 If the service has an API key configured, enter it in the report form.
-Use `--url`, `--protocol`, `--concurrency`, `--max-requests`, `--request-timeout`,
-or `--artifact-dir` to adjust the example. Only use an authorized endpoint;
-replacing the mock URL can execute agent actions and incur model/tool costs.
+Only use an authorized endpoint; replacing the mock URL can execute agent actions
+and incur model/tool costs. For CLI flags such as `--duration` or `--concurrency`,
+use the [advanced validation CLI](../scripts/validation/README.md).
+
+For load plus explicit relevance/correctness evaluation of framework agents, use
+the [LangGraph sample](../examples/langgraph_benchmark.py) or
+[OpenAI Agents sample](../examples/openai_agents_benchmark.py). Both use this
+facade against the corresponding `examples/framework_agent.py` endpoint, supply
+authoritative references, and cap post-load scoring at five answers per judge.
+The framework target defaults to fixture model responses, but configured judges
+can still incur costs. See the
+[framework example guide](../examples/README.md#framework-agent-benchmarks) for
+server startup, judge/tracking configuration, endpoint URLs, and artifact paths.
+Local tests use controlled provider boundaries, not paid/live validation.
 
 For the REST API with ordinary Python `requests`, use the
 [request-to-report example](USAGE.md#python-requests-client). Total runtime includes

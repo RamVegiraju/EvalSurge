@@ -8,6 +8,17 @@ Keep dependencies explicit and minimal. Do not add a second load runner or provi
 
 Document nontrivial functions with Google-style docstrings covering arguments, results, relevant exceptions, ownership, and side effects. Include measurement units and distinguish lifecycle completion from a passing quality verdict. Update [the code guide](docs/CODE_GUIDE.md) when responsibility boundaries change. Endpoint docstrings use `\f` to separate public operation descriptions from implementation details.
 
+Keep user-facing Python examples small and use the public `evalsurge` facade;
+put CLI orchestration and integration harnesses in `scripts/validation/`.
+Keep `examples/python_benchmark.py` a credential-free mock quickstart. The
+LangGraph and OpenAI Agents benchmark samples should call their existing
+framework endpoints and include load plus explicit relevance/correctness
+evaluation with authoritative references, not duplicate agent implementations.
+New examples must extend the tested inventory and end-to-end cases in
+`tests/test_simple_examples.py`, not merely pass an import check. CI exercises
+real Locust/framework/MLflow APIs with controlled provider responses; paid
+validation stays opt-in and is not required for the ordinary test suite.
+
 Generate the OpenAPI snapshot with `uv run python scripts/export_openapi.py`. Document breaking changes in `docs/API_REVIEW.md`; the current 0.x API is not stable. Do not commit `.env`, tokens, profiles, benchmark outputs, SQLite databases, or real customer prompts.
 
 Describe the problem and resulting behavior in pull requests, with validation and limitations. Live paid tests require an explicitly authorized workspace, bounded traffic, and a separate validation record. Local mock tests do not establish model quality or remote throughput.

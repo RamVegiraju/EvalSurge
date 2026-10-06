@@ -86,7 +86,7 @@ async def run_cli(arguments: list[str], *, api_key: str | None = None) -> tuple[
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
-        "examples.python_requests_benchmark",
+        "scripts.validation.python_requests_benchmark",
         *arguments,
         env=environment,
         stdout=asyncio.subprocess.PIPE,
@@ -263,7 +263,7 @@ async def test_requests_cli_wait_and_network_timeouts_do_not_retry_or_cancel(
     network_timeout: bool,
 ) -> None:
     """Waiting and HTTP inactivity have distinct errors; neither changes server ownership."""
-    from examples import python_requests_benchmark as example
+    from scripts.validation import python_requests_benchmark as example
 
     api_url, observed = requests_api
     target_url, _ = endpoint
@@ -307,7 +307,7 @@ async def test_requests_cli_returns_nonzero_for_real_terminal_load_outcomes(
     terminal_status: str,
 ) -> None:
     """Operator cancellation and a killed owned Locust worker are not successful exits."""
-    from examples import python_requests_benchmark as example
+    from scripts.validation import python_requests_benchmark as example
 
     api_url, observed = requests_api
     target_url, target = endpoint
@@ -366,7 +366,7 @@ async def test_requests_cli_connection_failure_is_safe(
     endpoint: tuple[str, dict[str, Any]], capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A real unlistened local API port does not leak transport exception details."""
-    from examples import python_requests_benchmark as example
+    from scripts.validation import python_requests_benchmark as example
 
     target_url, target = endpoint
     with socket.socket() as reservation:
@@ -393,7 +393,7 @@ async def test_requests_cli_connection_failure_is_safe(
 
 def test_requests_example_defaults_and_invalid_inputs() -> None:
     """Five-minute performance defaults are bounded; invalid waits fail before submission."""
-    from examples.python_requests_benchmark import parse_options
+    from scripts.validation.python_requests_benchmark import parse_options
 
     options = parse_options(["--target-url", "http://127.0.0.1:9001/chat"])
     assert options.duration == 300
@@ -428,7 +428,7 @@ def test_terminal_diagnostics_preserve_phase_outcomes_and_safe_guidance(
     capsys: pytest.CaptureFixture[str], error_phase: str
 ) -> None:
     """Rendering a failed phase never changes a passed probe or exports extra error data."""
-    from examples.python_requests_benchmark import terminal_result
+    from scripts.validation.python_requests_benchmark import terminal_result
 
     error = {
         "code": "fixture_error",
@@ -473,7 +473,7 @@ def test_completed_with_gaps_keeps_valid_report_and_warns_without_failed_probe(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Completion with gaps is a readable lifecycle result, not a quality pass or exit failure."""
-    from examples.python_requests_benchmark import terminal_result
+    from scripts.validation.python_requests_benchmark import terminal_result
 
     run = {
         "status": "completed_with_gaps",
@@ -495,7 +495,7 @@ async def test_requests_cli_real_evaluation_configuration_error_is_separate_from
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Unsupported evaluation evidence fails through the real API without target/judge calls."""
-    from examples.python_requests_benchmark import build_request, parse_options
+    from scripts.validation.python_requests_benchmark import build_request, parse_options
 
     for name in ("BENCHMARK_JUDGE_MODEL", "DATABRICKS_CONFIG_PROFILE", "DATABRICKS_HOST"):
         monkeypatch.delenv(name, raising=False)
@@ -530,7 +530,7 @@ async def test_requests_cli_http_read_budget_is_configurable_without_replay(
     exit_code: int,
 ) -> None:
     """A delayed creation response honors the configured HTTP budget without replaying admission."""
-    from examples import python_requests_benchmark as example
+    from scripts.validation import python_requests_benchmark as example
 
     api_url, observed = requests_api
     target_url, _ = endpoint

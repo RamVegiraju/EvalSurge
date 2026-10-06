@@ -5,6 +5,94 @@ Linux/Python 3.11–3.14. Observed main jobs failed during private-mirror instal
 there is no remote CI result for these local changes. Branch-protection
 settings have not been verified/enabled by this local work.
 
+## Agent-oriented Python examples — October 6, 2026
+
+The phase-named `quality_benchmark.py` tutorial was replaced before release with
+separate `langgraph_benchmark.py` and `openai_agents_benchmark.py` scripts. Each
+uses the public Python facade against the corresponding real framework demo and
+combines bounded load, authoritative references, explicit relevance/correctness
+judges, and one typed report. The credential-free `python_benchmark.py` remains
+the first quickstart. Framework implementation and advanced orchestration remain
+in `framework_agent.py` and `scripts/validation/` rather than being copied into
+the public requests.
+
+The example integration suite executes both scripts through the actual LangGraph
+graph and OpenAI Agents runner, Locust subprocess, native MLflow tracking and
+evaluation APIs, correlated tool/model/memory profiles, and controlled provider
+boundaries. It also verifies both inference and judge-readiness fail-fast paths,
+safe imports and argument rejection, durable report reopening, documentation
+links, and strict example inventory. No paid model or Databricks workspace call
+is part of this validation.
+
+- `UV_OFFLINE=1 MLFLOW_MODEL_CATALOG_URI='' uv run --no-sync pytest -q
+  tests/test_simple_examples.py --tb=short`: **16 passed**, 13 upstream
+  MLflow/pandas/SQLAlchemy warnings, **18.54 seconds**.
+- Full suite: **422 passed, no skips**, 30 upstream warnings, **176.05 seconds**.
+  The log is retained under `artifacts/agent-examples-20261006/pytest.log`.
+- Ruff lint and formatting passed for 102 files. OpenAPI snapshot equality and
+  independent schema validation, JavaScript syntax, and whitespace checks passed.
+- Offline sdist/wheel builds passed. The fresh wheel's required Python/API/report
+  assets were verified directly, and archive inspection confirmed all three public
+  Python requests plus both supporting agents and the example index. The first
+  verifier CLI invocation inspected an older wheel in `dist/` because that command
+  does not accept a path; it failed on that stale artifact before the fresh wheel
+  in this validation directory passed direct verification.
+
+No runtime API, load-engine, evaluation semantics, dependencies, lockfile,
+credentials, remote settings, commits, or pushes changed in this reorganization.
+
+## Minimal Python examples and complete example coverage — October 6, 2026
+
+The user-facing benchmark now has 23 lines and the opt-in quality example has
+33 lines. Both use the public Python facade, without REST polling or API-server
+orchestration. Advanced CLIs and framework/provider validation moved to
+`scripts/validation/`, with updated imports, commands, and repository-relative
+dotenv paths. Unsupported tutorial CLI flags fail before admission rather than
+silently loading the default target. The obsolete smoke script and its request
+fixture were removed after caller review: their missing correctness reference
+conflicts with fail-fast evaluation readiness.
+
+All four remaining example modules have integration coverage. The new checks
+execute the published scripts against the actual mock agent over localhost
+Uvicorn/Locust, exercise inference and judge-readiness failures, verify printed
+typed reports and durable reopening, and perform native MLflow scoring with a
+controlled provider boundary. Negative quality verdicts remain completed
+evaluations, not execution failures. The moved framework harness runs actual
+LangGraph and OpenAI Agents with isolated memory, tools, correlated MLflow spans,
+and report retrieval. An inventory regression and contribution guidance require
+new examples to extend the coverage. Live Databricks helpers receive import,
+dotenv-path, and missing-configuration guard checks, not a new paid/live success
+validation.
+
+- Initial minimal-example regression failed against the old CLI as expected.
+  Early checks also corrected test parsing for MLflow's console banner and the
+  existing `evaluation_status="failed"` judge-readiness contract; production
+  lifecycle semantics were not changed.
+- Final `uv run --no-sync pytest -q tests/test_simple_examples.py
+  tests/test_validation_tools.py`: **19 passed**, seven upstream warnings,
+  **16.33 seconds**.
+- First full `uv run --no-sync pytest -q`: **416 passed, one failed**,
+  24 upstream warnings, **198.81 seconds**. The first LangGraph fixture hit its
+  unchanged ten-second preflight deadline while native MLflow retried a
+  GitHub model-catalog metadata download after DNS resolution failed.
+- Installed MLflow 3.16.1 documents an empty `MLFLOW_MODEL_CATALOG_URI` as
+  disabling remote fetch. The offline framework fixture now sets it explicitly;
+  no runtime configuration or request deadline changed. The failing case passed
+  alone in **3.89 seconds**, with one upstream warning.
+- Full recheck: **417 passed, no skips**, 24 upstream warnings,
+  **169.83 seconds**. Initial and successful logs remain separately under
+  `artifacts/simpler-examples-20261006/`.
+- Ruff lint/format passed for 101 files; OpenAPI snapshot equality and schema
+  validation, JavaScript syntax, and whitespace checks passed.
+- Offline sdist/wheel builds passed. Archive inspection verified all 38 packaged
+  runtime/UI files against the checkout, the current README, all four example
+  sources and their index, and the moved validation tools.
+
+No benchmark-library behavior, dependencies, model/provider profiles, paid calls,
+remote repository settings, commits, or pushes changed in this work. The full
+suite uses controlled providers; it is not a live deployment, judge calibration,
+latest-dependency, remote CI, or production-readiness claim.
+
 ## Remote documentation integration — October 6, 2026
 
 The initial push of `fda02c4` was rejected because remote main had advanced to

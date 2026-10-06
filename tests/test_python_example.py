@@ -18,7 +18,7 @@ async def test_python_benchmark_cli_saves_success_or_preflight_failure(
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
-        "examples.python_benchmark",
+        "scripts.validation.python_benchmark",
         "--url",
         f"{base_url}/{mode}",
         "--duration",
@@ -69,7 +69,7 @@ async def test_python_benchmark_cli_saves_success_or_preflight_failure(
 
 def test_default_python_example_allows_a_three_minute_dispatch_window() -> None:
     """The default request budget must not remain the facade's short 100-request cap."""
-    from examples.python_benchmark import parse_options
+    from scripts.validation.python_benchmark import parse_options
 
     options = parse_options([])
     assert options.duration == 180
