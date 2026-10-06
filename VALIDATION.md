@@ -5,6 +5,18 @@ Linux/Python 3.11–3.14. Observed main jobs failed during private-mirror instal
 there is no remote CI result for these local changes. Branch-protection
 settings have not been verified/enabled by this local work.
 
+## Remote documentation integration — October 6, 2026
+
+The initial push of `fda02c4` was rejected because remote main had advanced to
+`fb8ce89`, containing the runner-placement documentation. Both histories were
+preserved in a merge, retaining public-PyPI setup and distinguishing REST-host
+load generation from local Python execution. The integration changes only
+documentation; runtime code and dependencies remain identical to `fda02c4`.
+`uv run --no-sync pytest -q tests/test_readme.py` passed **3 tests** in
+**3.11 seconds** after conflict resolution. Whitespace checks passed and no
+conflict markers remained. The full 398-test suite was not repeated for this
+documentation-only integration.
+
 ## README examples and commit preparation — October 6, 2026
 
 The README now includes a minimal Python input with authoritative references,

@@ -33,6 +33,7 @@ Do not replace this statement with a marketing label after a smoke test.
 | Judge validity | Labeled positive/negative and adversarial calibration sets, SME review, versioned provider/model revisions where possible |
 | Trace semantics | Verify autolog/custom span parenting, duplicate operation spans, recorded tool/retrieval evidence, and category attribution for each supported framework/version |
 | Capacity methodology | Warmup excluded, repeated load stages/windows, defined latency/error/quality thresholds, load-generator saturation checks |
+| Runner topology | Dedicated workers separate from the API and target, recorded runner size/region/network vantage point, resource telemetry, and evidence that generator limits did not determine reported target capacity |
 | Dependency/release supply chain | Portable public-index lockfile, clean Linux/macOS install matrix, supported-version CI, vulnerability/license scanning, provenance |
 | Deployment verification | TLS/proxy configuration, secret manager, fault injection, recovery tests, independent security review, rollback/runbook |
 

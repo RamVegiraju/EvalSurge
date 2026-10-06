@@ -24,6 +24,11 @@ uv run --no-sync uvicorn benchmark_agents.api:app --host 127.0.0.1 --port 8000 -
 ```
 
 API docs: `http://127.0.0.1:8000/docs/`. Keep one API worker.
+The API host also runs the Locust load generator. A laptop is suitable for this
+quickstart; use a separate, dedicated runner for repeatable load measurements.
+Runner size and network location affect the result. See [where to run
+EvalSurge](docs/USAGE.md#where-to-run-evalsurge).
+
 The quickstart selects public PyPI explicitly and reuses the installed environment.
 See [dependency setup and update limits](docs/DEPENDENCIES.md) if your network restricts package access.
 
