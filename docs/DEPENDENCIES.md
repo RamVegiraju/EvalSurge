@@ -215,6 +215,50 @@ log, not a fresh lock or environment. Finish the reviewed upgrade workflow from
 an authorized environment with working public-index access; do not disguise this
 gap by rewriting the authentic candidate's URLs, hashes, or version records.
 
+## Pre-push upstream review — October 7, 2026
+
+Official GitHub stable-release metadata was rechecked for all 22 declared runtime,
+framework, development, and build dependencies. Monorepo releases were matched to
+the specific package rather than assuming a repository's generic latest release
+was the package version. Gevent's latest-release endpoint remains stale; its
+highest observed release tag is 26.9.0, matching the lock, not a fresh PyPI result.
+
+Newer observed upstream releases:
+
+| Package | Locked version | Observed upstream stable release | Disposition |
+| --- | --- | --- | --- |
+| [OpenAI SDK](https://github.com/openai/openai-python/releases/tag/v3.26.0) | 3.22.1 | 3.26.0 | Range permits it; controlled compatibility validation pending |
+| [OpenAI Agents SDK](https://github.com/openai/openai-agents-python/releases/tag/v0.23.1) | 0.22.3 | 0.23.1 | Range permits it; actual Runner/memory integration validation pending |
+| [Locust](https://github.com/locustio/locust/releases/tag/2.46.7) | 2.46.6 | 2.46.7 | Range permits it; native load regression validation pending |
+| [Databricks SDK](https://github.com/databricks/databricks-sdk-py/releases/tag/v0.148.0) | 0.146.0 | 0.148.0 | Range permits it; profile/auth-routing metadata and OAuth integration review pending |
+| [LangChain Core](https://github.com/langchain-ai/langchain/releases/tag/langchain-core%3D%3D1.6.7) | 1.6.6 | 1.6.7 | Range permits it; framework/serialization validation pending |
+| [LangGraph](https://github.com/langchain-ai/langgraph/releases/tag/1.2.14) | 1.2.12 | 1.2.14 | Range permits it; graph/streaming/memory validation pending |
+| [MLflow](https://github.com/mlflow/mlflow/releases/tag/v3.17.0) | 3.16.1 | 3.17.0 | Intentionally excluded by `<3.17`; private rubric APIs/hashes require migration review |
+
+The other declared dependencies match their observed package-specific stable
+release metadata. This does not establish that every transitive dependency is
+upstream-latest or that newer packages are compatible/index-accessible. Swagger UI
+5.33.1, CI checkout 7.0.1, setup-node 7.0.0, setup-uv 10.2.0, and pinned uv 0.12.23
+also match observed official releases. The GitHub Advisory Database returned no
+matching `swagger-ui-dist@5.33.1` advisories; bundled transitive JS remains outside
+that narrow query.
+
+Direct public PyPI metadata access still fails with TCP connection refused, even
+after retry outside the sandbox. The verified public lock remains unchanged;
+no registry URLs, artifact URLs, hashes, or versions were relabeled. Open
+[Dependabot PR #4](https://github.com/RamVegiraju/EvalSurge/pull/4) updates two
+packages but is not a reviewed current full-graph upgrade and does not contain
+the newest observed OpenAI version. It was inspected read-only, not merged or
+otherwise changed. Finish the update workflow from an authorized public-index
+environment; review these gaps by **October 12, 2026**, or the next dependency PR.
+
+The unchanged full agents/dev/build hashed export was audited with OSV using
+`pip-audit --disable-pip --require-hashes`: **181 applicable dependencies, zero
+known advisories** on local Python 3.12. OSV enforces hash presence, not artifact
+validity; uv retains responsibility for download hash validation. This is not a
+clean-install matrix, complete license audit, or security sign-off. Evidence is
+retained under ignored `artifacts/prepush-20261007/`.
+
 ## Primary guidance
 
 - [uv locking and upgrades](https://docs.astral.sh/uv/concepts/projects/sync/)

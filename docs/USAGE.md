@@ -70,9 +70,11 @@ For a Databricks App target, run EvalSurge outside the **agent App's compute** o
 a dedicated host that can reach the App URL and use an operator-owned authorized
 connection. A runner in the same cloud region is useful for service-side load
 comparisons; a runner in the user's region is useful for end-user latency. The
-current `databricks` connection accepts workspace-host URLs only; an App URL
-currently needs an exact URL-bound bearer connection, a valid token, and a
-supported protocol. App-native OAuth refresh is not yet implemented.
+legacy `databricks` connection accepts workspace-host URLs only. For Apps, use a
+registered `databricks-app` connection with an explicitly selected SDK profile;
+the resolver discovers the App origin and refreshes OAuth per attempt. See
+[the v2 App configuration](V2_API.md#operator-configuration). Exact URL-bound
+bearer connections remain an advanced operator-managed alternative.
 The local alpha does not provide a managed distributed runner or a one-click
 Databricks Job deployment. If using short-lived job compute, arrange the API
 lifecycle, credentials, reachable target, and persistent POSIX artifacts yourself.

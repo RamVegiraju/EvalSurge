@@ -8,24 +8,29 @@ from .adapters import get_adapter
 from .models import RunRequest, Sample
 
 
-def payload(request: RunRequest, sample: Sample) -> dict[str, Any]:
+def payload(request: RunRequest, sample: Sample, request_id: str | None = None) -> dict[str, Any]:
     """Convert one workload case into a fixed hosted-agent wire contract.
 
     Args:
         request: Target adapter and model settings for this run.
-        sample: Nonempty raw inputs for http-json; query or messages for SSE.
+        sample: Nonempty raw inputs for http-json; query or messages for agent protocols.
+        request_id: Journaled UUID for an Agent Runtime invocation, if dispatching.
 
     Returns:
         The raw inputs object for http-json, or a streaming OpenAI Chat Completions
-        or MLflow agent-server envelope. Extra SSE input keys remain evaluation
-        metadata. No reasoning, tool, or sampling settings are injected. Streamed
+        or MLflow agent-server envelope, or a synchronous Agent Runtime invocation.
+        Extra agent input keys remain evaluation metadata. No reasoning, tool, or
+        sampling settings are injected. Streamed
         usage is requested only when target.request_usage is enabled for openai-chat.
 
     Raises:
         ValueError: JSON inputs are empty, or SSE inputs lack a query or valid messages.
             This validates the supported envelope, not all provider fields.
     """
-    return get_adapter(request.target.adapter).encode(request.target, sample)
+    body = get_adapter(request.target.adapter).encode(request.target, sample)
+    if request.target.adapter == "databricks-agent-runtime" and request_id is not None:
+        body["id"] = request_id
+    return body
 
 
 def percentile(values: list[float], quantile: float) -> float | None:

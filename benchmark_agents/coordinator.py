@@ -114,7 +114,10 @@ class RunCoordinator:
                         "request_hash",
                     )
                 }
-                if self.index[key]["status"] == "preflighting":
+                if (
+                    stored.get("planning_status") in {"pending", "running"}
+                    or self.index[key]["status"] == "preflighting"
+                ):
                     self.index[key].update(
                         status="interrupted", load_status="skipped", evaluation_status="skipped"
                     )
@@ -163,11 +166,13 @@ class RunCoordinator:
                 return
             self._closing = True
             try:
-                async with self.submission, self.planning:
+                async with self.submission:
                     for event in self.cancellations.values():
                         event.set()
                     if self.tasks:
                         await asyncio.gather(*list(self.tasks.values()), return_exceptions=True)
+                    async with self.planning:
+                        pass
             finally:
                 self._lock.close()
                 self._lock = None
@@ -266,6 +271,16 @@ class RunCoordinator:
         if not path.exists():
             raise CoordinatorError(404, "Unknown run")
         result = json.loads(path.read_text())
+        if result.get("planning_status") in {"pending", "running"}:
+            result.update(
+                status="interrupted",
+                planning_status="interrupted",
+                load_status="skipped",
+                evaluation_status="skipped",
+                profiling_status="skipped",
+                preflight=PreflightResult(status="not_run").model_dump(),
+                evaluation_preflight=EvaluationPreflight(status="not_run").model_dump(),
+            )
         if result["status"] == "preflighting":
             probe_root = self.root / "preflights" / key
             if probe_root.exists():
@@ -382,6 +397,10 @@ class RunCoordinator:
         idempotency_key: str | None = None,
         *,
         connection: Connection | None = None,
+        defer_planning: bool = False,
+        submission_hash: str | None = None,
+        name: str | None = None,
+        evaluation_mode: str | None = None,
     ) -> Accepted:
         """Validate, freeze, persist, and schedule one run; never infer inline.
 
@@ -390,6 +409,10 @@ class RunCoordinator:
             idempotency_key: At most 128 characters binding this body to a run.
             connection: Trusted local operator binding, not exposed by REST.
                 Otherwise resolve the existing server-owned environment policy.
+            defer_planning: Persist admission and plan inside the owned run task.
+            submission_hash: Trusted canonical v2 body hash for idempotency.
+            name: Bounded v2 display name, independent of evaluation inputs.
+            evaluation_mode: Explicit v2 evaluation policy for result presentation.
 
         Returns:
             Queued acknowledgment or the original matching idempotent submission.
@@ -423,9 +446,36 @@ class RunCoordinator:
             self._require_open()
             key_hash = fingerprint(idempotency_key) if idempotency_key else None
             request_body = request.model_dump(mode="json")
-            request_hash = fingerprint(request_body)
+            request_hash = submission_hash or fingerprint(request_body)
             replay_hashes = {request_hash}
-            if request.target.request_usage:
+            if (
+                submission_hash is None
+                and not request.target.session_id
+                and not request.target.session_per_request
+            ):
+                old_body = {
+                    **request_body,
+                    "target": {
+                        name: value
+                        for name, value in request_body["target"].items()
+                        if name not in {"session_id", "session_per_request"}
+                    },
+                }
+                replay_hashes.add(fingerprint(old_body))
+                if request.target.request_usage:
+                    replay_hashes.add(
+                        fingerprint(
+                            {
+                                **old_body,
+                                "target": {
+                                    name: value
+                                    for name, value in old_body["target"].items()
+                                    if name != "request_usage"
+                                },
+                            }
+                        )
+                    )
+            if request.target.request_usage and submission_hash is None:
                 legacy_body = {
                     **request_body,
                     "target": {
@@ -461,6 +511,7 @@ class RunCoordinator:
                     self.orphan_workers.pop(directory)
             if self.orphan_workers:
                 raise CoordinatorError(409, "A prior worker is draining after restart; retry later")
+            plan = None
             if request.plan_id:
                 try:
                     plan = self.get_plan(UUID(request.plan_id))
@@ -470,7 +521,7 @@ class RunCoordinator:
                     raise CoordinatorError(
                         409, "Evaluation data or policy differs from the frozen plan"
                     )
-            else:
+            elif not defer_planning:
                 async with self.planning:
                     plan = await self._create_plan(request.evaluation)
                 self._persist_plan(plan)
@@ -484,7 +535,10 @@ class RunCoordinator:
                 "preflight": PreflightResult(status="pending").model_dump(),
                 "evaluation_preflight": EvaluationPreflight(status="pending").model_dump(),
                 "config": request.model_dump(mode="json"),
-                "plan": plan.model_dump(),
+                "plan": plan.model_dump() if plan else None,
+                "planning_status": "pending" if plan is None else "completed",
+                "name": name,
+                "evaluation_mode": evaluation_mode,
                 "trace_coverage": "Internal spans are collected after load when explicitly configured.",
                 "idempotency_key_hash": key_hash,
                 "request_hash": request_hash,
@@ -527,6 +581,12 @@ class RunCoordinator:
             requests=[],
             trace_coverage="No measured load requests; pre-load checks did not permit load.",
         )
+        if self.runs[run_id]["preflight"]["status"] == "pending":
+            self.runs[run_id]["preflight"] = PreflightResult(status="not_run").model_dump()
+        if self.runs[run_id]["evaluation_preflight"]["status"] == "pending":
+            self.runs[run_id]["evaluation_preflight"] = EvaluationPreflight(
+                status="not_run"
+            ).model_dump()
         profiling = ProfilingSummary(
             total_requests=0,
             traced_requests=0,
@@ -538,14 +598,14 @@ class RunCoordinator:
         atomic_json(self.root / run_id / "profiling.json", profiling.model_dump())
 
     async def _execute(
-        self, run_id: str, request: RunRequest, plan: Plan, connection: Connection
+        self, run_id: str, request: RunRequest, plan: Plan | None, connection: Connection
     ) -> None:
         """Advance one owned run; preserve independent evidence at job boundaries.
 
         Args:
             run_id: Identifier already admitted and durably snapshotted.
             request: Detached bounded target/workload settings.
-            plan: Persisted frozen evaluation policy.
+            plan: Persisted frozen evaluation policy, or None for deferred planning.
             connection: Detached exact operator binding used by both workers.
 
         Only passed inference and selected-judge readiness checks permit load.
@@ -557,6 +617,30 @@ class RunCoordinator:
         run = self.runs[run_id]
         cancel = self.cancellations[run_id]
         try:
+            if plan is None:
+                if cancel.is_set():
+                    run["planning_status"] = "cancelled"
+                    self._skip_load(run_id, "cancelled")
+                    return
+                run["planning_status"] = "running"
+                self._persist(run_id)
+                try:
+                    async with self.planning:
+                        plan = await self._create_plan(request.evaluation)
+                    self._persist_plan(plan)
+                except Exception:  # noqa: BLE001
+                    run["planning_status"] = "failed"
+                    run["planning_error"] = {
+                        "code": "planning_failed",
+                        "message": "Evaluation planning could not complete.",
+                        "guidance": "Check operator provider and scorer configuration before a new run.",
+                    }
+                    run["preflight"] = PreflightResult(status="not_run").model_dump()
+                    self._skip_load(run_id, "failed")
+                    return
+                run["plan"] = plan.model_dump()
+                run["planning_status"] = "completed"
+                self._persist(run_id)
             run.update(status="preflighting")
             if cancel.is_set():
                 run["evaluation_preflight"] = EvaluationPreflight(status="cancelled").model_dump()
@@ -814,6 +898,8 @@ class RunCoordinator:
             CoordinatorError: No run exists.
         """
         run = self._read_run(run_id)
+        if run.get("plan") is None:
+            raise CoordinatorError(409, "Evaluation plan is not available", {"Retry-After": "1"})
         return RunResponse.model_validate(
             {key: value for key, value in run.items() if key in RunResponse.model_fields}
         ).model_copy(deep=True)

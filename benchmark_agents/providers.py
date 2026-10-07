@@ -1,11 +1,12 @@
 """Server-owned provider settings; SDK authentication avoids copied access tokens."""
 
-import os
 from collections.abc import Generator
 from typing import Any
 
 import httpx
 from openai import AsyncOpenAI, OpenAI
+
+from .configuration import getenv
 
 DEFAULT_FM_ENDPOINT = "databricks-gpt-5-4-mini"
 
@@ -18,8 +19,10 @@ def workspace_client(profile: str | None = None, host: str | None = None) -> Any
         host: Explicit workspace URL, falling back to DATABRICKS_HOST.
 
     Returns:
-        A WorkspaceClient with bounded HTTP and retry timeouts. Credentials remain
-        owned by the SDK instead of being copied into benchmark configuration.
+        A WorkspaceClient with nominal SDK HTTP and retry budgets. Credentials remain
+        owned by the SDK instead of being copied into benchmark configuration. The
+        task-local config-file selector is explicit; OAuth refresh has no hard overall
+        wall-time guarantee from these HTTP settings.
 
     Raises:
         ValueError: Neither a profile nor a host was explicitly configured.
@@ -27,14 +30,21 @@ def workspace_client(profile: str | None = None, host: str | None = None) -> Any
     from databricks.sdk import WorkspaceClient
     from databricks.sdk.core import Config
 
-    profile = profile or os.getenv("DATABRICKS_CONFIG_PROFILE")
-    host = host or os.getenv("DATABRICKS_HOST")
+    if profile is None and host is None:
+        profile = getenv("DATABRICKS_CONFIG_PROFILE")
+        host = getenv("DATABRICKS_HOST")
     if not profile and not host:
         raise ValueError(
             "Set DATABRICKS_CONFIG_PROFILE or DATABRICKS_HOST with SDK authentication."
         )
     return WorkspaceClient(
-        config=Config(profile=profile, host=host, http_timeout_seconds=20, retry_timeout_seconds=20)
+        config=Config(
+            profile=profile,
+            host=host,
+            config_file=getenv("DATABRICKS_CONFIG_FILE") or "~/.databrickscfg",
+            http_timeout_seconds=20,
+            retry_timeout_seconds=20,
+        )
     )
 
 
@@ -98,7 +108,7 @@ def judge_endpoint() -> str | None:
     Raises:
         ValueError: A configured provider URI targets something other than Databricks.
     """
-    configured = os.getenv("BENCHMARK_JUDGE_MODEL")
+    configured = getenv("BENCHMARK_JUDGE_MODEL")
     if configured:
         if configured.startswith("databricks:/"):
             return configured.removeprefix("databricks:/")
@@ -107,7 +117,7 @@ def judge_endpoint() -> str | None:
                 "Judging uses Databricks directly; configure a Databricks endpoint name."
             )
         return configured
-    if os.getenv("DATABRICKS_CONFIG_PROFILE") or os.getenv("DATABRICKS_HOST"):
+    if getenv("DATABRICKS_CONFIG_PROFILE") or getenv("DATABRICKS_HOST"):
         return DEFAULT_FM_ENDPOINT
     return None
 
@@ -124,7 +134,7 @@ def planner_client() -> Any:
         ValueError: BENCHMARK_LLM_PROVIDER is unsupported or workspace settings
             required by the Databricks path are absent.
     """
-    provider = os.getenv("BENCHMARK_LLM_PROVIDER", "databricks")
+    provider = getenv("BENCHMARK_LLM_PROVIDER", "databricks")
     if provider == "databricks":
         workspace = workspace_client()
         return AsyncOpenAI(
@@ -135,5 +145,5 @@ def planner_client() -> Any:
             max_retries=2,
         )
     if provider == "openai":
-        return AsyncOpenAI()
+        return AsyncOpenAI(api_key=getenv("OPENAI_API_KEY"))
     raise ValueError("BENCHMARK_LLM_PROVIDER must be databricks or openai.")

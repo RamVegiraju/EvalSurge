@@ -138,11 +138,16 @@ class AgentUser(HttpUser):
                     "X-Benchmark-Run-ID": run_id,
                     "X-Benchmark-Request-ID": row["request_id"],
                 }
+                if config.target.adapter in {"mlflow-agent-server", "databricks-agent-runtime"}:
+                    headers["X-MLflow-Return-Trace-ID"] = "true"
                 if auth_headers is None:
                     auth_headers = authentication(connection)
                 headers.update(auth_headers())
-                phase = "request"
                 row["auth_ms"] = (time.perf_counter() - lifecycle_start) * 1000
+                phase = "request"
+                body = payload(config, sample, request_id=row["request_id"])
+                if config.target.adapter == "databricks-agent-runtime" and "session_id" in body:
+                    headers["X-Routing-Key"] = body["session_id"]
                 sent = time.perf_counter()
                 last_dispatch = sent - started
                 row["dispatched"] = True
@@ -150,7 +155,7 @@ class AgentUser(HttpUser):
                 peak = max(peak, http_active)
                 with self.client.post(
                     str(config.target.url),
-                    json=payload(config, sample),
+                    json=body,
                     headers=headers,
                     stream=True,
                     catch_response=True,
@@ -163,7 +168,11 @@ class AgentUser(HttpUser):
                         response.raise_for_status()
                         if not 200 <= response.status_code < 300:
                             raise ValueError("Target returned a non-success HTTP status")
-                        phase = "response" if config.target.adapter == "http-json" else "stream"
+                        phase = (
+                            "response"
+                            if config.target.adapter in {"http-json", "databricks-agent-runtime"}
+                            else "stream"
+                        )
                         adapter.decode(response, row, sent)
                         if time.perf_counter() - lifecycle_start >= config.load.timeout_seconds:
                             raise TimeoutError("Request deadline exceeded")

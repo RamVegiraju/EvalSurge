@@ -29,6 +29,38 @@
         "title": "Accepted",
         "type": "object"
       },
+      "Acknowledgment": {
+        "additionalProperties": false,
+        "description": "Admission receipt; completion and quality are separate outcomes.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "poll_after_seconds": {
+            "default": 1,
+            "maximum": 60.0,
+            "minimum": 0.0,
+            "title": "Poll After Seconds",
+            "type": "number"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "links"
+        ],
+        "title": "Acknowledgment",
+        "type": "object"
+      },
       "AgentManifest": {
         "additionalProperties": false,
         "description": "Opt-in setup context for planning; source code is never executed by the API.",
@@ -83,6 +115,61 @@
         "title": "AgentManifest",
         "type": "object"
       },
+      "Capabilities": {
+        "additionalProperties": false,
+        "description": "Public metadata with no destinations, credential references, or SDK state.",
+        "properties": {
+          "api_version": {
+            "const": "v2",
+            "default": "v2",
+            "title": "Api Version",
+            "type": "string"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/EvaluationCapability"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/CapabilityLimits"
+          },
+          "protocols": {
+            "items": {
+              "enum": [
+                "openai-chat",
+                "mlflow-agent-server",
+                "http-json",
+                "databricks-agent-runtime"
+              ],
+              "type": "string"
+            },
+            "title": "Protocols",
+            "type": "array"
+          },
+          "runtime_verified": {
+            "const": false,
+            "default": false,
+            "title": "Runtime Verified",
+            "type": "boolean"
+          },
+          "targets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TargetCapability"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "tracing": {
+            "$ref": "#/components/schemas/TraceCapability"
+          }
+        },
+        "required": [
+          "protocols",
+          "evaluation",
+          "tracing"
+        ],
+        "title": "Capabilities",
+        "type": "object"
+      },
       "Capability": {
         "additionalProperties": false,
         "description": "An explicitly disclosed capability, not proof of runtime behavior.",
@@ -117,6 +204,120 @@
           "name"
         ],
         "title": "Capability",
+        "type": "object"
+      },
+      "CapabilityLimits": {
+        "additionalProperties": false,
+        "description": "Current local workload and transport bounds, independent of target capacity.",
+        "properties": {
+          "max_active_runs": {
+            "default": 1,
+            "title": "Max Active Runs",
+            "type": "integer"
+          },
+          "max_cases": {
+            "default": 1000,
+            "title": "Max Cases",
+            "type": "integer"
+          },
+          "max_concurrent_users": {
+            "default": 100,
+            "title": "Max Concurrent Users",
+            "type": "integer"
+          },
+          "max_duration_seconds": {
+            "default": 3600,
+            "title": "Max Duration Seconds",
+            "type": "number"
+          },
+          "max_json_response_bytes": {
+            "default": 2000000,
+            "title": "Max Json Response Bytes",
+            "type": "integer"
+          },
+          "max_request_bytes": {
+            "default": 8000000,
+            "title": "Max Request Bytes",
+            "type": "integer"
+          },
+          "max_requests": {
+            "default": 10000,
+            "title": "Max Requests",
+            "type": "integer"
+          },
+          "max_timeout_seconds": {
+            "default": 120,
+            "title": "Max Timeout Seconds",
+            "type": "number"
+          }
+        },
+        "title": "CapabilityLimits",
+        "type": "object"
+      },
+      "Case": {
+        "additionalProperties": false,
+        "description": "One bounded workload case and caller-owned authoritative evidence.",
+        "properties": {
+          "input": {
+            "additionalProperties": true,
+            "title": "Input",
+            "type": "object"
+          },
+          "reference": {
+            "additionalProperties": true,
+            "title": "Reference",
+            "type": "object"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "title": "Case",
+        "type": "object"
+      },
+      "DecisionSummary": {
+        "additionalProperties": false,
+        "description": "Completion does not imply a quality verdict or sustainable capacity.",
+        "properties": {
+          "evidence_gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Gaps",
+            "type": "array"
+          },
+          "performance": {
+            "enum": [
+              "pending",
+              "complete",
+              "incomplete",
+              "not_run"
+            ],
+            "title": "Performance",
+            "type": "string"
+          },
+          "quality": {
+            "enum": [
+              "pending",
+              "off",
+              "available",
+              "unavailable"
+            ],
+            "title": "Quality",
+            "type": "string"
+          },
+          "sustainable_capacity_established": {
+            "const": false,
+            "default": false,
+            "title": "Sustainable Capacity Established",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "performance",
+          "quality"
+        ],
+        "title": "DecisionSummary",
         "type": "object"
       },
       "ErrorDetail": {
@@ -255,6 +456,62 @@
         "title": "Evaluation",
         "type": "object"
       },
+      "EvaluationCapability": {
+        "additionalProperties": false,
+        "description": "Static planning/judging readiness and reviewed executable scorer identifiers.",
+        "properties": {
+          "catalog_judges": {
+            "enum": [
+              "configured",
+              "needs_configuration",
+              "disabled"
+            ],
+            "title": "Catalog Judges",
+            "type": "string"
+          },
+          "default_mode": {
+            "const": "off",
+            "default": "off",
+            "title": "Default Mode",
+            "type": "string"
+          },
+          "executable_catalog_scorers": {
+            "default": [
+              "relevance",
+              "correctness",
+              "safety"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "title": "Executable Catalog Scorers",
+            "type": "array"
+          },
+          "planner": {
+            "enum": [
+              "configured",
+              "needs_configuration",
+              "disabled"
+            ],
+            "title": "Planner",
+            "type": "string"
+          },
+          "registered_scorers": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Registered Scorers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "planner",
+          "catalog_judges"
+        ],
+        "title": "EvaluationCapability",
+        "type": "object"
+      },
       "EvaluationError": {
         "additionalProperties": false,
         "description": "Content-free evaluation failure with corrective guidance, never provider text.",
@@ -308,6 +565,53 @@
         "title": "EvaluationError",
         "type": "object"
       },
+      "EvaluationPolicy": {
+        "additionalProperties": false,
+        "description": "Planning and judging are opt-in; off bypasses both provider paths.",
+        "properties": {
+          "description": {
+            "default": "Benchmark captured agent answers",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "max_scored_requests": {
+            "default": 20,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Scored Requests",
+            "type": "integer"
+          },
+          "mode": {
+            "default": "off",
+            "enum": [
+              "off",
+              "automatic",
+              "explicit"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "sampling_seed": {
+            "default": 42,
+            "maximum": 4294967295.0,
+            "minimum": 0.0,
+            "title": "Sampling Seed",
+            "type": "integer"
+          },
+          "scorers": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Scorers",
+            "type": "array"
+          }
+        },
+        "title": "EvaluationPolicy",
+        "type": "object"
+      },
       "EvaluationPreflight": {
         "additionalProperties": false,
         "description": "One readiness assessment per criterion, outside measured load and quality results.",
@@ -346,6 +650,36 @@
           }
         },
         "title": "EvaluationPreflight",
+        "type": "object"
+      },
+      "Links": {
+        "additionalProperties": false,
+        "description": "Same-origin resource paths; credentials never enter links.",
+        "properties": {
+          "cancel": {
+            "title": "Cancel",
+            "type": "string"
+          },
+          "report": {
+            "title": "Report",
+            "type": "string"
+          },
+          "result": {
+            "title": "Result",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "result",
+          "report",
+          "cancel"
+        ],
+        "title": "Links",
         "type": "object"
       },
       "Load": {
@@ -454,6 +788,157 @@
           "scopes"
         ],
         "title": "MLflowExperimentLink",
+        "type": "object"
+      },
+      "Performance": {
+        "additionalProperties": false,
+        "description": "Typed client metrics from one closed-loop concurrency level.",
+        "properties": {
+          "completed_tps": {
+            "title": "Completed Tps",
+            "type": "number"
+          },
+          "configured_concurrency": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured Concurrency"
+          },
+          "dispatch_seconds": {
+            "title": "Dispatch Seconds",
+            "type": "number"
+          },
+          "elapsed_seconds_including_drain": {
+            "title": "Elapsed Seconds Including Drain",
+            "type": "number"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          },
+          "errors": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Errors",
+            "type": "object"
+          },
+          "measurement_complete": {
+            "default": false,
+            "title": "Measurement Complete",
+            "type": "boolean"
+          },
+          "observed_peak_in_flight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Peak In Flight"
+          },
+          "reported_output_tokens_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Output Tokens Per Second"
+          },
+          "requests": {
+            "minimum": 0.0,
+            "title": "Requests",
+            "type": "integer"
+          },
+          "successful_requests": {
+            "minimum": 0.0,
+            "title": "Successful Requests",
+            "type": "integer"
+          },
+          "successful_tps": {
+            "title": "Successful Tps",
+            "type": "number"
+          },
+          "timing_successful_only": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Timing"
+            },
+            "title": "Timing Successful Only",
+            "type": "object"
+          },
+          "token_usage_coverage": {
+            "title": "Token Usage Coverage",
+            "type": "number"
+          }
+        },
+        "required": [
+          "requests",
+          "successful_requests",
+          "successful_tps",
+          "completed_tps",
+          "elapsed_seconds_including_drain",
+          "dispatch_seconds",
+          "token_usage_coverage",
+          "timing_successful_only"
+        ],
+        "title": "Performance",
+        "type": "object"
+      },
+      "PhaseStates": {
+        "additionalProperties": false,
+        "description": "Independent planning, inference, load, profiling, and judging outcomes.",
+        "properties": {
+          "evaluation": {
+            "title": "Evaluation",
+            "type": "string"
+          },
+          "evaluation_readiness": {
+            "title": "Evaluation Readiness",
+            "type": "string"
+          },
+          "inference": {
+            "title": "Inference",
+            "type": "string"
+          },
+          "load": {
+            "title": "Load",
+            "type": "string"
+          },
+          "planning": {
+            "title": "Planning",
+            "type": "string"
+          },
+          "profiling": {
+            "title": "Profiling",
+            "type": "string"
+          }
+        },
+        "required": [
+          "planning",
+          "inference",
+          "evaluation_readiness",
+          "load",
+          "profiling",
+          "evaluation"
+        ],
+        "title": "PhaseStates",
         "type": "object"
       },
       "Plan": {
@@ -923,6 +1408,47 @@
         "title": "RegisteredScorer",
         "type": "object"
       },
+      "Report": {
+        "additionalProperties": false,
+        "description": "Protected paginated report without operator credentials or target configuration.",
+        "properties": {
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "profiling": {
+            "$ref": "#/components/schemas/ProfilingSummary"
+          },
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/RequestProfile"
+            },
+            "title": "Requests",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/Result"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run",
+          "profiling",
+          "requests",
+          "offset",
+          "limit",
+          "total"
+        ],
+        "title": "Report",
+        "type": "object"
+      },
       "RequestPage": {
         "additionalProperties": false,
         "description": "Bounded page of captured request records, including failures.",
@@ -1067,6 +1593,140 @@
           "status"
         ],
         "title": "RequestProfile",
+        "type": "object"
+      },
+      "Result": {
+        "additionalProperties": false,
+        "description": "Typed result envelope; protected assessment data retains native variants.",
+        "properties": {
+          "evaluation": {
+            "additionalProperties": true,
+            "title": "Evaluation",
+            "type": "object"
+          },
+          "evaluation_preflight": {
+            "$ref": "#/components/schemas/EvaluationPreflight"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "load_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoadError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Performance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "phases": {
+            "$ref": "#/components/schemas/PhaseStates"
+          },
+          "planning_error": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planning Error"
+          },
+          "preflight": {
+            "$ref": "#/components/schemas/PreflightResult"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DecisionSummary"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "phases",
+          "links",
+          "summary",
+          "preflight",
+          "evaluation_preflight"
+        ],
+        "title": "Result",
+        "type": "object"
+      },
+      "RunCreate": {
+        "additionalProperties": false,
+        "description": "Golden path: a registered target, cases, one load level, optional judging.",
+        "properties": {
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/Case"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Cases",
+            "type": "array"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/EvaluationPolicy"
+          },
+          "load": {
+            "$ref": "#/components/schemas/Load"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "target": {
+            "$ref": "#/components/schemas/TargetReference"
+          }
+        },
+        "required": [
+          "target",
+          "cases"
+        ],
+        "title": "RunCreate",
         "type": "object"
       },
       "RunPage": {
@@ -1334,6 +1994,53 @@
         "title": "RunResponse",
         "type": "object"
       },
+      "RunStatus": {
+        "additionalProperties": false,
+        "description": "Lightweight polling response with no prompts, answers, or destinations.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "phases": {
+            "$ref": "#/components/schemas/PhaseStates"
+          },
+          "poll_after_seconds": {
+            "default": 1,
+            "maximum": 60.0,
+            "minimum": 0.0,
+            "title": "Poll After Seconds",
+            "type": "number"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "phases",
+          "links"
+        ],
+        "title": "RunStatus",
+        "type": "object"
+      },
       "RunSummary": {
         "additionalProperties": false,
         "description": "Compact history entry without prompts, answers, or reference data.",
@@ -1527,7 +2234,8 @@
             "enum": [
               "openai-chat",
               "mlflow-agent-server",
-              "http-json"
+              "http-json",
+              "databricks-agent-runtime"
             ],
             "title": "Adapter",
             "type": "string"
@@ -1571,6 +2279,25 @@
             "title": "Request Usage",
             "type": "boolean"
           },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "session_per_request": {
+            "default": false,
+            "description": "Generate an isolated Agent Runtime session for each attempt.",
+            "title": "Session Per Request",
+            "type": "boolean"
+          },
           "url": {
             "description": "Exact HTTP endpoint URL (SSE or JSON) authorized by server target policy.",
             "examples": [
@@ -1587,6 +2314,130 @@
           "url"
         ],
         "title": "Target",
+        "type": "object"
+      },
+      "TargetCapability": {
+        "additionalProperties": false,
+        "description": "Explicit public target alias and its declared invocation protocols.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "protocols": {
+            "default": [],
+            "items": {
+              "enum": [
+                "openai-chat",
+                "mlflow-agent-server",
+                "http-json",
+                "databricks-agent-runtime"
+              ],
+              "type": "string"
+            },
+            "title": "Protocols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "TargetCapability",
+        "type": "object"
+      },
+      "TargetReference": {
+        "additionalProperties": false,
+        "description": "Only an operator-registered target name crosses the public v2 boundary.",
+        "properties": {
+          "connection_id": {
+            "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id"
+        ],
+        "title": "TargetReference",
+        "type": "object"
+      },
+      "Timing": {
+        "additionalProperties": false,
+        "description": "Successful client observations in milliseconds; absent values stay unknown.",
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "p50": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50"
+          },
+          "p95": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95"
+          },
+          "p99": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P99"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "Timing",
+        "type": "object"
+      },
+      "TraceCapability": {
+        "additionalProperties": false,
+        "description": "Static tracing readiness and public collection budgets without private scope.",
+        "properties": {
+          "max_spans": {
+            "title": "Max Spans",
+            "type": "integer"
+          },
+          "max_traces": {
+            "title": "Max Traces",
+            "type": "integer"
+          },
+          "readiness": {
+            "enum": [
+              "configured",
+              "needs_configuration",
+              "disabled"
+            ],
+            "title": "Readiness",
+            "type": "string"
+          }
+        },
+        "required": [
+          "readiness",
+          "max_traces",
+          "max_spans"
+        ],
+        "title": "TraceCapability",
         "type": "object"
       },
       "TraceSource": {
@@ -1630,6 +2481,60 @@
           "experiment_ids"
         ],
         "title": "TraceSource",
+        "type": "object"
+      },
+      "V2ErrorDetail": {
+        "additionalProperties": false,
+        "description": "Fixed safe error guidance; provider text and submitted values are excluded.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "guidance": {
+            "title": "Guidance",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "request_id",
+          "phase",
+          "retryable",
+          "guidance"
+        ],
+        "title": "V2ErrorDetail",
+        "type": "object"
+      },
+      "V2ErrorResponse": {
+        "additionalProperties": false,
+        "description": "Versioned common error envelope.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/V2ErrorDetail"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "V2ErrorResponse",
         "type": "object"
       }
     },
@@ -5162,6 +6067,2741 @@
         "summary": "Get Requests",
         "tags": [
           "Runs"
+        ]
+      }
+    },
+    "/v2/capabilities": {
+      "get": {
+        "description": "Read secret-free static capabilities; this does not certify runtime availability.",
+        "operationId": "capabilities_v2_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Authentication required",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication required",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Access denied",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Access denied",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource not found",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource conflict",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource conflict",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Input exceeds limit",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Input exceeds limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "invalid_request",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Invalid request",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Runner busy",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Runner busy",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Suggested polling/retry delay in seconds.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Server failure",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Target resolution failed",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Target resolution failed",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Capabilities",
+        "tags": [
+          "Benchmarks v2"
+        ]
+      }
+    },
+    "/v2/runs": {
+      "post": {
+        "description": "Admit a registered workload; planning and preflights execute after the receipt.\n\nEach admitted run performs one extra inference probe and optional judge-readiness\nassessments. Those calls can execute tools and incur cost, and are excluded from\nmeasured results. Idempotency binds the complete canonical v2 request.",
+        "operationId": "start_v2_runs_post",
+        "parameters": [
+          {
+            "description": "Optional retry key; reuse with identical input only.",
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "cases": [
+                  {
+                    "input": {
+                      "query": "Can I refund?"
+                    }
+                  }
+                ],
+                "evaluation": {
+                  "mode": "off"
+                },
+                "load": {
+                  "concurrency": 3,
+                  "duration_seconds": 10,
+                  "max_requests": 20
+                },
+                "target": {
+                  "connection_id": "refund-agent"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/RunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Acknowledgment"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "Relative URL of the created resource.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Suggested polling/retry delay in seconds.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Authentication required",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication required",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Access denied",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Access denied",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource not found",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource conflict",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource conflict",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Input exceeds limit",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Input exceeds limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "invalid_request",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Invalid request",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Runner busy",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Runner busy",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Suggested polling/retry delay in seconds.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Server failure",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Target resolution failed",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Target resolution failed",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Start",
+        "tags": [
+          "Benchmarks v2"
+        ]
+      }
+    },
+    "/v2/runs/{run_id}": {
+      "get": {
+        "description": "Poll lifecycle and independent phases without transferring report contents.",
+        "operationId": "status_v2_runs__run_id__get",
+        "parameters": [
+          {
+            "description": "UUID returned when this resource was created.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatus"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Authentication required",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication required",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Access denied",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Access denied",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource not found",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource conflict",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource conflict",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Input exceeds limit",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Input exceeds limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "invalid_request",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Invalid request",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Runner busy",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Runner busy",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Suggested polling/retry delay in seconds.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Server failure",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Target resolution failed",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Target resolution failed",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Status",
+        "tags": [
+          "Benchmarks v2"
+        ]
+      }
+    },
+    "/v2/runs/{run_id}/cancel": {
+      "post": {
+        "description": "Stop new dispatch and drain active calls; already executed actions remain.",
+        "operationId": "cancel_v2_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "description": "UUID returned when this resource was created.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Acknowledgment"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Authentication required",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication required",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Access denied",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Access denied",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource not found",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource conflict",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource conflict",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Input exceeds limit",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Input exceeds limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "invalid_request",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Invalid request",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Runner busy",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Runner busy",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Suggested polling/retry delay in seconds.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Server failure",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Target resolution failed",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Target resolution failed",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Cancel",
+        "tags": [
+          "Benchmarks v2"
+        ]
+      }
+    },
+    "/v2/runs/{run_id}/report": {
+      "get": {
+        "description": "Read a bounded content-free profile page alongside protected assessment results.",
+        "operationId": "report_v2_runs__run_id__report_get",
+        "parameters": [
+          {
+            "description": "UUID returned when this resource was created.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Authentication required",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication required",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Access denied",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Access denied",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource not found",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource conflict",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource conflict",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Input exceeds limit",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Input exceeds limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "invalid_request",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Invalid request",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Runner busy",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Runner busy",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Suggested polling/retry delay in seconds.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Server failure",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Target resolution failed",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Target resolution failed",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Report",
+        "tags": [
+          "Benchmarks v2"
+        ]
+      }
+    },
+    "/v2/runs/{run_id}/result": {
+      "get": {
+        "description": "Read measured performance and protected quality evidence, including partial failures.",
+        "operationId": "result_v2_runs__run_id__result_get",
+        "parameters": [
+          {
+            "description": "UUID returned when this resource was created.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Authentication required",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication required",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Access denied",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Access denied",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource not found",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Resource conflict",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource conflict",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Input exceeds limit",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Input exceeds limit",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "invalid_request",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Invalid request",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Runner busy",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Runner busy",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Suggested polling/retry delay in seconds.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Server failure",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": false
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Server failure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "request_failed",
+                    "guidance": "Check request and operator configuration before submitting again.",
+                    "message": "Target resolution failed",
+                    "phase": "admission",
+                    "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
+                    "retryable": true
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Target resolution failed",
+            "headers": {
+              "Cache-Control": {
+                "description": "Private run data must not be cached.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Disable content sniffing.",
+                "schema": {
+                  "const": "nosniff",
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "Server-generated correlation UUID.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Result",
+        "tags": [
+          "Benchmarks v2"
         ]
       }
     }

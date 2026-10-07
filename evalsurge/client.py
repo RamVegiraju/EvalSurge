@@ -28,6 +28,8 @@ from benchmark_agents.models import (
     Target,
 )
 
+from .remote import RemoteClient
+
 Protocol = Literal["openai-chat", "mlflow-agent-server", "http-json"]
 Result = TypeVar("Result")
 
@@ -547,6 +549,20 @@ class Client:
 
 class EvalSurge:
     """Factories for local contexts using one coordinator and one Locust engine."""
+
+    @staticmethod
+    def remote(base_url: str, *, api_key: str | None = None, **kwargs: Any) -> RemoteClient:
+        """Create a remote HTTP client; the API host remains the load generator.
+
+        Args:
+            base_url: Authorized HTTPS API origin, or HTTP loopback for local tests.
+            api_key: Optional in-memory service key; never included in URLs.
+            **kwargs: RemoteClient timeout, transport, and polling options.
+
+        Returns:
+            Unopened remote client. Enter its context to own and close HTTP resources.
+        """
+        return RemoteClient(base_url, api_key=api_key, **kwargs)
 
     @staticmethod
     def local(*, artifact_dir: str | Path = "artifacts") -> Client:

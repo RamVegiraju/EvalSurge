@@ -25,7 +25,7 @@ Do not replace this statement with a marketing label after a smoke test.
 | Tenant isolation | OIDC identities, per-run and per-connection ACLs, scoped MLflow credentials, authorization tests |
 | Network isolation | Egress policy at the network layer, DNS rebinding protection, localhost/metadata-service isolation, reviewed endpoint ownership |
 | Durable execution | Transactional database/queue, isolated workers, leases/fencing, heartbeats, cancel/recovery semantics and migration tests |
-| Hard phase deadlines | Process isolation for planner/trace/judge work; stop stalled transports or native scorer code without leaving threads alive |
+| Hard phase deadlines | Process isolation for App discovery/authentication and planner/trace/judge work; stop stalled credential subprocesses, transports, or native scorer code without leaving threads alive |
 | Spend/resource quotas | Per-tenant/provider token/cost/concurrency quotas, registered scorer timeout/retry budgets, admission accounting |
 | Storage lifecycle | Retention/deletion/export policies, indexed request/history access, bounded index memory, encrypted storage and backups |
 | Operational observability | Structured safe audit logs, OTel/service metrics, readiness, SLOs, dashboards, alerting, run ownership diagnostics |

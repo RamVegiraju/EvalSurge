@@ -1,9 +1,163 @@
 # Validation — 0.2.0
 
-Validated locally on macOS/Python 3.12 on October 4–6, 2026. CI is configured for
+Validated locally on macOS/Python 3.12 on October 4–7, 2026. CI is configured for
 Linux/Python 3.11–3.14. Observed main jobs failed during private-mirror installation;
 there is no remote CI result for these local changes. Branch-protection
 settings have not been verified/enabled by this local work.
+
+## Pre-push repository review — October 7, 2026
+
+The user authorized publishing the implementation after a repository and dependency
+scan. Read-only review found three concrete issues, fixed before publication:
+
+- The SDK/CLI report link used `?run_id=` while the shipped browser reads `?run=`.
+  A regression executing the actual report renderer confirms the old URL made no
+  report fetch and the corrected SDK URL loads the requested run. Focused
+  SDK/CLI/report tests passed **105 tests in 4.56 seconds**.
+- Cancellation before or during deferred planning left inference `pending` on a
+  terminal run. Both regressions failed before the fix; `_skip_load` now marks
+  unstarted inference `not_run`. Focused v2/coordinator/foundation tests passed
+  **21 tests in 3.68 seconds**.
+- App profile guards omitted several SDK identity/auth-routing fields not tagged
+  as credentials in SDK metadata. The shared presence-only guard now includes
+  those inputs; offline native Config precedence and pre-SDK/doctor regressions
+  prevent the override without provider traffic or OAuth reproduction. The scoped
+  App/runtime/settings/diagnostics suite passed **104 tests in 1.61 seconds**.
+
+README and the v2 guide now include the complete automatic-evaluation request,
+authoritative-reference requirements, default-off behavior, constrained LLM judge
+selection, operator provider prerequisites, and per-judge sampling/cost semantics.
+Credential-snapshot rotation guidance is explicit. README contract/link tests
+passed **4 tests in 3.10 seconds**. Final full verification after these fixes:
+
+- `uv sync --locked --extra agents --group dev --default-index
+  https://pypi.org/simple --offline --no-build-isolation`: 190 resolved packages,
+  182 installed packages checked; cached locked environment retained.
+- `uv run --no-sync pytest -q --tb=short`: **601 passed, no skips, 30 upstream
+  warnings, 186.12 seconds**.
+- Ruff lint passed and formatting checked **120 files**. OpenAPI snapshot equality
+  and independent schema validation passed; the public schema remains unchanged
+  by the pre-push fixes.
+- Sdist/wheel build and required-asset verification passed; **46 packaged runtime/UI
+  files** matched the checkout byte-for-byte. Shipped renderer and test harness
+  JavaScript syntax checks passed. Lock/provenance and whitespace checks passed.
+- A narrow credential-signature/path check of the **53 changed/new candidate
+  files** found no forbidden artifacts or common credential signatures. Ignored
+  environments, profiles, stores, and run artifacts are excluded. This is not a
+  comprehensive secret or security audit.
+
+Dependency review used official upstream release metadata for all 22 declared
+runtime/framework/dev/build dependencies, package-specific monorepo releases, and
+CI/vendored asset releases. Seven packages have newer observed releases; MLflow
+3.17 is intentionally excluded pending private rubric API/hash review. The exact
+versions, sources, index limitation, and follow-up are recorded in
+[the dependency policy](docs/DEPENDENCIES.md#pre-push-upstream-review--october-7-2026).
+No dependency versions, ranges, artifact origins/hashes, or lockfile were changed.
+Public PyPI metadata requests failed with TCP connection refused inside and outside
+the sandbox; this is not a successful latest-compatible resolution or install.
+
+```bash
+uv export --quiet --locked --default-index https://pypi.org/simple \
+  --extra agents --group dev --no-emit-project \
+  --output-file artifacts/prepush-20261007/audit-requirements.txt
+uv run --no-sync pip-audit --disable-pip --require-hashes \
+  --progress-spinner off --vulnerability-service osv --timeout 10 \
+  --requirement artifacts/prepush-20261007/audit-requirements.txt \
+  --format json --output artifacts/prepush-20261007/audit.json
+```
+
+The OSV audit passed: **181 applicable dependencies, zero known advisories**.
+Initial uv export/audit attempts hit sandbox cache permissions; the approved retry
+succeeded. OSV enforces hash presence, not validity; uv verifies artifact hashes.
+A narrow GitHub Advisory Database query found no matching `swagger-ui-dist@5.33.1`
+advisories. This is not a comprehensive security/license audit or a supported-
+interpreter clean-install matrix. Dependabot PR #4 was inspected read-only, not
+merged, rebased, or otherwise modified. GitHub identity was verified as the personal
+account authorized for `RamVegiraju/EvalSurge`; remote settings remain unchanged.
+
+## Registered-target v2 API and Databricks Apps — October 7, 2026
+
+Implemented additive v2 admission/status/result/report/cancel/capabilities, deferred
+owned planning, the remote SDK and packaged CLI, immutable operator settings,
+configuration-only diagnostics, and synchronous Databricks App resolution/OAuth/
+invocation support. V1 continues to use the same coordinator and one Locust engine;
+judging reuses captured answers. Evaluation is off by default. ADR 0009 and these
+public/trust-boundary changes require designated maintainer review.
+
+Local environment: macOS 26.6.2 arm64, Python 3.12.13, Databricks SDK 0.146.0,
+MLflow 3.16.1, Locust 2.46.6, FastAPI 0.142.2, OpenAI 3.22.1, LangGraph 1.2.12,
+and OpenAI Agents 0.22.3. No dependency version or lockfile changes were made.
+
+`uv sync --locked --extra agents --group dev` initially rejected this machine's
+different default index as requiring a lock update; the lock was not rewritten.
+Selecting public PyPI explicitly then failed fetching Hatchling for an isolated
+build with a connection-refused error, including the required retry outside the
+sandbox. The cached, non-isolated install succeeded with:
+
+```bash
+uv sync --locked --extra agents --group dev \
+  --default-index https://pypi.org/simple --offline --no-build-isolation
+```
+
+It resolved 190 packages and rebuilt/installed the editable project. Subsequent
+checks use `uv run --no-sync` to preserve that locked installed environment rather
+than implicitly resolving through the machine's different default registry.
+This is not a successful clean online installation or updated dependency audit.
+
+Tests cover actual remote SDK/CLI → REST → localhost Locust traffic, packaged CLI
+entrypoint execution, native SDK configuration/discovery/OAuth with controlled
+HTTP boundaries, strict synchronous invocation completion/correlation, legacy
+Responses trace events, and native framework/MLflow integration. Static diagnostics
+forbid SDK imports/calls and redact operator values. File snapshots survive source
+edits/deletion; contexts propagate through tasks/threads/worker environments without
+global mutation. App identity/config-file conflicts fail before SDK resolution.
+
+Final review reproduced a planning-recovery defect: a terminal interrupted run
+left its unstarted inference phase pending. The new regression failed with
+`pending != not_run`, then passed after recovery explicitly marked it `not_run`.
+Focused v2/coordinator/foundation tests passed **20 tests in 3.66 seconds**.
+The README checks passed **3 tests in 2.81 seconds**. Intermediate full-suite
+runs passed **568 tests in 177.28 seconds** and **571 tests in 176.68 seconds**,
+each with 30 upstream MLflow/pandas/SQLAlchemy warnings. After all implementation
+files were frozen, final `uv run --no-sync pytest -q --tb=short` passed
+**578 tests, no skips, 30 upstream warnings, in 177.40 seconds**.
+
+Final non-test gates passed:
+
+- `uv run --no-sync ruff check .` and `uv run --no-sync ruff format --check .`:
+  lint clean; **120 files already formatted**.
+- `uv run --no-sync python scripts/export_openapi.py --check` and
+  `uv run --no-sync openapi-spec-validator docs/openapi.json`: snapshot equality
+  and independent OpenAPI validation passed.
+- `uv build --no-build-isolation`: sdist and wheel built successfully.
+  `uv run --no-sync python scripts/verify_wheel.py` verified required package/UI
+  assets; independent archive reads confirmed byte-for-byte checkout parity for
+  **46 packaged runtime/UI files**. The integration suite separately executes
+  the built wheel's CLI entrypoint.
+- `uv lock --check --offline --default-index https://pypi.org/simple`: 190 resolved
+  packages; `uv run --no-sync python scripts/check_ci_prerequisites.py` verified
+  public registry/artifact provenance for **189 locked dependency packages**.
+  `uv.lock` remains unchanged; this does not relabel mirror artifacts.
+- `node --check benchmark_agents/static/report.js` and `git diff --check` passed.
+
+Final App/runtime/settings/diagnostics focused checks passed **84 tests in 1.53
+seconds**, including the native config-file consistency regressions. Hard OAuth
+deadlines remain a documented limitation rather than a passing local test claim.
+
+Schema review against `41311ac9b523e37ba7e4909fdbd1bd84f5d915bf` reports zero
+breaking/potentially breaking changes. Lint reports zero errors, 130 warnings,
+and 50 informational findings; design score is **71.76/100 (C)**, not a sign-off.
+Raw generated reports are retained in `docs/review/v2-*.json` and interpreted in
+[the API review](docs/API_REVIEW.md). These tools do not replace behavior tests.
+
+No live Databricks/App deployment, paid inference/planning/judging, GitHub access,
+remote-service changes, commits, or pushes were performed. SDK HTTP/retry budgets
+are not hard deadlines for OAuth/CLI credential work; thread offloading cannot
+terminate a stalled credential source. Hard discovery/auth isolation, background/
+resumable invocation, planless browser reports, lifecycle/retention/capacity
+campaigns, distributed workers/stores, and shared hosting remain gaps or later
+milestones. Local controlled tests do not establish sustainable capacity, judge
+calibration, remote CI success, browser layout, or production readiness.
 
 ## Agent-oriented Python examples — October 6, 2026
 

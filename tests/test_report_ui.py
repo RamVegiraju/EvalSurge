@@ -9,6 +9,8 @@ from typing import Any
 
 import pytest
 
+from evalsurge.remote import RemoteClient
+
 STATIC = Path(__file__).resolve().parents[1] / "benchmark_agents" / "static"
 
 
@@ -85,6 +87,21 @@ def test_report_shows_safe_mlflow_experiment_links(evidence) -> None:
     }
     assert len(output["calls"]) == 1
     assert "private-test-key" not in json.dumps(links)
+
+
+def test_remote_report_url_autoloads_the_shipped_renderer(evidence: dict[str, Any]) -> None:
+    """SDK/browser links must use the real renderer's query and prefix contract."""
+    with RemoteClient("https://api.example/prefix", api_key="private-test-key") as client:
+        url = client.report_url(evidence["run"]["id"])
+    output = render(evidence, origin=url, autoload=True)
+    assert len(output["calls"]) == 1
+    assert output["calls"][0]["url"] == (
+        f"/prefix/v1/runs/{evidence['run']['id']}/report?offset=0&limit=25"
+    )
+    assert output["calls"][0]["options"]["headers"] == {}
+    assert not output["nodes"]["report"]["hidden"]
+    assert evidence["run"]["id"] in output["nodes"]["message"]["text"]
+    assert "private-test-key" not in url + json.dumps(output["history"])
 
 
 @pytest.mark.parametrize(

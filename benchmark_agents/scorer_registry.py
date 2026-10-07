@@ -1,18 +1,18 @@
 """Resolve trusted MLflow scorers from an operator allowlist, never uploaded Python."""
 
 import json
-import os
 from typing import Any
 from urllib.parse import urlsplit
 
+from .configuration import getenv
 from .models import RegisteredScorer, TraceSource
 
 
 def tracking_uri() -> str | None:
     """Resolve an explicit store and forbid credentials embedded in persisted URIs."""
-    uri = os.getenv("MLFLOW_TRACKING_URI")
+    uri = getenv("MLFLOW_TRACKING_URI")
     if uri == "databricks":
-        profile = os.getenv("DATABRICKS_CONFIG_PROFILE")
+        profile = getenv("DATABRICKS_CONFIG_PROFILE")
         if not profile:
             raise ValueError("MLflow Databricks tracking requires an explicit profile")
         uri = f"databricks://{profile}"
@@ -23,24 +23,25 @@ def tracking_uri() -> str | None:
 
 def trace_source() -> TraceSource | None:
     """Freeze opt-in trace scope and hard collection limits from server configuration."""
-    if os.getenv("BENCHMARK_TRACE_ENABLED", "false").lower() != "true":
+    if getenv("BENCHMARK_TRACE_ENABLED", "false").lower() != "true":
         return None
     uri = tracking_uri()
-    experiments = json.loads(os.getenv("BENCHMARK_TRACE_EXPERIMENT_IDS", "[]"))
-    if not experiments and os.getenv("MLFLOW_EXPERIMENT_ID"):
-        experiments = [os.environ["MLFLOW_EXPERIMENT_ID"]]
+    experiments = json.loads(getenv("BENCHMARK_TRACE_EXPERIMENT_IDS", "[]"))
+    if not experiments and getenv("MLFLOW_EXPERIMENT_ID"):
+        experiments = [getenv("MLFLOW_EXPERIMENT_ID")]
     if not uri or not experiments:
         raise ValueError("Tracing requires MLFLOW_TRACKING_URI and authorized experiment IDs")
     return TraceSource(
         tracking_uri=uri,
         experiment_ids=experiments,
-        max_traces=int(os.getenv("BENCHMARK_MAX_TRACES", "100")),
+        max_traces=int(getenv("BENCHMARK_MAX_TRACES", "100")),
+        max_spans=int(getenv("BENCHMARK_MAX_SPANS", "250")),
     )
 
 
 def catalog() -> dict[str, dict[str, Any]]:
     """Read bounded operator-owned scorer references without executing scorer code."""
-    raw = json.loads(os.getenv("BENCHMARK_SCORERS", "{}"))
+    raw = json.loads(getenv("BENCHMARK_SCORERS", "{}"))
     if not isinstance(raw, dict) or len(raw) > 20:
         raise ValueError("BENCHMARK_SCORERS must be an object with at most 20 aliases")
     result = {}

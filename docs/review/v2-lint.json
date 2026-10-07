@@ -1,0 +1,1273 @@
+{
+  "summary": {
+    "total_endpoints": 14,
+    "endpoints_with_issues": 13,
+    "total_issues": 180,
+    "errors": 0,
+    "warnings": 130,
+    "info": 50,
+    "score": 68.57
+  },
+  "issues": [
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for POST /v1/evaluation-plans",
+      "path": "/paths//v1/evaluation-plans/post/responses/413",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for POST /v1/evaluation-plans",
+      "path": "/paths//v1/evaluation-plans/post/responses/502",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'plan_id' should use camelCase or kebab-case",
+      "path": "/paths//v1/evaluation-plans/{plan_id}",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v1/evaluation-plans/{plan_id}",
+      "path": "/paths//v1/evaluation-plans/{plan_id}/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v1/evaluation-plans/{plan_id}",
+      "path": "/paths//v1/evaluation-plans/{plan_id}/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v1/evaluation-plans/{plan_id}",
+      "path": "/paths//v1/evaluation-plans/{plan_id}/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v1/evaluation-plans/{plan_id}",
+      "path": "/paths//v1/evaluation-plans/{plan_id}/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'plan_id' should use camelCase or kebab-case in GET /v1/evaluation-plans/{plan_id}",
+      "path": "/paths//v1/evaluation-plans/{plan_id}/get/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v1/runs",
+      "path": "/paths//v1/runs/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v1/runs",
+      "path": "/paths//v1/runs/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v1/runs",
+      "path": "/paths//v1/runs/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v1/runs",
+      "path": "/paths//v1/runs/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 202 for POST /v1/runs",
+      "path": "/paths//v1/runs/post/responses/202",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for POST /v1/runs",
+      "path": "/paths//v1/runs/post/responses/413",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for POST /v1/runs",
+      "path": "/paths//v1/runs/post/responses/502",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case",
+      "path": "/paths//v1/runs/{run_id}",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v1/runs/{run_id}",
+      "path": "/paths//v1/runs/{run_id}/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v1/runs/{run_id}",
+      "path": "/paths//v1/runs/{run_id}/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v1/runs/{run_id}",
+      "path": "/paths//v1/runs/{run_id}/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v1/runs/{run_id}",
+      "path": "/paths//v1/runs/{run_id}/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case in GET /v1/runs/{run_id}",
+      "path": "/paths//v1/runs/{run_id}/get/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case",
+      "path": "/paths//v1/runs/{run_id}/cancel",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "rest_conventions",
+      "message": "POST request typically should have request body: POST /v1/runs/{run_id}/cancel",
+      "path": "/paths//v1/runs/{run_id}/cancel/post",
+      "suggestion": "Consider adding requestBody for POST operation or use GET if no data is being sent"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for POST /v1/runs/{run_id}/cancel",
+      "path": "/paths//v1/runs/{run_id}/cancel/post/responses/413",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for POST /v1/runs/{run_id}/cancel",
+      "path": "/paths//v1/runs/{run_id}/cancel/post/responses/502",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case in POST /v1/runs/{run_id}/cancel",
+      "path": "/paths//v1/runs/{run_id}/cancel/post/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case",
+      "path": "/paths//v1/runs/{run_id}/report",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v1/runs/{run_id}/report",
+      "path": "/paths//v1/runs/{run_id}/report/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v1/runs/{run_id}/report",
+      "path": "/paths//v1/runs/{run_id}/report/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v1/runs/{run_id}/report",
+      "path": "/paths//v1/runs/{run_id}/report/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v1/runs/{run_id}/report",
+      "path": "/paths//v1/runs/{run_id}/report/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case in GET /v1/runs/{run_id}/report",
+      "path": "/paths//v1/runs/{run_id}/report/get/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case",
+      "path": "/paths//v1/runs/{run_id}/requests",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v1/runs/{run_id}/requests",
+      "path": "/paths//v1/runs/{run_id}/requests/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v1/runs/{run_id}/requests",
+      "path": "/paths//v1/runs/{run_id}/requests/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v1/runs/{run_id}/requests",
+      "path": "/paths//v1/runs/{run_id}/requests/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v1/runs/{run_id}/requests",
+      "path": "/paths//v1/runs/{run_id}/requests/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case in GET /v1/runs/{run_id}/requests",
+      "path": "/paths//v1/runs/{run_id}/requests/get/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v2/capabilities",
+      "path": "/paths//v2/capabilities/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v2/capabilities",
+      "path": "/paths//v2/capabilities/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v2/capabilities",
+      "path": "/paths//v2/capabilities/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v2/capabilities",
+      "path": "/paths//v2/capabilities/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 202 for POST /v2/runs",
+      "path": "/paths//v2/runs/post/responses/202",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for POST /v2/runs",
+      "path": "/paths//v2/runs/post/responses/413",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for POST /v2/runs",
+      "path": "/paths//v2/runs/post/responses/502",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case",
+      "path": "/paths//v2/runs/{run_id}",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v2/runs/{run_id}",
+      "path": "/paths//v2/runs/{run_id}/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v2/runs/{run_id}",
+      "path": "/paths//v2/runs/{run_id}/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v2/runs/{run_id}",
+      "path": "/paths//v2/runs/{run_id}/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v2/runs/{run_id}",
+      "path": "/paths//v2/runs/{run_id}/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case in GET /v2/runs/{run_id}",
+      "path": "/paths//v2/runs/{run_id}/get/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case",
+      "path": "/paths//v2/runs/{run_id}/cancel",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "rest_conventions",
+      "message": "POST request typically should have request body: POST /v2/runs/{run_id}/cancel",
+      "path": "/paths//v2/runs/{run_id}/cancel/post",
+      "suggestion": "Consider adding requestBody for POST operation or use GET if no data is being sent"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for POST /v2/runs/{run_id}/cancel",
+      "path": "/paths//v2/runs/{run_id}/cancel/post/responses/413",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for POST /v2/runs/{run_id}/cancel",
+      "path": "/paths//v2/runs/{run_id}/cancel/post/responses/502",
+      "suggestion": "Consider using standard codes for POST: [200, 201, 400, 409, 422]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case in POST /v2/runs/{run_id}/cancel",
+      "path": "/paths//v2/runs/{run_id}/cancel/post/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case",
+      "path": "/paths//v2/runs/{run_id}/report",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v2/runs/{run_id}/report",
+      "path": "/paths//v2/runs/{run_id}/report/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v2/runs/{run_id}/report",
+      "path": "/paths//v2/runs/{run_id}/report/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v2/runs/{run_id}/report",
+      "path": "/paths//v2/runs/{run_id}/report/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v2/runs/{run_id}/report",
+      "path": "/paths//v2/runs/{run_id}/report/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case in GET /v2/runs/{run_id}/report",
+      "path": "/paths//v2/runs/{run_id}/report/get/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case",
+      "path": "/paths//v2/runs/{run_id}/result",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 409 for GET /v2/runs/{run_id}/result",
+      "path": "/paths//v2/runs/{run_id}/result/get/responses/409",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 413 for GET /v2/runs/{run_id}/result",
+      "path": "/paths//v2/runs/{run_id}/result/get/responses/413",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 422 for GET /v2/runs/{run_id}/result",
+      "path": "/paths//v2/runs/{run_id}/result/get/responses/422",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "info",
+      "category": "responses",
+      "message": "Uncommon status code 502 for GET /v2/runs/{run_id}/result",
+      "path": "/paths//v2/runs/{run_id}/result/get/responses/502",
+      "suggestion": "Consider using standard codes for GET: [200, 304, 404]"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Path parameter 'run_id' should use camelCase or kebab-case in GET /v2/runs/{run_id}/result",
+      "path": "/paths//v2/runs/{run_id}/result/get/parameters[0]/name",
+      "suggestion": "Use camelCase (e.g., 'userId') or kebab-case (e.g., 'user-id')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'poll_after_seconds' in schema 'Acknowledgment' should use camelCase",
+      "path": "/components/schemas/Acknowledgment/properties/poll_after_seconds",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'api_version' in schema 'Capabilities' should use camelCase",
+      "path": "/components/schemas/Capabilities/properties/api_version",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'runtime_verified' in schema 'Capabilities' should use camelCase",
+      "path": "/components/schemas/Capabilities/properties/runtime_verified",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_active_runs' in schema 'CapabilityLimits' should use camelCase",
+      "path": "/components/schemas/CapabilityLimits/properties/max_active_runs",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_cases' in schema 'CapabilityLimits' should use camelCase",
+      "path": "/components/schemas/CapabilityLimits/properties/max_cases",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_concurrent_users' in schema 'CapabilityLimits' should use camelCase",
+      "path": "/components/schemas/CapabilityLimits/properties/max_concurrent_users",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_duration_seconds' in schema 'CapabilityLimits' should use camelCase",
+      "path": "/components/schemas/CapabilityLimits/properties/max_duration_seconds",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_json_response_bytes' in schema 'CapabilityLimits' should use camelCase",
+      "path": "/components/schemas/CapabilityLimits/properties/max_json_response_bytes",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_request_bytes' in schema 'CapabilityLimits' should use camelCase",
+      "path": "/components/schemas/CapabilityLimits/properties/max_request_bytes",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_requests' in schema 'CapabilityLimits' should use camelCase",
+      "path": "/components/schemas/CapabilityLimits/properties/max_requests",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_timeout_seconds' in schema 'CapabilityLimits' should use camelCase",
+      "path": "/components/schemas/CapabilityLimits/properties/max_timeout_seconds",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'evidence_gaps' in schema 'DecisionSummary' should use camelCase",
+      "path": "/components/schemas/DecisionSummary/properties/evidence_gaps",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'sustainable_capacity_established' in schema 'DecisionSummary' should use camelCase",
+      "path": "/components/schemas/DecisionSummary/properties/sustainable_capacity_established",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'request_id' in schema 'ErrorDetail' should use camelCase",
+      "path": "/components/schemas/ErrorDetail/properties/request_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'agent_manifest' in schema 'Evaluation' should use camelCase",
+      "path": "/components/schemas/Evaluation/properties/agent_manifest",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_scored_requests' in schema 'Evaluation' should use camelCase",
+      "path": "/components/schemas/Evaluation/properties/max_scored_requests",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'registered_scorers' in schema 'Evaluation' should use camelCase",
+      "path": "/components/schemas/Evaluation/properties/registered_scorers",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'sampling_seed' in schema 'Evaluation' should use camelCase",
+      "path": "/components/schemas/Evaluation/properties/sampling_seed",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'catalog_judges' in schema 'EvaluationCapability' should use camelCase",
+      "path": "/components/schemas/EvaluationCapability/properties/catalog_judges",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'default_mode' in schema 'EvaluationCapability' should use camelCase",
+      "path": "/components/schemas/EvaluationCapability/properties/default_mode",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'executable_catalog_scorers' in schema 'EvaluationCapability' should use camelCase",
+      "path": "/components/schemas/EvaluationCapability/properties/executable_catalog_scorers",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'registered_scorers' in schema 'EvaluationCapability' should use camelCase",
+      "path": "/components/schemas/EvaluationCapability/properties/registered_scorers",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'http_status' in schema 'EvaluationError' should use camelCase",
+      "path": "/components/schemas/EvaluationError/properties/http_status",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_scored_requests' in schema 'EvaluationPolicy' should use camelCase",
+      "path": "/components/schemas/EvaluationPolicy/properties/max_scored_requests",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'sampling_seed' in schema 'EvaluationPolicy' should use camelCase",
+      "path": "/components/schemas/EvaluationPolicy/properties/sampling_seed",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'checked_scorers' in schema 'EvaluationPreflight' should use camelCase",
+      "path": "/components/schemas/EvaluationPreflight/properties/checked_scorers",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'duration_seconds' in schema 'Load' should use camelCase",
+      "path": "/components/schemas/Load/properties/duration_seconds",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_requests' in schema 'Load' should use camelCase",
+      "path": "/components/schemas/Load/properties/max_requests",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'timeout_seconds' in schema 'Load' should use camelCase",
+      "path": "/components/schemas/Load/properties/timeout_seconds",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'experiment_id' in schema 'MLflowExperimentLink' should use camelCase",
+      "path": "/components/schemas/MLflowExperimentLink/properties/experiment_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'completed_tps' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/completed_tps",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'configured_concurrency' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/configured_concurrency",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'dispatch_seconds' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/dispatch_seconds",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'elapsed_seconds_including_drain' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/elapsed_seconds_including_drain",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'error_rate' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/error_rate",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'measurement_complete' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/measurement_complete",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'observed_peak_in_flight' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/observed_peak_in_flight",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'reported_output_tokens_per_second' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/reported_output_tokens_per_second",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'successful_requests' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/successful_requests",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'successful_tps' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/successful_tps",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'timing_successful_only' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/timing_successful_only",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'token_usage_coverage' in schema 'Performance' should use camelCase",
+      "path": "/components/schemas/Performance/properties/token_usage_coverage",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'evaluation_readiness' in schema 'PhaseStates' should use camelCase",
+      "path": "/components/schemas/PhaseStates/properties/evaluation_readiness",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'dataset_hash' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/dataset_hash",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'evaluation_hash' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/evaluation_hash",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'judge_host' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/judge_host",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'judge_max_completion_tokens' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/judge_max_completion_tokens",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'judge_max_retries' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/judge_max_retries",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'judge_model' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/judge_model",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'judge_profile' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/judge_profile",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'judge_timeout_seconds' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/judge_timeout_seconds",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_scored_requests' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/max_scored_requests",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'planner_model' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/planner_model",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'registered_scorers' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/registered_scorers",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'rubric_hash' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/rubric_hash",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'rubric_version' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/rubric_version",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'sampling_policy' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/sampling_policy",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'sampling_seed' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/sampling_seed",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'time_bins' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/time_bins",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'trace_source' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/trace_source",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'tracking_uri' in schema 'Plan' should use camelCase",
+      "path": "/components/schemas/Plan/properties/tracking_uri",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'case_id' in schema 'PreflightResult' should use camelCase",
+      "path": "/components/schemas/PreflightResult/properties/case_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'http_status' in schema 'PreflightResult' should use camelCase",
+      "path": "/components/schemas/PreflightResult/properties/http_status",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'latency_ms' in schema 'PreflightResult' should use camelCase",
+      "path": "/components/schemas/PreflightResult/properties/latency_ms",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'request_id' in schema 'PreflightResult' should use camelCase",
+      "path": "/components/schemas/PreflightResult/properties/request_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'total_requests' in schema 'ProfilingSummary' should use camelCase",
+      "path": "/components/schemas/ProfilingSummary/properties/total_requests",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'traced_requests' in schema 'ProfilingSummary' should use camelCase",
+      "path": "/components/schemas/ProfilingSummary/properties/traced_requests",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'eligible_samples' in schema 'Recommendation' should use camelCase",
+      "path": "/components/schemas/Recommendation/properties/eligible_samples",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'required_fields' in schema 'Recommendation' should use camelCase",
+      "path": "/components/schemas/Recommendation/properties/required_fields",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'total_samples' in schema 'Recommendation' should use camelCase",
+      "path": "/components/schemas/Recommendation/properties/total_samples",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'definition_hash' in schema 'RegisteredScorer' should use camelCase",
+      "path": "/components/schemas/RegisteredScorer/properties/definition_hash",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'experiment_id' in schema 'RegisteredScorer' should use camelCase",
+      "path": "/components/schemas/RegisteredScorer/properties/experiment_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'required_fields' in schema 'RegisteredScorer' should use camelCase",
+      "path": "/components/schemas/RegisteredScorer/properties/required_fields",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'agent_duration_ms' in schema 'RequestProfile' should use camelCase",
+      "path": "/components/schemas/RequestProfile/properties/agent_duration_ms",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'case_id' in schema 'RequestProfile' should use camelCase",
+      "path": "/components/schemas/RequestProfile/properties/case_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'client_minus_agent_ms' in schema 'RequestProfile' should use camelCase",
+      "path": "/components/schemas/RequestProfile/properties/client_minus_agent_ms",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'latency_ms' in schema 'RequestProfile' should use camelCase",
+      "path": "/components/schemas/RequestProfile/properties/latency_ms",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'occupancy_ms' in schema 'RequestProfile' should use camelCase",
+      "path": "/components/schemas/RequestProfile/properties/occupancy_ms",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'request_id' in schema 'RequestProfile' should use camelCase",
+      "path": "/components/schemas/RequestProfile/properties/request_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'trace_id' in schema 'RequestProfile' should use camelCase",
+      "path": "/components/schemas/RequestProfile/properties/trace_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'evaluation_preflight' in schema 'Result' should use camelCase",
+      "path": "/components/schemas/Result/properties/evaluation_preflight",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'load_error' in schema 'Result' should use camelCase",
+      "path": "/components/schemas/Result/properties/load_error",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'planning_error' in schema 'Result' should use camelCase",
+      "path": "/components/schemas/Result/properties/planning_error",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'mlflow_experiments' in schema 'RunReport' should use camelCase",
+      "path": "/components/schemas/RunReport/properties/mlflow_experiments",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'plan_id' in schema 'RunRequest' should use camelCase",
+      "path": "/components/schemas/RunRequest/properties/plan_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'error_type' in schema 'RunResponse' should use camelCase",
+      "path": "/components/schemas/RunResponse/properties/error_type",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'evaluation_preflight' in schema 'RunResponse' should use camelCase",
+      "path": "/components/schemas/RunResponse/properties/evaluation_preflight",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'evaluation_status' in schema 'RunResponse' should use camelCase",
+      "path": "/components/schemas/RunResponse/properties/evaluation_status",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'load_error' in schema 'RunResponse' should use camelCase",
+      "path": "/components/schemas/RunResponse/properties/load_error",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'load_status' in schema 'RunResponse' should use camelCase",
+      "path": "/components/schemas/RunResponse/properties/load_status",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'profiling_status' in schema 'RunResponse' should use camelCase",
+      "path": "/components/schemas/RunResponse/properties/profiling_status",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'trace_coverage' in schema 'RunResponse' should use camelCase",
+      "path": "/components/schemas/RunResponse/properties/trace_coverage",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'poll_after_seconds' in schema 'RunStatus' should use camelCase",
+      "path": "/components/schemas/RunStatus/properties/poll_after_seconds",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'evaluation_status' in schema 'RunSummary' should use camelCase",
+      "path": "/components/schemas/RunSummary/properties/evaluation_status",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'load_status' in schema 'RunSummary' should use camelCase",
+      "path": "/components/schemas/RunSummary/properties/load_status",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'duration_ms' in schema 'SpanProfile' should use camelCase",
+      "path": "/components/schemas/SpanProfile/properties/duration_ms",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'parent_id' in schema 'SpanProfile' should use camelCase",
+      "path": "/components/schemas/SpanProfile/properties/parent_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'self_ms' in schema 'SpanProfile' should use camelCase",
+      "path": "/components/schemas/SpanProfile/properties/self_ms",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'span_id' in schema 'SpanProfile' should use camelCase",
+      "path": "/components/schemas/SpanProfile/properties/span_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'start_ms' in schema 'SpanProfile' should use camelCase",
+      "path": "/components/schemas/SpanProfile/properties/start_ms",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'connection_id' in schema 'Target' should use camelCase",
+      "path": "/components/schemas/Target/properties/connection_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'request_usage' in schema 'Target' should use camelCase",
+      "path": "/components/schemas/Target/properties/request_usage",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'session_id' in schema 'Target' should use camelCase",
+      "path": "/components/schemas/Target/properties/session_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'session_per_request' in schema 'Target' should use camelCase",
+      "path": "/components/schemas/Target/properties/session_per_request",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'connection_id' in schema 'TargetReference' should use camelCase",
+      "path": "/components/schemas/TargetReference/properties/connection_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_spans' in schema 'TraceCapability' should use camelCase",
+      "path": "/components/schemas/TraceCapability/properties/max_spans",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_traces' in schema 'TraceCapability' should use camelCase",
+      "path": "/components/schemas/TraceCapability/properties/max_traces",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'experiment_ids' in schema 'TraceSource' should use camelCase",
+      "path": "/components/schemas/TraceSource/properties/experiment_ids",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_spans' in schema 'TraceSource' should use camelCase",
+      "path": "/components/schemas/TraceSource/properties/max_spans",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'max_traces' in schema 'TraceSource' should use camelCase",
+      "path": "/components/schemas/TraceSource/properties/max_traces",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'tracking_uri' in schema 'TraceSource' should use camelCase",
+      "path": "/components/schemas/TraceSource/properties/tracking_uri",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    },
+    {
+      "severity": "warning",
+      "category": "naming",
+      "message": "Property 'request_id' in schema 'V2ErrorDetail' should use camelCase",
+      "path": "/components/schemas/V2ErrorDetail/properties/request_id",
+      "suggestion": "Use camelCase for property names (e.g., 'firstName', 'createdAt')"
+    }
+  ]
+}

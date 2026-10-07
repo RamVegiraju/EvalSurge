@@ -1,5 +1,16 @@
 # Security and deployment boundary
 
+The `/v2` API accepts registered target IDs only. File-backed operator configuration
+is captured privately per application; task-local propagation avoids cross-request
+process-environment mutation. Capabilities and doctor publish configuration states,
+never destinations, profiles, credential references, source, or tokens, and make no
+external checks. App origins come from the operator-selected SDK profile; OAuth is
+refreshed and bound to that exact origin. Conflicting ambient SDK destinations,
+credentials, identity selectors, and authentication-routing overrides are rejected
+before App resolution. See [v2 configuration](docs/V2_API.md).
+App configuration-file selectors must also agree between the API process and
+private runtime snapshot; SDK CLI credential subprocesses inherit process values.
+
 EvalSurge 0.2 is a local, single-tenant prototype. Bind to loopback with proxy headers disabled. Set `BENCHMARK_API_KEY` when serving beyond loopback and terminate TLS before exposing any remote connection. A shared API key authenticates the service; it does not provide tenant authorization. Documentation endpoints and the OpenAPI schema are public metadata.
 
 Configure destination credentials only through server-owned `BENCHMARK_CONNECTIONS`. Each connection binds an authentication method to one exact URL. Unauthenticated remote targets need an exact allowlist entry. Redirects, URL credentials, fragments, and query strings are rejected. Databricks credentials are restricted to the configured HTTPS workspace. The load worker disables environment proxy and netrc credential discovery.

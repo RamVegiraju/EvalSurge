@@ -87,7 +87,10 @@ async function main() {
       },
     },
     URL, URLSearchParams,
-    location: {search: "", href: input.origin ?? "http://localhost/reports/"},
+    location: {
+      search: input.autoload ? new URL(input.origin).search : "",
+      href: input.origin ?? "http://localhost/reports/",
+    },
     history: {replaceState: (...args) => history.push(args)},
     fetch: async (url, options) => {
       calls.push({url, options});
@@ -96,9 +99,14 @@ async function main() {
     },
   });
   vm.runInContext(fs.readFileSync(input.script, "utf8"), context);
-  nodes["run-id"].value = input.report.run.id;
-  nodes["api-key"].value = "private-test-key";
-  await vm.runInContext("load()", context);
+  if (input.autoload) {
+    // The shipped initializer calls load(); let its bounded fixture promises settle.
+    await new Promise(resolve => setImmediate(resolve));
+  } else {
+    nodes["run-id"].value = input.report.run.id;
+    nodes["api-key"].value = "private-test-key";
+    await vm.runInContext("load()", context);
+  }
   if (input.toggle) {
     nodes["show-framework"].checked = true;
     await nodes["show-framework"].listeners.change();

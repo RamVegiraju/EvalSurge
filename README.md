@@ -105,6 +105,44 @@ Remote/authenticated agents require [server-owned connections](docs/USAGE.md#con
 If `BENCHMARK_API_KEY` is configured, add `X-API-Key` to API calls or enter it in
 the report form. Only benchmark agents you are authorized to exercise.
 
+### Registered targets and automatic judging (v2)
+
+For the simpler API, the operator registers a target such as `refund-agent` and
+configures the planner and judge provider. Clients submit `POST /v2/runs` without
+sending endpoint URLs, Databricks profiles, or OAuth tokens:
+
+```json
+{
+  "name": "refund-quality-baseline",
+  "target": {"connection_id": "refund-agent"},
+  "cases": [{
+    "input": {"query": "Can I refund an opened item?"},
+    "reference": {"expected_response": "Opened items are not refundable."}
+  }],
+  "load": {"concurrency": 3, "duration_seconds": 10, "max_requests": 20},
+  "evaluation": {
+    "mode": "automatic",
+    "description": "Answer refund questions accurately according to the refund policy.",
+    "max_scored_requests": 20
+  }
+}
+```
+
+This reference is illustrative; replace it with your authoritative policy.
+`automatic` lets the configured LLM recommend supported judges and operator-approved
+registered scorers. EvalSurge validates evidence/readiness and freezes the plan;
+the model cannot create scorer code or change load limits. Planning and judging
+can incur cost, and the sample budget is per selected judge. Judging reuses captured
+answers; one additional inference probe occurs before measured load.
+
+Omit `evaluation` or use `mode: "off"` for performance-only runs. Use
+`mode: "explicit"` with `scorers` to choose criteria yourself. V2 returns `202`
+before planning; poll the returned status link and inspect independent phase
+outcomes. `/v1/evaluation-plans` remains available for suggestion/review before
+running; v2 automatic mode plans within the run.
+
+See [v2 operator setup, Databricks Apps, remote SDK, and CLI](docs/V2_API.md).
+
 ### Python API
 
 With your agent running, no EvalSurge web server is required:
@@ -215,6 +253,7 @@ Protect reports: judge rationales can quote private inputs, answers, and referen
 
 ## Documentation
 
+- [Registered-target v2 API, remote SDK/CLI, and Databricks Apps](docs/V2_API.md)
 - [Configuration, API operations, and live examples](docs/USAGE.md)
 - [Traces, manifests, MLflow judges, and datasets](docs/PROFILING_AND_EVALUATION.md)
 - [Architecture](ARCHITECTURE.md) · [Code guide](docs/CODE_GUIDE.md) · [Validation](VALIDATION.md)

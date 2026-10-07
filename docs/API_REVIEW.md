@@ -1,5 +1,37 @@
 # API and implementation review — 0.2.0
 
+## Registered-target v2 façade — October 7, 2026
+
+The additive `/v2` API uses registered targets, defaults evaluation to off, admits
+before deferred planning, and shares the existing coordinator and Locust engine.
+Status, result/report, cancellation, and static capabilities have separate
+contracts; v2 errors add fixed phase, retryability, and guidance fields while v1
+error components and wire envelopes remain unchanged. App SDK resolution and
+OAuth are operator-owned, and planning failures remain reportable through v2.
+See [the guide](V2_API.md) and [ADR 0009](adr/0009-v2-databricks-app-boundaries.md).
+Designated maintainer review is still required.
+
+The schema tools evaluated 14 operations: [lint](review/v2-lint.json) reports
+**0 errors, 130 warnings, 50 informational findings**; the
+[compatibility comparison](review/v2-breaking-changes.json) against HEAD
+`41311ac9b523e37ba7e4909fdbd1bd84f5d915bf` reports **0 breaking and 0 potentially
+breaking changes**, with 28 additive/nonbreaking findings. The
+[scorecard](review/v2-scorecard.json) is **71.76/100 (C)**, below its suggested B
+threshold; this is not an API sign-off. Intentional snake_case fields, asynchronous
+202 acknowledgments, 422 validation, and bodyless cancellation remain. Generic
+cache/bulk/projection recommendations do not justify caching protected reports
+or adding unrelated local-alpha features. Tools do not fully resolve schema
+references or runtime headers. Controlled wire/integration tests establish
+behavioral evidence separately from these heuristic scores.
+
+Legacy v1 idempotency hashes remain recognized despite the new optional protocol/
+session fields. The new `databricks-agent-runtime` adapter enum requires exhaustive
+clients to update. V1 retrieval of a v2 run without a frozen plan returns safe
+409; v2 JSON reports handle failed/interrupted planning. The existing browser
+report shell is not a renderer for those planless runs. Results describe one
+closed-loop load level, not sustainable capacity; assessment dictionaries remain
+an explicit schema-maturity limitation.
+
 Each evaluated criterion now includes an additive `assessments` array in run and
 report responses, available identically through Python and REST. Exact request
 tags associate bounded judge rationales with case/request IDs; quality failures,

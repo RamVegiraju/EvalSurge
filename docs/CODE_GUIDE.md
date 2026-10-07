@@ -4,6 +4,14 @@ EvalSurge has one production load engine and one post-load evaluation path. Func
 docstrings describe arguments, results, side effects, and important failure behavior;
 this guide explains how those functions fit together.
 
+`v2.py` validates registered-target requests, translates through `v2_models.py`,
+and admits a deferred-plan run in the same coordinator. `configuration.py` carries
+private operator snapshots through request/task/thread scopes and worker environments
+without global mutation. `settings.py` and `diagnostics.py` perform bounded static
+inspection. `target_resolver.py` separates App identity/OAuth resolution from
+`adapters.py` invocation semantics. `evalsurge/remote.py` and `cli.py` own HTTP
+polling and command output; they do not create another load engine.
+
 ## Request-to-report flow
 
 1. `api.create_app()` installs HTTP authentication/error handling/metadata over
@@ -11,7 +19,9 @@ this guide explains how those functions fit together.
    a web server. Both acquire the same exclusive local-storage lock.
 2. `RunCoordinator.submit()` validates a target through `connections.resolve_connection()` and each
    workload envelope through `runner.payload()`. It checks idempotency and admission,
-   then creates or reuses a persisted plan before scheduling background work.
+   then creates or reuses a persisted plan before scheduling background work for
+   v1/local runs. V2 admission persists first; the owned task performs planning
+   asynchronously, before preflights and measured load.
 3. `planner.create_plan()` uses explicit scorer IDs or a constrained planner call.
    `validate_plan()` independently determines evidence readiness and freezes data
    hashes, installed rubric sources, judge configuration, and sampling settings.

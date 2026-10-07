@@ -27,10 +27,16 @@ def consume(row: dict[str, Any], data: str, elapsed_ms: float) -> bool:
         return True
     event = json.loads(data)
     kind = event.get("type", "")
-    if kind == "evalsurge.trace":
+    if kind == "evalsurge.trace" or (not kind and "trace_id" in event):
         trace_id = event.get("trace_id")
-        if not isinstance(trace_id, str) or len(trace_id) > 128:
+        if not isinstance(trace_id, str) or not trace_id.strip() or len(trace_id) > 128:
             raise ValueError("Invalid trace identifier")
+        try:
+            trace_id.encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("Invalid trace identifier") from None
+        if row.get("trace_id") is not None and row["trace_id"] != trace_id:
+            raise ValueError("Trace identifiers disagree")
         row["trace_id"] = trace_id
     if event.get("error") or kind in {"error", "response.failed", "response.incomplete"}:
         raise ValueError("Agent emitted an error event")

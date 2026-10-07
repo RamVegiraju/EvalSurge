@@ -1,8 +1,8 @@
 """Post-run scoring through native MLflow APIs; no agent reinvocation."""
 
-import os
 from typing import Any
 
+from .configuration import getenv
 from .evaluation_details import REQUEST_TAG, assessment_details
 from .evaluation_errors import evaluation_error
 from .models import Plan
@@ -68,7 +68,7 @@ def evaluate(
     from mlflow.tracking import MlflowClient
 
     client = MlflowClient(tracking_uri=plan.tracking_uri)
-    experiment_id = os.getenv("MLFLOW_EXPERIMENT_ID")
+    experiment_id = getenv("MLFLOW_EXPERIMENT_ID")
     if not experiment_id:
         experiment = client.get_experiment_by_name("benchmark-agents")
         experiment_id = (

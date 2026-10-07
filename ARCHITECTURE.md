@@ -2,6 +2,14 @@
 
 The current milestone is a reproducible single-run benchmark with durable partial records, correlated framework traces, a bounded visual report, and representative quality sampling. Shared hosting and capacity discovery remain separate release gates.
 
+The additive `/v2` façade selects registered targets and defaults evaluation to off.
+It admits before asynchronous planning, then shares the same preflights, Locust,
+captured-answer evaluation, and evidence storage. Operator settings use private
+task-local snapshots; App discovery, OAuth, and synchronous invocation wire handling
+remain separate from load execution. See [the v2 guide](docs/V2_API.md) and
+[ADR 0009](docs/adr/0009-v2-databricks-app-boundaries.md). Lifecycle/retention and
+capacity campaigns in that ADR remain deferred.
+
 ```mermaid
 flowchart LR
     C[API client] --> A[FastAPI validation and connection policy]

@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
+from .configuration import environment as operator_environment
 from .connections import Connection, resolve_connection, validate_connection
 from .models import Load, PreflightError, PreflightResult, RunRequest
 from .runner import summarize
@@ -188,7 +189,7 @@ async def run_load(
     if cancel.is_set():
         cancel_path.touch(exist_ok=True)
     environment = {
-        **os.environ,
+        **operator_environment(),
         "BENCHMARK_LOCUST_CONFIG": str(config_path),
         "BENCHMARK_LOCUST_RESULT": str(result_path),
         "BENCHMARK_LOCUST_CANCEL": str(cancel_path),

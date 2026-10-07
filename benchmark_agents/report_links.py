@@ -1,12 +1,12 @@
 """Build bounded MLflow navigation links without querying stores or credentials."""
 
-import os
 import re
 from typing import Any
 from urllib.parse import urlsplit
 
 from pydantic import HttpUrl, ValidationError
 
+from .configuration import getenv
 from .models import MLflowExperimentLink, Plan
 from .scorer_registry import tracking_uri
 
@@ -60,7 +60,7 @@ def _ui_base(uri: str | None) -> str | None:
     """
     if not uri:
         return None
-    configured = os.getenv("BENCHMARK_MLFLOW_UI_URL")
+    configured = getenv("BENCHMARK_MLFLOW_UI_URL")
     if configured:
         try:
             if uri == tracking_uri():

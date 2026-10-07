@@ -12,6 +12,7 @@ import pytest
 
 from benchmark_agents.evaluation_details import assessment_details
 from benchmark_agents.models import Evaluation, RunReport
+from benchmark_agents.v2_models import RunCreate
 from evalsurge import EvalSurge, Sample
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,8 +82,10 @@ def test_readme_quality_policy_and_output_match_current_contracts() -> None:
     )
     assert sample.expectations["expected_response"]
     blocks = re.findall(r"```json\n(.*?)```", readme, re.DOTALL)
-    assert len(blocks) == 1
-    excerpt = json.loads(blocks[0])
+    documents = [json.loads(block) for block in blocks]
+    reports = [document for document in documents if "run" in document]
+    assert len(reports) == 1
+    excerpt = reports[0]
     assert set(excerpt) <= RunReport.model_fields.keys()
     run = excerpt["run"]
     assert run["status"] == "completed"
@@ -111,6 +114,25 @@ def test_readme_quality_policy_and_output_match_current_contracts() -> None:
         catalog=True,
     )
     assert criterion["assessments"] == normalized
+
+
+def test_readme_automatic_request_matches_v2_contract() -> None:
+    """Validate opt-in automatic judging and authoritative evidence without traffic."""
+    documents = [
+        json.loads(block)
+        for block in re.findall(r"```json\n(.*?)```", README.read_text(), re.DOTALL)
+    ]
+    requests = [document for document in documents if "cases" in document]
+    assert len(requests) == 1
+    request = RunCreate.model_validate(requests[0])
+    assert request.target.connection_id == "refund-agent"
+    assert request.evaluation.mode == "automatic"
+    assert request.evaluation.scorers == []
+    assert request.evaluation.max_scored_requests == 20
+    assert request.cases[0].reference["expected_response"]
+    assert request.load.max_requests == 20
+    assert "url" not in requests[0]["target"]
+    assert "profile" not in requests[0]["target"]
 
 
 def test_readme_relative_documentation_links_and_anchors_resolve() -> None:

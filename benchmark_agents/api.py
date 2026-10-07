@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.staticfiles import StaticFiles
 
+from .configuration import configured_environment, getenv
 from .coordinator import CoordinatorError, RunCoordinator
 from .middleware import BodyLimitMiddleware
 from .models import (
@@ -51,7 +52,7 @@ async def authorize(request: Request, key: Annotated[str | None, Depends(api_key
     A configured key is required even on loopback. Proxy-header trust must remain
     disabled for unkeyed local access; this is not resource-level tenant authorization.
     """
-    expected = os.getenv("BENCHMARK_API_KEY")
+    expected = getenv("BENCHMARK_API_KEY")
     if expected:
         if key is None or not hmac.compare_digest(key, expected):
             raise HTTPException(401, "Invalid or missing API key")
@@ -59,11 +60,12 @@ async def authorize(request: Request, key: Annotated[str | None, Depends(api_key
         raise HTTPException(403, "Configure BENCHMARK_API_KEY for non-loopback access")
 
 
-def create_app(artifact_dir: Path | None = None) -> FastAPI:
+def create_app(artifact_dir: Path | None = None, *, config_path: Path | None = None) -> FastAPI:
     """Build the REST adapter with an isolated single-owner run coordinator.
 
     Args:
         artifact_dir: Storage root; defaults to BENCHMARK_ARTIFACT_DIR or artifacts.
+        config_path: Optional bounded operator TOML/YAML configuration file.
 
     Returns:
         A FastAPI application whose lifespan owns and drains the coordinator.
@@ -71,7 +73,13 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
     Use one process per POSIX artifact directory. REST and the local Python facade
     use the same lifecycle and Locust engine, not separate load implementations.
     """
-    coordinator = RunCoordinator(artifact_dir or ARTIFACTS)
+    from .diagnostics import startup_diagnostics
+    from .settings import SettingsError, load_settings
+    from .v2 import install_routes
+
+    settings = load_settings(config_path) if config_path or os.getenv("BENCHMARK_CONFIG") else None
+    values = settings.to_environment() if settings else None
+    coordinator = RunCoordinator(artifact_dir or (settings.artifact_dir if settings else ARTIFACTS))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -120,6 +128,9 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
         swagger_ui_oauth2_redirect_url=None,
     )
     app.state.coordinator = coordinator
+    app.state.startup_diagnostics = (
+        startup_diagnostics(settings, environ=values) if settings else None
+    )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.add_middleware(BodyLimitMiddleware)
     app.mount("/reports", StaticFiles(directory=Path(__file__).with_name("static"), html=True))
@@ -136,7 +147,8 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
         """Attach safe correlation, cache, content-sniffing, and CSP metadata."""
         request.state.request_id = str(uuid4())
         try:
-            response = await call_next(request)
+            with configured_environment(values):
+                response = await call_next(request)
         except Exception as error:
             logger.error("Request failed: %s", type(error).__name__, exc_info=True)
             response = await unexpected_error(request, error)
@@ -151,14 +163,53 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
 
     def error_body(request: Request, code: str, message: str) -> dict[str, Any]:
         """Build the common envelope; never serialize input values or credentials."""
-        return {"error": {"code": code, "message": message, "request_id": request.state.request_id}}
+        detail: dict[str, Any] = {
+            "code": code,
+            "message": message,
+            "request_id": request.state.request_id,
+        }
+        if request.url.path.startswith("/v2/"):
+            codes = {
+                401: "authentication_required",
+                403: "access_denied",
+                404: "resource_not_found",
+                409: "resource_conflict",
+                413: "input_limit",
+                422: "invalid_request",
+                429: "runner_busy",
+                500: "internal_error",
+                502: "target_resolution_failed",
+            }
+            number = (
+                int(code.removeprefix("http_"))
+                if code.startswith("http_")
+                else 422
+                if code == "validation_error"
+                else 500
+            )
+            detail.update(
+                code=codes.get(number, "request_failed"),
+                phase="admission",
+                retryable=number in {429, 502, 503},
+                guidance="Check request and operator configuration; poll an admitted run before submitting again.",
+            )
+        return {"error": detail}
 
     @app.exception_handler(CoordinatorError)
     async def coordinator_error(request: Request, error: CoordinatorError) -> JSONResponse:
         """Translate domain failure without making the coordinator depend on HTTP."""
         code = "internal_error" if error.status_code == 500 else f"http_{error.status_code}"
+        body = error_body(request, code, str(error))
+        if (
+            request.url.path.startswith("/v2/")
+            and error.status_code == 409
+            and error.headers
+            and error.headers.get("Retry-After")
+            and request.url.path.endswith("/report")
+        ):
+            body["error"].update(code="report_not_ready", phase="report", retryable=True)
         return JSONResponse(
-            error_body(request, code, str(error)),
+            body,
             status_code=error.status_code,
             headers=error.headers,
         )
@@ -175,11 +226,20 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
         """Return validation locations/messages without submitted input values."""
-        message = "; ".join(
-            ".".join(str(part) for part in failure["loc"]) + ": " + failure["msg"]
-            for failure in error.errors()
+        message = (
+            "Invalid request fields"
+            if request.url.path.startswith("/v2/")
+            else "; ".join(
+                ".".join(str(part) for part in failure["loc"]) + ": " + failure["msg"]
+                for failure in error.errors()
+            )
         )
         return JSONResponse(error_body(request, "validation_error", message), status_code=422)
+
+    @app.exception_handler(SettingsError)
+    async def settings_error(request: Request, error: SettingsError) -> JSONResponse:
+        """Expose only the configuration loader's fixed safe diagnostic."""
+        return JSONResponse(error_body(request, "http_422", str(error)), status_code=422)
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
@@ -270,6 +330,7 @@ def create_app(artifact_dir: Path | None = None) -> FastAPI:
         """Stop preflight/load dispatch and drain active requests; judging cancellation is unsupported."""
         return coordinator.cancel(run_id)
 
+    install_routes(app, coordinator)
     install_schema(app)
     return app
 

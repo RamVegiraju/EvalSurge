@@ -1,0 +1,79 @@
+{
+  "overall": {
+    "score": 71.76,
+    "grade": "C",
+    "totalEndpoints": 14
+  },
+  "api_info": {
+    "title": "EvalSurge",
+    "version": "0.2.0",
+    "description": "Check inference once before benchmarking one concurrency level, then evaluate captured answers with a frozen plan. Local, single-tenant prototype; not a maximum-capacity discovery service.",
+    "total_paths": 13,
+    "openapi_version": "3.1.0"
+  },
+  "categories": {
+    "consistency": {
+      "score": 81.92,
+      "grade": "B",
+      "weight": 30,
+      "weightedScore": 24.58,
+      "issues": [],
+      "recommendations": [
+        "Minor consistency improvements needed in naming or response formats",
+        "Consider creating API design guidelines document"
+      ]
+    },
+    "documentation": {
+      "score": 78.47,
+      "grade": "C",
+      "weight": 20,
+      "weightedScore": 15.69,
+      "issues": [],
+      "recommendations": [
+        "Improve documentation completeness for some endpoints",
+        "Add more examples to enhance developer experience"
+      ]
+    },
+    "security": {
+      "score": 76,
+      "grade": "C",
+      "weight": 20,
+      "weightedScore": 15.2,
+      "issues": [],
+      "recommendations": [
+        "Review security coverage for all endpoints",
+        "Consider additional security measures for sensitive operations"
+      ]
+    },
+    "usability": {
+      "score": 62.58,
+      "grade": "D",
+      "weight": 15,
+      "weightedScore": 9.39,
+      "issues": [],
+      "recommendations": [
+        "Consider adding HATEOAS links for better discoverability",
+        "Enhance developer experience with better examples"
+      ]
+    },
+    "performance": {
+      "score": 46,
+      "grade": "F",
+      "weight": 15,
+      "weightedScore": 6.9,
+      "issues": [],
+      "recommendations": [
+        "Implement pagination for list endpoints",
+        "Add caching headers for cacheable responses",
+        "Consider batch operations for bulk updates"
+      ]
+    }
+  },
+  "topRecommendations": [
+    "Consistency: Minor consistency improvements needed in naming or response formats",
+    "Consistency: Consider creating API design guidelines document",
+    "Documentation: Improve documentation completeness for some endpoints",
+    "Documentation: Add more examples to enhance developer experience",
+    "Security: Review security coverage for all endpoints"
+  ]
+}

@@ -1,10 +1,11 @@
 """LLM proposes catalog selections; code validates evidence independently."""
 
+import asyncio
 import hashlib
 import json
-import os
 from typing import Any
 
+from .configuration import getenv
 from .models import Evaluation, Plan, PlannerOutput, Recommendation, Selection
 from .providers import DEFAULT_FM_ENDPOINT, judge_endpoint, planner_client, workspace_client
 
@@ -132,9 +133,9 @@ def validate_plan(
             )
         )
 
-    profile = os.getenv("DATABRICKS_CONFIG_PROFILE")
-    host = os.getenv("DATABRICKS_HOST")
-    if profile or host:
+    profile = getenv("DATABRICKS_CONFIG_PROFILE")
+    host = getenv("DATABRICKS_HOST")
+    if (profile or host) and selections:
         host = workspace_client(profile=profile, host=host).config.host
     return Plan(
         source=source,
@@ -177,13 +178,14 @@ async def create_plan(evaluation: Evaluation, client: Any = None) -> Plan:
     A client created by this function is closed on both success and failure.
     """
     if evaluation.scorers is not None:
-        return validate_plan(
+        return await asyncio.to_thread(
+            validate_plan,
             evaluation,
             [Selection(scorer=s, reason="Explicit user selection") for s in evaluation.scorers],
             "explicit",
         )
-    model = os.getenv("BENCHMARK_PLANNER_MODEL")
-    if not model and os.getenv("BENCHMARK_LLM_PROVIDER", "databricks") == "databricks":
+    model = getenv("BENCHMARK_PLANNER_MODEL")
+    if not model and getenv("BENCHMARK_LLM_PROVIDER", "databricks") == "databricks":
         model = DEFAULT_FM_ENDPOINT
     if not model:
         raise ValueError(
@@ -254,8 +256,8 @@ async def create_plan(evaluation: Evaluation, client: Any = None) -> Plan:
                 raise ValueError("Unknown planner scorer alias")
         except (ValueError, AttributeError, IndexError, TypeError) as error:
             raise PlannerResponseError("Planner returned an invalid recommendation") from error
-        return validate_plan(
-            evaluation, output.selections, "llm", model, output.registered_selections
+        return await asyncio.to_thread(
+            validate_plan, evaluation, output.selections, "llm", model, output.registered_selections
         )
     finally:
         if owned_client:

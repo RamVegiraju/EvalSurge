@@ -1,12 +1,12 @@
 """Server-owned destination and credential bindings for a single-tenant service."""
 
 import json
-import os
 from collections.abc import Callable
 from urllib.parse import urlsplit
 
 from pydantic import Field
 
+from .configuration import environment, getenv
 from .models import Model, Target
 from .providers import workspace_client
 
@@ -15,8 +15,10 @@ class Connection(Model):
     """Loaded from server configuration, never from an API request."""
 
     url: str
-    auth: str = Field(default="none", pattern="^(none|bearer|databricks)$")
+    auth: str = Field(default="none", pattern="^(none|bearer|databricks|databricks-app)$")
     token_env: str | None = None
+    profile: str | None = Field(default=None, min_length=1, max_length=512)
+    app_name: str | None = Field(default=None, pattern=r"^[a-z0-9-]{1,30}$")
 
 
 def validate_connection(target: Target, connection: Connection) -> Connection:
@@ -44,6 +46,13 @@ def validate_connection(target: Target, connection: Connection) -> Connection:
         raise ValueError("Target URL does not match the authorized connection")
     if parsed.scheme != "https" and parsed.hostname not in {"127.0.0.1", "::1", "localhost"}:
         raise ValueError("Remote credential connections require HTTPS")
+    if connection.auth == "databricks-app" and (
+        not connection.profile
+        or not connection.app_name
+        or parsed.scheme != "https"
+        or parsed.path not in {"/api/invocations", "/responses"}
+    ):
+        raise ValueError("Invalid operator Databricks App binding")
     return connection.model_copy(deep=True)
 
 
@@ -67,16 +76,27 @@ def resolve_connection(target: Target) -> Connection:
         raise ValueError("Target URL must not contain credentials, query parameters, or fragments")
     if target.connection_id:
         try:
-            connections = json.loads(os.getenv("BENCHMARK_CONNECTIONS", "{}"))
+            connections = json.loads(getenv("BENCHMARK_CONNECTIONS", "{}"))
             if not isinstance(connections, dict):
                 raise ValueError
             if target.connection_id not in connections:
                 raise ValueError("Unknown server connection_id")
-            connection = Connection.model_validate(connections[target.connection_id])
+            record = connections[target.connection_id]
+            if isinstance(record, dict) and any(
+                key in record for key in ("kind", "protocols", "model", "request_usage")
+            ):
+                from .settings import ConnectionSettings
+
+                preset = ConnectionSettings.model_validate(record)
+                if preset.protocols and target.adapter not in preset.protocols:
+                    raise ValueError("Target protocol is not authorized for the connection")
+                connection = preset.connection()
+            else:
+                connection = Connection.model_validate(record)
         except ValueError:
             raise ValueError("Invalid operator connection configuration") from None
         return validate_connection(target, connection)
-    allowed = json.loads(os.getenv("BENCHMARK_ALLOWED_TARGETS", "[]"))
+    allowed = json.loads(getenv("BENCHMARK_ALLOWED_TARGETS", "[]"))
     if parsed.hostname not in {"127.0.0.1", "::1", "localhost"} and url not in allowed:
         raise ValueError("Target requires a server connection or BENCHMARK_ALLOWED_TARGETS entry")
     return Connection(url=url)
@@ -96,7 +116,13 @@ def authentication(connection: Connection) -> Callable[[], dict[str, str]]:
         ValueError: Databricks credentials would target a different workspace,
             SDK settings are absent, or a bearer credential is unavailable.
             Bearer credential errors occur when the returned callable is called.
+            App discovery/OAuth failures are fixed safe TargetResolutionErrors.
     """
+    if connection.auth == "databricks-app":
+        # Lazy import prevents the operator registry from becoming a models/settings cycle.
+        from .target_resolver import app_authentication
+
+        return app_authentication(connection)
     if connection.auth == "databricks":
         workspace = workspace_client()
         if urlsplit(connection.url).scheme != "https" or (
@@ -108,7 +134,7 @@ def authentication(connection: Connection) -> Callable[[], dict[str, str]]:
 
         def bearer() -> dict[str, str]:
             """Read the configured token at dispatch time, without caching it."""
-            token = os.environ.get(connection.token_env or "")
+            token = environment().get(connection.token_env or "")
             if not token:
                 raise ValueError("Connection credential is unavailable")
             return {"Authorization": "Bearer " + token}

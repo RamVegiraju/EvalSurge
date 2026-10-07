@@ -81,6 +81,13 @@ def install_schema(app: FastAPI) -> None:
                                 "request_id": "f8b348aa-05f1-4a0c-a706-11708aaf85e1",
                             }
                         }
+                        if path.startswith("/v2/"):
+                            response["content"]["application/json"]["example"]["error"].update(
+                                code="invalid_request" if name == "422" else "request_failed",
+                                phase="admission",
+                                retryable=name in {"429", "502"},
+                                guidance="Check request and operator configuration before submitting again.",
+                            )
                 for parameter in operation.get("parameters", []):
                     if parameter["in"] == "path":
                         parameter["description"] = "UUID returned when this resource was created."
@@ -92,6 +99,13 @@ def install_schema(app: FastAPI) -> None:
                     operation["requestBody"]["content"]["application/json"]["example"] = (
                         RUN_EXAMPLE if path == "/v1/runs" else EVALUATION_EXAMPLE
                     )
+                if method == "post" and path == "/v2/runs":
+                    operation["requestBody"]["content"]["application/json"]["example"] = {
+                        "target": {"connection_id": "refund-agent"},
+                        "cases": [{"input": {"query": "Can I refund?"}}],
+                        "load": {"concurrency": 3, "duration_seconds": 10, "max_requests": 20},
+                        "evaluation": {"mode": "off"},
+                    }
         app.openapi_schema = result
         return result
 

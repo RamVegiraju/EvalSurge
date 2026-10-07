@@ -124,7 +124,9 @@ class Target(Model):
         description="Exact HTTP endpoint URL (SSE or JSON) authorized by server target policy.",
         examples=["http://127.0.0.1:9001/chat"],
     )
-    adapter: Literal["openai-chat", "mlflow-agent-server", "http-json"] = "openai-chat"
+    adapter: Literal[
+        "openai-chat", "mlflow-agent-server", "http-json", "databricks-agent-runtime"
+    ] = "openai-chat"
     framework: Literal["langgraph", "openai-agents"] | None = None
     model: str = Field(
         default="agent",
@@ -135,6 +137,10 @@ class Target(Model):
         description="Request streamed token usage for openai-chat. Disable when the endpoint rejects stream_options; absent usage stays unknown. Ignored by mlflow-agent-server and http-json.",
     )
     connection_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+    session_id: str | None = Field(default=None, min_length=1, max_length=128)
+    session_per_request: bool = Field(
+        default=False, description="Generate an isolated Agent Runtime session for each attempt."
+    )
 
 
 class Load(Model):
