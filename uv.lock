@@ -916,12 +916,20 @@ dependencies = [
 
 [package.optional-dependencies]
 agents = [
-    { name = "evalsurge", extra = ["server"] },
+    { name = "databricks-sdk" },
+    { name = "fastapi" },
+    { name = "gevent" },
     { name = "langchain-core" },
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint" },
+    { name = "locust" },
+    { name = "mlflow" },
+    { name = "openai" },
     { name = "openai-agents" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "uvicorn" },
 ]
 server = [
     { name = "databricks-sdk" },
@@ -965,7 +973,7 @@ requires-dist = [
     { name = "requests", marker = "extra == 'server'", specifier = ">=2.34.2,<3" },
     { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.54,<1" },
 ]
-provides-extras = ["agents", "server"]
+provides-extras = ["server", "agents"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2166,7 +2174,7 @@ wheels = [
 
 [[package]]
 name = "locust"
-version = "2.46.6"
+version = "2.46.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "configargparse" },
@@ -2186,9 +2194,9 @@ dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.12'" },
     { name = "werkzeug" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/44/de/45f598ddfa8f00889b10ffdf1f21e0e2bac5fe868c44b6ef7e98d0603f1e/locust-2.46.6.tar.gz", hash = "sha256:424833db016bbfa3e0ee83f4966f4577a39ea9d2d311368ff1313ee88f76b968", size = 1479271, upload-time = "2026-09-17T17:46:15.451Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/09/6487af16b8abaa58259e5f68ab3b72e3140156478af1b02fac5d9a20a9dd/locust-2.46.7.tar.gz", hash = "sha256:cf112214068abe59615d36769db31ffd1430b67c6e5f693b9a23b8510224442b", size = 1479672, upload-time = "2026-10-04T20:51:36.72Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/b2/ad46212711c4b818322eeca8cb82b85c7e93712d0c6916daca513f497393/locust-2.46.6-py3-none-any.whl", hash = "sha256:a029bf6973457a8567a163a891ca2e9491e4b45a3f52749c9b011a75246483c7", size = 1498929, upload-time = "2026-09-17T17:46:13.264Z" },
+    { url = "https://files.pythonhosted.org/packages/75/74/9c5b14bf99b2d059bf7651893b656e9cc8dc984341bec760bd46278b6124/locust-2.46.7-py3-none-any.whl", hash = "sha256:a737bcf8d6728d4f0efe9e460ef9c69d0084e1dd085734db6e4775ece453b7fe", size = 1499328, upload-time = "2026-10-04T20:51:35.118Z" },
 ]
 
 [[package]]
@@ -2912,7 +2920,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "3.22.1"
+version = "3.24.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -2922,14 +2930,14 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e7/db/b135830095e2ae120ea04b0a53d3a1644eb65554385a8ef4c9cb4de3f5fd/openai-3.22.1.tar.gz", hash = "sha256:2575f961e4c1df8761f8eeb4d78e967de3f9b9f91b22f7120d60e393e970094d", size = 1751626, upload-time = "2026-09-30T00:25:55.548Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/4f/e57670227cb7b61362d8f9bfba54d4e9f7bde799798c342782788bc12d6c/openai-3.24.0.tar.gz", hash = "sha256:1e7463f7d78773ab2ce4fe85710481aa5bd5ffefd54c8de4b067506cd2d42895", size = 1797218, upload-time = "2026-10-02T15:55:18.851Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/74/e3b77d1157c8b9ad815a87d5719545097e5edb06156869c1657fbb6b797b/openai-3.22.1-py3-none-any.whl", hash = "sha256:43ff3de5457a8beb4afa177d4e0ba6841cfadd5219ebc62297fde6c8a9d401a6", size = 2090965, upload-time = "2026-09-30T00:25:53.524Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/01/32baec3bdb83d36da27281d7eeac2647241345cf8ff538bc21d1013ddeec/openai-3.24.0-py3-none-any.whl", hash = "sha256:b59703a3e3b5df78b269e90049d383a1dda58c90104cc4be59db21078db4b7a4", size = 2127166, upload-time = "2026-10-02T15:55:16.228Z" },
 ]
 
 [[package]]
 name = "openai-agents"
-version = "0.22.3"
+version = "0.23.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "griffelib" },
@@ -2945,9 +2953,9 @@ dependencies = [
     { name = "urllib3" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/88/2a/78734078b2d6c2132fab1c4c0ca223b4085b3c983c135a5bd7171c5d57ff/openai_agents-0.22.3.tar.gz", hash = "sha256:33c79a5da0c9cf8ace0019bb09e268338d9162a18edbb6c2ce12bc139917109e", size = 6584491, upload-time = "2026-09-17T22:20:44.87Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/8e/67aa6f764c9041e96c523ff01407d3304bb1c886e2cfb216821a1086ef8f/openai_agents-0.23.1.tar.gz", hash = "sha256:2bbd0a87a42531d25638529396644defd3ff2afd92fd9ec7d2f02167e5458a99", size = 6908432, upload-time = "2026-10-02T15:42:06.011Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f8/56/f5d32edb2e890a5dea9824cb76d179cef47c6a5ea8269d3559d092936106/openai_agents-0.22.3-py3-none-any.whl", hash = "sha256:41dec9e2e703db32a627bf0290f3721a6ca37405603a8cb654213356dbb8ee9d", size = 1149658, upload-time = "2026-09-17T22:20:42.768Z" },
+    { url = "https://files.pythonhosted.org/packages/09/a7/546403f30d1409db12a7c81c2912442e841ecb43edf8dbdcb714cf9f17ae/openai_agents-0.23.1-py3-none-any.whl", hash = "sha256:0183e6da7370df80f7cf900379d9f113e664e32b426f51aa7486c9091faf8f2d", size = 1215213, upload-time = "2026-10-02T15:42:03.694Z" },
 ]
 
 [[package]]
