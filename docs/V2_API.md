@@ -9,6 +9,8 @@ End users can select either a locally hosted HTTP agent or a Databricks App from
 the operator registry. Both use the same request and execution pipeline; see
 [the two-target guide](TARGETS.md). Localhost refers to the API/load-generator
 host, not a remote submitter's laptop.
+For complete local and Databricks App requests for LangGraph and OpenAI Agents,
+see [the four framework-target examples](FRAMEWORK_TARGET_EXAMPLES.md).
 
 Plain `evalsurge` installs only the remote SDK/CLI and their HTTPX/Pydantic
 dependencies. Install `evalsurge[server]` to run local

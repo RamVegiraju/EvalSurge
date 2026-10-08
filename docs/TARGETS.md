@@ -5,6 +5,8 @@ Locust engine, and captured-answer evaluation. Your agent must already be runnin
 reachable from the runner, and compatible with a supported input/response contract.
 EvalSurge does not deploy agents, import remote source, run arbitrary Python
 callables, or automatically instrument an agent's internal model/tools/memory.
+Copyable LangGraph and OpenAI Agents requests for both hosting options are in
+[the four framework-target examples](FRAMEWORK_TARGET_EXAMPLES.md).
 
 ## Choose where load runs
 
@@ -117,13 +119,20 @@ while exposing `/api/invocations`. Verify model API support independently.
 ## Verification boundaries
 
 Controlled tests exercise local HTTP, real frameworks/native MLflow, remote SDK/API,
-Databricks SDK/OAuth boundaries, and one Locust engine. The October 7 consented
+Databricks SDK/OAuth boundaries, and one Locust engine. On October 8, both native
+LangGraph and OpenAI Agents Apps passed 500/500 measured requests at five users
+through actual loopback HTTP v2 submission, with separate failed probes stopping
+all measured traffic. These samples used real GPT-OSS-120B, no tools/history/traces,
+and evaluation off. See [the framework examples](FRAMEWORK_TARGET_EXAMPLES.md) and
+[VALIDATION.md](../VALIDATION.md) for exact revisions, budgets and limitations.
+
+The historical October 7 consented
 native App check passed fail-fast, 500/500 measured requests at concurrency five,
 and a tiny explicit relevance/correctness check. See [VALIDATION.md](../VALIDATION.md)
 for the retained failure, correction, budgets, and gaps. It used the local facade/
 registered resolver, not a deployed EvalSurge service or live `/v2` HTTP submission.
 
 Endpoint-only access cannot reveal internal tool/model/memory timings. Profiling
-requires authorized correlated agent-side MLflow traces. The sample has no agent
-memory or tracing. No short single-level run establishes sustainable capacity,
+requires authorized correlated agent-side MLflow traces. The live samples have no
+agent memory or tracing. No short single-level run establishes sustainable capacity,
 general agent compatibility, judge calibration, or shared-hosting readiness.

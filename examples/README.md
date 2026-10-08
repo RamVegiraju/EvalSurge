@@ -7,6 +7,9 @@ Only benchmark endpoints and agent actions you are authorized to exercise.
 These examples use runner-local HTTP agents. Databricks Apps are also supported
 through registered targets in `/v2`; see [the target guide](../docs/TARGETS.md).
 The local Python interface has no App-specific convenience factory.
+For REST, CLI, and remote SDK examples of each framework under both hosting
+options, use [the four-target guide](../docs/FRAMEWORK_TARGET_EXAMPLES.md) and its
+[JSON request files](requests/local-langgraph.json) / [operator TOML](requests/operator.toml).
 
 | Example | Purpose |
 | --- | --- |
@@ -16,7 +19,7 @@ The local Python interface has no App-specific convenience factory.
 
 ## Credential-free mock quickstart
 
-From the checkout, after [installation](../README.md#quickstart), start the
+From the checkout, after [installation](../README.md#credential-free-quickstart-legacy-v1), start the
 deterministic sample agent in one terminal:
 
 ```bash

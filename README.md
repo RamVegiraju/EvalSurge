@@ -10,7 +10,32 @@ agents and deployed Databricks Apps.
 **Local alpha:** Linux/macOS, single tenant, one active run. Not a shared production
 service, and a single load level does not establish sustainable capacity.
 
-## Quickstart
+## Recommended request: registered targets (v2)
+
+Have the operator register an already running HTTP agent or a Databricks App,
+then submit the same request shape for either hosting option:
+
+```json
+{
+  "name": "refund-performance-baseline",
+  "target": {"connection_id": "refund-agent"},
+  "cases": [{"input": {"query": "Can I refund an opened item?"}}],
+  "load": {"concurrency": 3, "duration_seconds": 10, "max_requests": 20}
+}
+```
+
+Send it to `POST /v2/runs` through REST, the remote SDK, or the CLI. Evaluation
+defaults to off: no planner or judge calls. The target itself can still incur
+cost. Profiles, URLs, credentials and protocols stay in operator configuration,
+not public requests. Start with [the four framework/hosting examples](docs/FRAMEWORK_TARGET_EXAMPLES.md)
+for local LangGraph/OpenAI Agents or deployed Apps; see
+[v2 setup and submission](docs/V2_API.md) for authentication and lifecycle details.
+
+## Credential-free quickstart (legacy v1)
+
+The following standalone mock tutorial preserves the supported `/v1` contract.
+Prefer `/v2` for new registered-target integrations; local Python retains its
+existing compatible facade below.
 
 Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and `jq` for the sample
 request. No model credentials or paid calls are needed.
@@ -95,6 +120,8 @@ EvalSurge does not deploy your agent or execute an arbitrary Python callable.
 “Localhost” is relative to the load generator: your machine for `EvalSurge.local()`,
 the API host for remote SDK/REST submissions. Supported input/response contracts,
 two-target operator setup, and limitations are in [the target guide](docs/TARGETS.md).
+For copyable LangGraph and OpenAI Agents requests under both hosting options, see
+[the four framework-target examples](docs/FRAMEWORK_TARGET_EXAMPLES.md).
 
 Replace `target.url` with your authorized supported HTTP endpoint and supply workload
 samples when using `/v1`; v2 instead selects the registered connection.
@@ -163,10 +190,15 @@ deployments. Existing MLflow AgentServer Apps select `mlflow-agent-server` for
 `/responses`. See the [bounded App validation guide](docs/DATABRICKS_APP_VALIDATION.md)
 before sending live traffic. Fixed message adapters require exactly one `query`
 or `messages` field; extra inference fields are rejected, never silently dropped.
-The October 7 native App check passed 500 measured requests at concurrency five
-and a separate tiny relevance/correctness check. See [the validation record](VALIDATION.md)
-for the retained preflight failure, fix, exact bounds and limitations; this is
-wiring evidence, not a sustainable-capacity or general-quality guarantee.
+On October 8, separate native LangGraph and OpenAI Agents Apps each passed 500
+measured requests at five configured users with zero errors, plus intentional
+failed-preflight checks proving zero measured traffic afterward. Those live
+samples were stateless/tool-free and quality-off; native JSON TTFT/token usage
+and internal tracing were unavailable. The earlier October 7 small quality check
+is separate historical evidence, not proof of a currently deployed App. See
+[the validation record](VALIDATION.md) for revisions, preserved failures and
+coverage limits. These checks do not establish sustainable capacity or judge
+calibration.
 
 ### Python API
 

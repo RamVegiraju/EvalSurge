@@ -1,0 +1,11 @@
+{
+  "name": "local-openai-agents-baseline",
+  "target": {"connection_id": "local-openai-agents"},
+  "cases": [{"input": {"query": "Can I refund an opened item?"}}],
+  "load": {
+    "concurrency": 5,
+    "duration_seconds": 180,
+    "max_requests": 500,
+    "timeout_seconds": 60
+  }
+}

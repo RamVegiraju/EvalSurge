@@ -21,7 +21,9 @@ LangGraph and OpenAI Agents benchmark samples should call their existing
 framework endpoints and include load plus explicit relevance/correctness
 evaluation with authoritative references, not duplicate agent implementations.
 New examples must extend the tested inventory and end-to-end cases in
-`tests/test_simple_examples.py`, not merely pass an import check. CI exercises
+`tests/test_simple_examples.py`, not merely pass an import check. Registered-target
+JSON examples also extend `tests/test_framework_request_docs.py` and, for the
+controlled App boundary, `tests/test_framework_app_requests.py`. CI exercises
 real Locust/framework/MLflow APIs with controlled provider responses; paid
 validation stays opt-in and is not required for the ordinary test suite.
 

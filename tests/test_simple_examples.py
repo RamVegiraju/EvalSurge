@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import re
 import socket
 import sys
@@ -14,9 +15,14 @@ import mlflow
 import pytest
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
 
+from benchmark_agents.api import create_app
 from benchmark_agents.models import RunReport
+from benchmark_agents.v2_models import Report, RunCreate
 from evalsurge import EvalSurge, RunFailed
+from evalsurge.cli import main as cli_main
+from evalsurge.remote import RemoteClient, RemoteRunFailed
 from examples.mock_agent import app as mock_agent
 from tests.test_evaluation_preflight import install_judge
 
@@ -24,6 +30,10 @@ ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORK_EXAMPLES = {
     "langgraph_benchmark.py": ("langgraph", "langgraph/chat"),
     "openai_agents_benchmark.py": ("openai-agents", "openai-agents/chat"),
+}
+LOCAL_REQUEST_EXAMPLES = {
+    "local-langgraph.json": ("local-langgraph", "langgraph/chat"),
+    "local-openai-agents.json": ("local-openai-agents", "openai-agents/chat"),
 }
 
 
@@ -65,7 +75,7 @@ async def sample_agent() -> AsyncIterator[tuple[str, dict[str, int]]]:
 @pytest.fixture
 async def framework_agent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> AsyncIterator[tuple[str, dict[str, int], str]]:
+) -> AsyncIterator[tuple[str, dict[str, Any], str]]:
     """Serve the real LangGraph and OpenAI Agents demos with controlled model responses."""
     pytest.importorskip("agents")
     pytest.importorskip("langgraph")
@@ -76,13 +86,24 @@ async def framework_agent(
     monkeypatch.setenv("MLFLOW_ENABLE_ASYNC_TRACE_LOGGING", "false")
     monkeypatch.setenv("MLFLOW_MODEL_CATALOG_URI", "")
     monkeypatch.delenv("MLFLOW_EXPERIMENT_ID", raising=False)
-    observed = {"received": 0}
+    observed: dict[str, Any] = {"received": 0, "provider_messages": [], "request_ids": []}
+    original_provider = framework_demo.fixture_provider
+
+    def capture_provider(request: httpx.Request) -> httpx.Response:
+        """Observe real framework conversations or deny the controlled provider boundary."""
+        observed["provider_messages"].append(json.loads(request.content)["messages"])
+        if observed.get("provider_failure"):
+            return httpx.Response(401, json={"error": {"message": "private provider failure"}})
+        return original_provider(request)
+
+    monkeypatch.setattr(framework_demo, "fixture_provider", capture_provider)
     app = framework_demo.create_app()
 
     @app.middleware("http")
     async def count_invocations(request: Request, call_next: Any) -> Any:
         if request.url.path.endswith("/chat"):
             observed["received"] += 1
+            observed["request_ids"].append(request.headers.get("X-Benchmark-Request-ID"))
         return await call_next(request)
 
     with socket.socket() as connection:
@@ -187,7 +208,7 @@ async def test_mock_python_example_runs_or_surfaces_preflight_failure(
 @pytest.mark.parametrize("filename", FRAMEWORK_EXAMPLES)
 async def test_framework_python_example_produces_load_evaluation_and_profiles(
     filename: str,
-    framework_agent: tuple[str, dict[str, int], str],
+    framework_agent: tuple[str, dict[str, Any], str],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -224,6 +245,195 @@ async def test_framework_python_example_produces_load_evaluation_and_profiles(
             assert client.report(report.run.id) == report
     finally:
         mlflow.set_tracking_uri(previous_tracking_uri)
+
+
+def _bounded_local_request(filename: str) -> dict[str, Any]:
+    """Copy a published request without ever executing its three-minute traffic budget.
+
+    Args:
+        filename: Covered local framework request fixture under examples/requests.
+
+    Returns:
+        Validated default-off workload reduced to two measured attempts, two
+        concurrent users, five seconds of dispatch, and ten-second HTTP deadlines.
+        Published files are not modified and no credentials are resolved.
+    """
+    body = json.loads((ROOT / "examples" / "requests" / filename).read_text())
+    assert "evaluation" not in body
+    body["load"].update(concurrency=2, duration_seconds=5, max_requests=2, timeout_seconds=10)
+    RunCreate.model_validate(body)
+    return body
+
+
+def _framework_api_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    alias: str,
+    target_url: str,
+) -> Path:
+    """Create one test-owned registered target without ambient operator configuration.
+
+    Args:
+        tmp_path: Test-owned directory for the private config and evidence.
+        monkeypatch: Restores ambient settings after the test.
+        alias: Published connection identifier selected by the API caller.
+        target_url: Actual ephemeral framework server URL selected by the operator.
+
+    Returns:
+        TOML path binding the alias to OpenAI Chat SSE. Tracing settings remain
+        disabled here; actual agent MLflow instrumentation continues to execute.
+    """
+    for name in list(os.environ):
+        if name.startswith(("BENCHMARK_", "DATABRICKS_", "EVALSURGE_")):
+            monkeypatch.delenv(name)
+    path = tmp_path / "framework-operator.toml"
+    path.write_text(
+        f"artifact_dir = {json.dumps(str(tmp_path / 'v2-evidence'))}\n"
+        f"[connections.{alias}]\n"
+        f"url = {json.dumps(target_url)}\n"
+        'protocols = ["openai-chat"]\n',
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.mark.parametrize("filename", LOCAL_REQUEST_EXAMPLES)
+@pytest.mark.parametrize("entrypoint", ["sdk", "cli"])
+async def test_local_framework_request_runs_real_v2_pipeline_with_isolated_memory(
+    filename: str,
+    entrypoint: str,
+    framework_agent: tuple[str, dict[str, Any], str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Execute published requests through REST, the SDK/CLI, and real framework streams."""
+    base_url, observed, _ = framework_agent
+    alias, suffix = LOCAL_REQUEST_EXAMPLES[filename]
+    body = _bounded_local_request(filename)
+    assert body["target"] == {"connection_id": alias}
+    config = _framework_api_configuration(
+        tmp_path, monkeypatch, alias=alias, target_url=f"{base_url}/{suffix}"
+    )
+
+    def forbidden(*args: Any, **kwargs: Any) -> None:
+        pytest.fail("Omitted evaluation must not initialize a planner or judge")
+
+    monkeypatch.setattr("benchmark_agents.planner.planner_client", forbidden)
+    monkeypatch.setattr("benchmark_agents.judges.judge_client", forbidden)
+
+    def execute() -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Keep synchronous API/client ownership off the real target's event loop."""
+        app = create_app(config_path=config)
+        with (
+            TestClient(app, client=("127.0.0.1", 50000)) as http,
+            EvalSurge.remote("http://127.0.0.1", http_client=http, poll_interval=0.01) as sdk,
+        ):
+            if entrypoint == "sdk":
+                handle = sdk.start(body)
+                report = handle.wait(timeout=30)
+                identifier = str(handle.id)
+            else:
+                request_file = tmp_path / "bounded-request.json"
+                request_file.write_text(json.dumps(body), encoding="utf-8")
+
+                def client_factory(*args: Any, **kwargs: Any) -> RemoteClient:
+                    """Borrow the actual API transport without replacing CLI behavior."""
+                    return RemoteClient(*args, **kwargs, http_client=http)
+
+                assert (
+                    cli_main(
+                        ["run", str(request_file), "--wait", "--timeout", "30"],
+                        client_factory=client_factory,
+                    )
+                    == 0
+                )
+                identifier = next(iter(app.state.coordinator.index))
+                report = sdk.report(identifier)
+            Report.model_validate(report)
+            result = sdk.result(identifier)
+            assert result["summary"]["performance"] == "complete"
+            assert result["summary"]["quality"] == "off"
+            assert result["summary"]["sustainable_capacity_established"] is False
+            assert result["phases"] == {
+                "planning": "completed",
+                "inference": "passed",
+                "evaluation_readiness": "skipped",
+                "load": "completed",
+                "profiling": "completed",
+                "evaluation": "no_ready_scorers",
+            }
+            rows = http.get(f"/v1/runs/{identifier}/requests").json()["items"]
+            return report, rows
+
+    report, rows = await asyncio.to_thread(execute)
+    assert report["run"]["status"] == "completed"
+    assert report["total"] == report["run"]["metrics"]["successful_requests"] == 2
+    assert report["run"]["metrics"]["requests"] == 2
+    assert all(request["status"] == "disabled" for request in report["requests"])
+    assert observed["received"] == 3  # one excluded probe, then two measured attempts
+    assert len(set(observed["request_ids"])) == 3
+    assert len(rows) == 2
+    for row in rows:
+        assert row["outputs"] == "Opened items cannot be refunded."
+        assert row["success"] is True
+        assert 0 <= row["first_event_ms"] < row["ttft_ms"] <= row["latency_ms"]
+        assert row["trace_id"]
+    # Inspect actual model inputs: neither real framework sees another request's
+    # transcript, even when the same workload case is reused by concurrent users.
+    for messages in observed["provider_messages"]:
+        user_messages = [message for message in messages if message["role"] == "user"]
+        assert len(user_messages) == 1
+        assert user_messages[0]["content"] == body["cases"][0]["input"]["query"]
+    assert len(observed["provider_messages"]) == (3 if alias == "local-langgraph" else 6)
+    if entrypoint == "cli":
+        output = capsys.readouterr()
+        assert "accepted" in output.out and "completed" in output.out
+        assert body["cases"][0]["input"]["query"] not in output.out
+
+
+@pytest.mark.parametrize("filename", LOCAL_REQUEST_EXAMPLES)
+async def test_local_framework_request_fails_fast_at_real_provider_boundary(
+    filename: str,
+    framework_agent: tuple[str, dict[str, Any], str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real SDK provider denial causes one excluded probe and zero measured attempts."""
+    base_url, observed, _ = framework_agent
+    alias, suffix = LOCAL_REQUEST_EXAMPLES[filename]
+    body = _bounded_local_request(filename)
+    observed["provider_failure"] = True
+    config = _framework_api_configuration(
+        tmp_path, monkeypatch, alias=alias, target_url=f"{base_url}/{suffix}"
+    )
+
+    def forbidden(*args: Any, **kwargs: Any) -> None:
+        pytest.fail("Performance-only failure must not initialize a planner or judge")
+
+    monkeypatch.setattr("benchmark_agents.planner.planner_client", forbidden)
+    monkeypatch.setattr("benchmark_agents.judges.judge_client", forbidden)
+
+    def execute() -> dict[str, Any]:
+        """Retain the API failure report without blocking framework request servicing."""
+        with (
+            TestClient(create_app(config_path=config), client=("127.0.0.1", 50000)) as http,
+            EvalSurge.remote("http://127.0.0.1", http_client=http, poll_interval=0.01) as sdk,
+        ):
+            with pytest.raises(RemoteRunFailed) as failure:
+                sdk.start(body).wait(timeout=30)
+            assert "private provider failure" not in str(failure.value)
+            return failure.value.report
+
+    report = await asyncio.to_thread(execute)
+    assert report["run"]["status"] == "failed"
+    assert report["run"]["preflight"]["status"] == "failed"
+    assert report["run"]["phases"]["load"] == "skipped"
+    assert report["run"]["phases"]["evaluation"] == "skipped"
+    assert report["run"]["metrics"] is None
+    assert report["total"] == 0
+    assert observed["received"] == len(observed["provider_messages"]) == 1
 
 
 @pytest.mark.parametrize("filename", FRAMEWORK_EXAMPLES)

@@ -4,15 +4,23 @@ This workstream validates an **existing, authorized deployed sample**, with Eval
 running separately on the operator's machine. It does not deploy, reconfigure, or
 restart an App. A new sample deployment needs separate approval and selected resources.
 
-For normal end-user setup, see [local HTTP and App targets](TARGETS.md). The separately
-authorized October 7 redeployment passed intentional fail-fast, 500/500 measured
+For normal end-user setup, see [local HTTP and App targets](TARGETS.md) and the
+[four framework request examples](FRAMEWORK_TARGET_EXAMPLES.md). Separate October 8
+deployments validated both LangGraph and OpenAI Agents native Apps through actual
+loopback HTTP v2 submission and the remote SDK, with 500/500 successes each at five
+users and intentional failed probes that stopped measured load. Those samples were
+stateless, tool-free, quality-off and untraced; exact revisions, results and limits
+are in [VALIDATION.md](../VALIDATION.md). These tests do not deploy EvalSurge itself.
+
+The separately authorized October 7 redeployment passed intentional fail-fast, 500/500 measured
 requests at concurrency five, and a two-capture explicit quality check; retained
 failures and exact metrics are in [VALIDATION.md](../VALIDATION.md). Those checks used
 the local facade/resolver, not live `/v2` HTTP submission or hosted EvalSurge.
 
 ## Current deployment and protocol guidance
 
-Official guidance checked October 7, 2026 (pages last updated October 6):
+Official guidance checked October 7, 2026, with Agent Server guidance rechecked
+October 8 (the original pages were last updated October 6):
 
 - [Develop agents](https://docs.databricks.com/aws/en/agents/) recommends Agent Runtime
   and AgentKit `DurableAgentServer`.

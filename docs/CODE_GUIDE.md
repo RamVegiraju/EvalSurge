@@ -88,8 +88,10 @@ extra; the public Pydantic models and HTTP client need only the base installatio
 
 ## Contracts worth preserving
 
-- `evaluation.scorers=None` invokes planning; an explicit list bypasses it; `[]`
-  disables catalog judging. Registered aliases are independently selectable.
+- Legacy v1/local `evaluation.scorers=None` invokes planning; an explicit list
+  bypasses it; `[]` disables catalog judging. V2 instead defaults to
+  `evaluation.mode="off"`; automatic planning requires explicit opt-in.
+  Registered aliases are independently selectable.
 - Plan reuse binds evaluation input exactly. Target and load settings can change,
   but the scorer selection, references, seed, and budget cannot silently drift.
 - Planner clients injected for tests remain caller-owned. Clients created by planning
@@ -128,6 +130,16 @@ extra; the public Pydantic models and HTTP client need only the base installatio
   relevance/correctness evaluation. Provider/tracking setup remains operator-owned
   and opt-in; local integration tests control provider boundaries rather than
   establishing paid/live validation.
+- `examples/requests/` contains four performance-only v2 requests for LangGraph
+  and OpenAI Agents, each runner-local or hosted on Databricks Apps, plus a
+  placeholder-only operator configuration. The [framework target examples](FRAMEWORK_TARGET_EXAMPLES.md)
+  guide shows REST, CLI, and remote SDK submission. Static schema/encoder tests
+  keep the guide and files aligned; real framework/Locust integration tests use
+  reduced copies, not the published 500-request budgets. App-boundary tests use
+  controlled SDK/OAuth and a local invocation envelope, not a deployed App or
+  native DurableAgentServer/Runtime Store. Separate full-budget local and actual
+  native App tests are recorded in [validation](../VALIDATION.md); their model,
+  tracing, memory and quality boundaries are not interchangeable.
 - `scripts/validation/python_benchmark.py` retains the advanced CLI and saves a
   report even on preflight failure; it is not the beginner tutorial.
 - `scripts/validation/python_requests_benchmark.py` submits one REST request with Requests,

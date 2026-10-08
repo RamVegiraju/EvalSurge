@@ -5,6 +5,326 @@ Linux/Python 3.11–3.14. Observed main jobs failed during private-mirror instal
 there is no remote CI result for these local changes. Branch-protection
 settings have not been verified/enabled by this local work.
 
+## Publication verification — October 8, 2026
+
+Reviewed the pending four framework/hosting request examples, controlled real
+framework/Locust/API tests, README and operator guides before publication. README
+now leads with a performance-only v2 request and keeps the supported v1 mock
+tutorial clearly labeled. Updated App evidence/navigation, distinguished local
+fixture and native live coverage, repaired the renamed quickstart anchor and
+recorded fresh upstream dependency observations in `docs/DEPENDENCIES.md`.
+No production module, API contract, load engine or dependency lock changed.
+
+Commands/results for this publication checkpoint:
+
+```bash
+uv sync --locked --extra agents --group dev
+uv sync --locked --offline --default-index https://pypi.org/simple --extra agents --group dev
+uv run --no-sync pytest -q tests/test_readme.py tests/test_simple_examples.py tests/test_framework_app_requests.py tests/test_framework_request_docs.py --tb=short
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pytest -q --tb=short --junitxml=artifacts/prepush-20261008/final-junit.xml
+uv run --no-sync python scripts/export_openapi.py --check
+uv run --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --no-sync python scripts/verify_wheel.py
+uv run --no-sync python scripts/verify_remote_install.py --offline
+uv run --no-sync python scripts/check_ci_prerequisites.py
+uv export --quiet --locked --offline --default-index https://pypi.org/simple --extra agents --group dev --no-emit-project --output-file artifacts/prepush-20261008-audit-requirements.txt
+uv run --no-sync pip-audit --disable-pip --require-hashes --progress-spinner off --vulnerability-service osv --requirement artifacts/prepush-20261008-audit-requirements.txt --format json --output artifacts/prepush-20261008-audit.json
+git diff --check
+```
+
+The bare sync rejected the authentic unchanged lock under the ambient index
+configuration; explicit public-index cached sync succeeded (**190 resolved,
+182 checked**). Focused tests passed **38 tests, 13 warnings in 56.10 seconds**.
+One initial Ruff format check found the new README test's layout; formatting that
+file resolved it. Final lint and format checks passed (**135 files**). Full pytest
+passed **691 tests, no skips, 42 known upstream warnings in 226.53 seconds**.
+OpenAPI snapshot equality and independent schema validation, wheel/sdist build,
+packaged assets, isolated base-only remote SDK/CLI and missing-server guidance all
+passed. Provenance checks verified **189 public registry/artifact package sources**.
+The hashed lock export's OSV audit covered **181 applicable dependencies with zero
+known advisories and no skipped packages** on local Python 3.12. OSV checks hash
+presence, not artifact validity; this is not a license audit or security sign-off.
+
+No paid traffic, App redeployment or resource mutation was repeated to prepare
+this publication. Protected artifacts are ignored and excluded; unrelated `.isaac/`
+content is preserved and not staged. The three reproduced runtime defects below
+(swallowed client validation guidance, first-user App lookup race, repeated snapshot
+reads) remain unresolved; these tests/docs do not implement those fixes. Newer
+upstream dependency releases still need the reviewed compatibility workflow.
+Remote CI results, maintainer approval and a clean install across all supported
+interpreters are not established by these local checks.
+
+## Native Databricks App deployments and live checks — October 8, 2026
+
+Following separate authorization for the exact selected OAuth profile/workspace,
+deployed **both** native framework samples on Databricks Apps, each with one MEDIUM
+instance and a managed Lakebase Runtime Store. LangGraph active revision:
+`01f1c3330cfe1a8caddb1e52caafad8f`; OpenAI Agents active revision:
+`01f1c3333df91bb8a95241b11f68124d`. Both were RUNNING/ACTIVE; deployed source
+hashes, runtime controls and store ownership matched before traffic. Real App names,
+profile, URLs, store bindings and protected source/evidence remain uncommitted.
+The earlier October 7 App is no longer listed; its historical results do not prove
+present deployment health.
+
+Samples execute a compiled LangGraph or the native OpenAI Agents Runner with
+`system.ai.gpt-oss-120b` over the provider Responses API. They use 512 output-token
+limits, low reasoning effort, 30-second model deadlines and zero model retries.
+There are no tools, transcript history, long-term memory, automatic recovery or
+trace exporter in these live samples. The required Runtime Store persists
+invocation execution, not an enabled agent Session/Memory Store. The synthetic
+refund policy is embedded in their instructions; the published questions/load
+requests were unchanged. Native controlled tests verified completion, idempotency,
+pre-provider failure and rejection of unfinished output. Final policy-source
+controlled runs passed once per framework (5.92 / 5.93 seconds).
+
+Real loopback HTTP remote SDK → Uvicorn v2 API → server-owned SDK App
+resolution/OAuth → sole Locust subprocess → App HTTPS `/api/invocations` → real
+model. No ASGI/TestClient replacement, controlled provider or synthetic App-origin
+mapping was used for these live runs. Ran the two performance tests sequentially
+with concurrency five, 180-second dispatch ceiling, 500 measured-request cap and
+60-second HTTP timeout, plus one separately excluded successful inference probe.
+Evaluation was omitted/default off; no paid planner or judge calls occurred.
+
+| Live observation | LangGraph | OpenAI Agents |
+| --- | ---: | ---: |
+| Measured successes / attempts | 500 / 500 | 500 / 500 |
+| Errors | 0 | 0 |
+| Configured users / observed peak HTTP in-flight | 5 / 5 | 5 / 5 |
+| Dispatch window | 147.52 s | 135.15 s |
+| Elapsed including drain | 148.80 s | 136.40 s |
+| Successful requests/s including drain | 3.360 | 3.666 |
+| Successful latency p50 / p95 / p99 | 1204.89 / 2386.61 / 5763.19 ms | 1225.17 / 2362.05 / 2638.67 ms |
+| Native JSON TTFT / usage coverage | unavailable / 0% | unavailable / 0% |
+| Internal trace coverage | 0 / 500 | 0 / 500 |
+
+Performance run IDs: `0526ee83-0883-4588-8bc5-54be52aef4d8` and
+`3399b567-8903-4319-8e4c-c8cee8522fb1`. These reached the request cap before
+three minutes; they are bounded integration runs, not capacity studies or a
+statistically controlled comparison of frameworks. Endpoint-only native JSON
+does not provide TTFT/token usage, internal breakdowns or live memory/tool coverage.
+
+Separate intentional failure runs used a reserved sample sentinel that fails
+before the model call. Each produced exactly one excluded HTTP-500 probe,
+`target_http_error`, terminal failed status, skipped load and **zero measured
+requests**; no target retry or judge call followed. Failure IDs:
+`ee57526f-a620-4f02-bebd-d21c261efe38` and
+`45ade80a-d935-483b-992c-996d3141cfbe`. Failed reports remain preserved.
+OpenAI's real CLI doctor and idempotent replay both exited zero, returning the
+same accepted run without additional target calls.
+
+Protected deployment/control/source, successful and failed run, complete journal,
+CLI and timing evidence is under `artifacts/live-framework-apps-20261008/`.
+Final read-only checks retained the same active revisions/source hashes, runtime
+controls and managed-store ownership. Independent journal audit confirmed matched
+start/completion counts, valid unique IDs, no interrupted attempts and no overlap
+with probe IDs. Total observed App invocations were 1004: 1000 measured, two
+successful excluded probes and two intentional non-model failed probes. The
+single-turn/no-retry source implies 1002 model calls; billing was not independently
+reconciled. Local harness/API/Locust/deployment processes stopped; an unrelated
+older MLflow server was preserved.
+
+Initial name-limit, sandbox authentication/startup, STARTING-instance-update and
+read-only evidence-serialization failures are retained in the protected summary.
+Secure credential access was used without enabling plaintext caching, deleting
+resources or changing the selected profile. Isolated sample dependencies used the
+existing mirror after public refresh failed; cloud deployment selected public
+PyPI and excluded the local lock. Mirror provenance is retained and complete cloud
+transitive-dependency parity is not claimed.
+
+At this live-validation checkpoint, no core/API/engine fix or dependency upgrade
+was implemented and no commit/push had been performed. Apps/stores remained
+provisioned; local controlled
+framework/tool/memory evidence is separate below. Sustainable capacity, judge
+calibration, production durability/recovery, App streaming and remote CI are not
+established by this record.
+
+After all live/local benchmark processes stopped, final repository verification
+passed:
+
+```bash
+uv sync --locked --extra agents --group dev --offline --default-index https://pypi.org/simple
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pytest -q --tb=short --junitxml=artifacts/review-feedback-20261008/final-junit.xml
+uv run --no-sync python scripts/export_openapi.py --check
+uv run --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --no-sync python scripts/verify_wheel.py
+uv run --no-sync python scripts/verify_remote_install.py --offline
+uv run --no-sync python scripts/check_ci_prerequisites.py
+git diff --check
+```
+
+Cached locked sync resolved **190 packages** and checked **182**. The full suite
+passed **690 tests, no skips, 42 known upstream warnings in 220.07 seconds**.
+Ruff lint/format (**135 files**), unchanged OpenAPI snapshot and independent
+validation, sdist/wheel build, packaged assets, isolated base-only remote SDK/CLI
+and missing-server guidance all passed. Source/provenance checks verified **189
+locked registry packages**. Offline verification is not fresh release/advisory
+metadata retrieval, cloud dependency parity, remote CI or maintainer approval.
+
+## Feedback review and full-budget local checks — October 8, 2026
+
+Validated the colleague's API/CLI, SDK, persistence, measurement and App-parity
+feedback against first-party source, installed dependency source and current
+official documentation. This is a review, not implementation of the proposed
+runtime fixes. Reproduced three defects without paid traffic:
+
+- Schema `ValidationError` is caught as `ValueError` by the CLI/remote submission
+  paths, hiding the field-specific guidance. A valid JSON request with concurrency
+  zero reports the misleading finite-JSON error and sends no HTTP traffic.
+- Five delayed concurrent first-user App resolutions perform five SDK discovery
+  calls. Admission/preflight and measured workers have separate caches.
+- A synthetic terminal snapshot with 10,000 captures / 21,691,019 bytes is read
+  once for status and three times for result/report. Observed local elapsed times
+  were 33.625 / 66.732 / 65.521 ms respectively; these are not remote estimates.
+
+Confirmed that native `fsync` can block the gevent hub; the measured local
+200-event test had 0.0725-ms median and 0.1141-ms p95 sync cost. Network-disk cost
+and actual generator saturation remain unmeasured. Any writer optimization must
+retain durable start acknowledgment before target dispatch and truthful incomplete
+completion recovery. Successful-only latency and elapsed-including-drain TPS are
+already explicitly labeled. Output tokens exist per request; aggregate token
+distributions remain absent. Locust `constant_throughput` is pacing, not a genuine
+independent arrival scheduler. Remote submission already accepts typed `RunCreate`,
+and local Python already can invoke an App through the operator resolver without
+an EvalSurge REST server.
+
+Native `databricks-agentbricks==0.4.0` source and a controlled actual server verified
+foreground streaming and runtime terminal failure events. A server that emitted
+answer text before failing returned HTTP 200 plus `run.failed`, with failed final
+state. Adding native streaming requires terminal-outcome validation, separate
+first-event/answer-text timing and actual usage evidence, not just `stream:true`.
+
+Read-only API/CLI/SDK/v2 suite: **68 passed in 2.70 seconds**. Focused four-example
+rerun: **32 passed, 13 upstream warnings in 41.95 seconds**. Ruff lint/format
+(135 files), whitespace, unchanged OpenAPI export and independent validation passed.
+Protected review/reproduction evidence is under
+`artifacts/review-feedback-20261008/`. Fresh public release metadata retrieval was
+blocked even after an escalated retry; no newly verified latest-release claim or
+dependency upgrade is made.
+
+Both unchanged published **local** JSON requests were also run through actual
+loopback HTTP Uvicorn target/API servers, remote SDK, the sole Locust engine,
+compiled LangGraph/OpenAI Agents Runner and native MLflow. Only provider HTTP
+responses were controlled; tools, request-isolated memory and instrumentation
+executed. No paid model, planner or judge calls occurred.
+
+| Full-budget observation | LangGraph | OpenAI Agents |
+| --- | ---: | ---: |
+| Measured successes / attempts | 500 / 500 | 500 / 500 |
+| Errors | 0 | 0 |
+| Excluded successful probe | 1 | 1 |
+| Configured users / observed peak HTTP in-flight | 5 / 5 | 5 / 5 |
+| Elapsed including drain | 22.929 s | 17.190 s |
+| Successful requests/s including drain | 21.807 | 29.086 |
+| Latency p50 / p95 / p99 | 220.49 / 308.35 / 359.87 ms | 161.32 / 218.41 / 264.65 ms |
+| Answer-text TTFT p50 / p95 / p99 | 120.66 / 178.34 / 216.15 ms | 113.68 / 138.95 / 210.82 ms |
+| TTFT / usage coverage | 500 / 500 | 500 / 500 |
+| Profiled / budget gaps | 200 / 300 | 200 / 300 |
+
+The 500-request cap ended both runs before the 180-second dispatch ceiling.
+Quality was off; trace-budget gaps were explicit. Run IDs were
+`baf46b35-0be2-4479-87c3-f22385022015` and
+`87a5e2a4-5776-4be4-8c32-199eff9f8e23`. Complete journals, excluded probes,
+unique invocation/trace IDs and per-request timing/usage were verified. Evidence
+and the completed-run rerun guard are under
+`artifacts/framework-local-full-20261008/`. These are controlled integration
+observations, not live-model speed, calibrated quality or sustainable capacity.
+
+## Four framework/hosting request examples — initial October 8, 2026 checkpoint
+
+Added [the framework target guide](docs/FRAMEWORK_TARGET_EXAMPLES.md), four
+copyable default-off v2 JSON requests under `examples/requests/`, and one
+placeholder-only operator TOML. The matrix covers LangGraph and OpenAI Agents,
+each runner-local HTTP or a registered Databricks App. REST, CLI, and remote SDK
+submission share the same aliases. Published load bounds are concurrency five,
+180 seconds of dispatch, 500 measured attempts and a 60-second request timeout;
+automated tests use detached copies reduced to two users/two measured attempts,
+five seconds of dispatch and ten-second HTTP deadlines. No public API, runtime
+behavior, dependencies, lockfile, or live resources changed.
+
+Official Databricks Agent Server documentation retrieved on October 8 confirms
+recommended DurableAgentServer `/api/invocations`, explicit legacy MLflow
+`/responses`, both framework templates, and a managed Runtime Store separate from
+agent transcript history/memory. No obsolete deployment skill was used to change
+the protocol. Operator profiles, App names, destinations and OAuth remain outside
+public requests; committed bindings contain placeholders, not selected resources.
+
+Static tests validate all four request files through actual v2 models, translation,
+protocol encoders and the CLI configuration reader, compare guide JSON to files,
+and check registry/inventory/navigation. Actual local framework tests execute SDK
+and CLI submissions through the API and real Locust HTTP to compiled LangGraph
+and OpenAI Agents Runner. They verify default-off behavior, streamed timing,
+request-isolated memory, correlation, and exactly one excluded probe plus two
+measured successes. Real framework provider denials stop after one probe, with
+zero measured traffic and no retries or judging.
+
+App tests exercise the real v2/remote SDK, native Databricks Config/WorkspaceClient/
+AppsAPI and OAuth interfaces, original Locust workers, both frameworks and native
+MLflow traces. Test-only bootstrap controls discovery/auth and maps one exact
+synthetic HTTPS App origin to loopback HTTP after production destination checks.
+The loopback invocation envelope wraps the real framework demo; it is **not**
+DurableAgentServer, a deployed App, or a Lakebase-backed Runtime Store. Tests verify
+fresh OAuth per dispatch, unique invocation/session identifiers, exact correlation,
+probe exclusion and content-free profile coverage. An unfinished outer invocation
+fails fast with one excluded probe, zero measured attempts and no hidden polling.
+Process-local boundary patches and exact raw MLflow selectors are restored.
+
+Focused verification:
+
+- `uv run --no-sync pytest -q tests/test_simple_examples.py`: **22 passed**,
+  13 existing upstream warnings, **30.23 seconds**.
+- `uv run --no-sync pytest -q tests/test_framework_app_requests.py
+  tests/test_frameworks.py tests/test_remote_integration.py`: **52 passed**,
+  one upstream SQLAlchemy warning, **62.56 seconds**.
+- `uv run --no-sync pytest -q tests/test_framework_request_docs.py
+  tests/test_readme.py --tb=short`: **11 passed in 3.02 seconds**. After adding
+  the actual CLI reader assertion, the six static request tests passed again.
+
+Locked public-index agents/dev sync resolved **190 packages** and checked **182**.
+Environment: Python **3.12.13**, LangGraph **1.2.12**, OpenAI Agents **0.22.3**,
+MLflow **3.16.1**, Databricks SDK **0.146.0**, Locust **2.46.6**. Commands:
+
+```bash
+uv sync --locked --extra agents --group dev --default-index https://pypi.org/simple
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pytest -q --tb=short \
+  --junitxml=artifacts/framework-target-examples-20261008/junit.xml
+uv run --no-sync python scripts/export_openapi.py --check
+uv run --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --no-sync python scripts/verify_wheel.py
+uv run --no-sync python scripts/verify_remote_install.py --offline
+uv run --no-sync python scripts/check_ci_prerequisites.py
+git diff --check
+```
+
+Final full suite: **690 passed, no skips, 42 existing upstream warnings in
+222.59 seconds**. Warnings remain MLflow's SQLAlchemy loader deprecation and
+positional pandas API usage, not new framework/hosting failures. Ruff lint and
+formatting (**135 files**), unchanged OpenAPI snapshot equality and independent
+schema validation, sdist/wheel build, packaged assets, and actual isolated base-only
+SDK/CLI/missing-server checks passed. Source-distribution inspection also verified
+all four JSON requests, the operator TOML and new guide. Public provenance checks
+still cover **189 registry packages**; no fresh upgrade or advisory audit is
+claimed. Whitespace checks passed. Protected JUnit evidence is retained at the
+path in the command above.
+
+No new paid target/planner/judge calls, workspace reads, App deployments or store
+provisioning were performed. Live retests require an exact confirmed profile,
+deployed App and bounded consent; a new LangGraph deployment is not inferred from
+the earlier OpenAI App authorization. The October 7 live OpenAI Agents record
+below remains separate historical evidence. Controlled tests do not establish
+live App health, native server/store durability, sustainable capacity or calibrated
+quality. Remote CI and designated maintainer review are not claimed. Changes are
+uncommitted on `main` at `78681fbe68d61c4ffc0c47126328244e25b76b44`; the unrelated
+`.isaac/` directory is preserved. No commit, push or GitHub operation occurred.
+
 ## Documentation and source publication review — October 7–8, 2026
 
 Reviewed the first-party API/coordinator, models/settings/diagnostics, connection

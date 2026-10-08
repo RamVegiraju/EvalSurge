@@ -1,0 +1,29 @@
+# Example only: registration does not deploy agents or authorize traffic.
+# Keep real profiles and destinations in a protected, uncommitted operator file.
+artifact_dir = "artifacts/framework-target-examples"
+
+[connections.local-langgraph]
+kind = "http"
+url = "http://127.0.0.1:9001/langgraph/chat"
+protocols = ["openai-chat"]
+framework = "langgraph"
+
+[connections.local-openai-agents]
+kind = "http"
+url = "http://127.0.0.1:9001/openai-agents/chat"
+protocols = ["openai-chat"]
+framework = "openai-agents"
+
+[connections.databricks-langgraph]
+kind = "databricks-app"
+app_name = "your-langgraph-app"
+profile = "YOUR_SELECTED_OAUTH_PROFILE"
+protocols = ["databricks-agent-runtime"]
+framework = "langgraph"
+
+[connections.databricks-openai-agents]
+kind = "databricks-app"
+app_name = "your-openai-agents-app"
+profile = "YOUR_SELECTED_OAUTH_PROFILE"
+protocols = ["databricks-agent-runtime"]
+framework = "openai-agents"

@@ -125,7 +125,11 @@ def test_readme_automatic_request_matches_v2_contract() -> None:
         json.loads(block)
         for block in re.findall(r"```json\n(.*?)```", README.read_text(), re.DOTALL)
     ]
-    requests = [document for document in documents if "cases" in document]
+    requests = [
+        document
+        for document in documents
+        if document.get("evaluation", {}).get("mode") == "automatic"
+    ]
     assert len(requests) == 1
     request = RunCreate.model_validate(requests[0])
     assert request.target.connection_id == "refund-agent"
@@ -136,6 +140,21 @@ def test_readme_automatic_request_matches_v2_contract() -> None:
     assert request.load.max_requests == 20
     assert "url" not in requests[0]["target"]
     assert "profile" not in requests[0]["target"]
+
+
+def test_readme_recommended_request_defaults_to_performance_only() -> None:
+    """Validate the first v2 example without resolving credentials or invoking targets."""
+    readme = README.read_text()
+    documents = [json.loads(block) for block in re.findall(r"```json\n(.*?)```", readme, re.DOTALL)]
+    body = documents[0]
+    request = RunCreate.model_validate(body)
+    assert request.target.connection_id == "refund-agent"
+    assert "evaluation" not in body
+    assert request.evaluation.mode == "off"
+    assert set(body["target"]) == {"connection_id"}
+    assert request.load.concurrency == 3
+    assert request.load.max_requests == 20
+    assert readme.index("Recommended request") < readme.index("legacy v1")
 
 
 def test_target_guide_examples_validate_without_discovery_or_traffic() -> None:

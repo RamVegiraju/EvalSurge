@@ -284,6 +284,34 @@ validity; uv retains responsibility for download hash validation. This is not a
 clean-install matrix, complete license audit, or security sign-off. Evidence is
 retained under ignored `artifacts/prepush-20261007/`.
 
+## Publication metadata recheck — October 8, 2026
+
+Official GitHub stable-release metadata was rechecked for the OpenAI SDK, OpenAI
+Agents SDK, Locust and Databricks SDK. OpenAI SDK
+[3.26.1](https://github.com/openai/openai-python/releases/tag/v3.26.1) and Databricks
+SDK [0.149.0](https://github.com/databricks/databricks-sdk-py/releases/tag/v0.149.0)
+were published October 8; the unchanged lock still contains 3.22.1 and 0.146.0.
+The observed Agents 0.23.1 and Locust 2.46.7 releases remain newer than locked
+0.22.3 and 2.46.6. These observations supersede only the corresponding latest-release
+observations in the October 7 table; they do not change that historical audit.
+
+The fetched Dependabot runtime branch updates Locust to 2.46.7, OpenAI to 3.24.0
+and Agents to 0.23.1. It was inspected read-only, not merged: it is neither a
+validated full-graph upgrade nor the newest observed OpenAI/Databricks environment.
+Finish the existing compatibility/update workflow before adopting it.
+
+The bare required `uv sync --locked --extra agents --group dev` resolved against
+the ambient index configuration and rejected the unchanged lock. Explicit
+`--default-index https://pypi.org/simple --offline` accepted the authentic public
+lock and checked the cached agents/dev environment. No dependency metadata, source,
+version or hash was rewritten for this publication. A fresh hashed export of the
+unchanged agents/dev/build lock was audited with OSV: **181 applicable dependencies,
+zero known advisories, no skipped packages** on local Python 3.12. Evidence is under
+ignored `artifacts/prepush-20261008-audit.*`. This checks known version advisories
+and hash presence, not artifact validity, licenses or other interpreters. A fresh
+full-graph latest-release review and public-index clean install was not performed;
+the October 12 review deadline and existing release gaps still apply.
+
 ## Primary guidance
 
 - [uv locking and upgrades](https://docs.astral.sh/uv/concepts/projects/sync/)
