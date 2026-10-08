@@ -1,7 +1,10 @@
 """Live FM planning, answer generation, and positive/negative MLflow judging.
 
-Small validation only: one planning request, one inference request, and four judge
-requests. Does not load test the workspace or modify remote resources.
+Legacy manual validation, not a consent-gated App harness. The expected path is
+one planning call, one generated answer, and four assessments for two criteria.
+Planner-selected criteria and configured provider retries can add calls; this is
+not a hard provider-attempt or spend cap. Does not load test the workspace or
+modify remote resources. Invoke only after explicit profile and paid-call consent.
 """
 
 import asyncio

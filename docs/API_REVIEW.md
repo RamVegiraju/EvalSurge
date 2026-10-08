@@ -27,10 +27,40 @@ behavioral evidence separately from these heuristic scores.
 Legacy v1 idempotency hashes remain recognized despite the new optional protocol/
 session fields. The new `databricks-agent-runtime` adapter enum requires exhaustive
 clients to update. V1 retrieval of a v2 run without a frozen plan returns safe
-409; v2 JSON reports handle failed/interrupted planning. The existing browser
-report shell is not a renderer for those planless runs. Results describe one
+409; v2 JSON reports handle failed/interrupted planning. The browser report shell
+now renders those planless runs through a same-origin v2 fallback. Results describe one
 closed-loop load level, not sustainable capacity; assessment dictionaries remain
 an explicit schema-maturity limitation.
+
+## Client/input/failure follow-up — October 7, 2026
+
+The follow-up patch fixes cancellation acknowledgments, mixed-version history
+links, planless browser reports, safe field-specific v2 validation, and the remote
+dependency surface. The App-default finding was checked against current official
+guidance: DurableAgentServer `/api/invocations` remains the default; MLflow
+AgentServer `/responses` is explicit legacy compatibility. See
+[ADR 0010](adr/0010-client-input-and-failure-contracts.md), pending maintainer review.
+
+Compatibility changes need attention beyond schema-diff tools:
+
+- The optional v2 `error.errors` response field is additive; v1 envelopes remain.
+- V1 history entries for v2 runs now link to v2 status, not an unusable v1 resource.
+  V1-origin run links remain unchanged. Cancellation-request acknowledgment is not
+  a new polling/terminal state.
+- Fixed message adapters reject formerly ignored top-level inference fields and
+  simultaneous `query`/`messages`. This is an intentional behavioral tightening
+  across v1, v2, and local Python, despite no removed OpenAPI request field.
+- Plain installation is now remote-only; local/server consumers must select the
+  `server` extra. The `agents` extra includes it, preserving the checkout developer
+  workflow. Lazy local APIs retain their signatures with the extra installed.
+- Runtime responses reject explicitly unfinished assistant messages even when the
+  outer invocation/handler reports completion. No partial answer is published;
+  omitted message status remains compatible with current normalized output.
+
+Controlled API/Locust/SDK, shipped-DOM, and isolated-wheel tests validate these
+behaviors. Separate bounded live App evidence is recorded in `VALIDATION.md`; it
+used the local facade/resolver, not live v2 HTTP submission or a deployed EvalSurge
+service. Neither establishes remote CI success or production readiness.
 
 Each evaluated criterion now includes an additive `assessments` array in run and
 report responses, available identically through Python and REST. Exact request
@@ -46,7 +76,8 @@ field for safe diagnostics. Failed checks terminate with skipped load, profiling
 and evaluation, and remain reportable. Enum-aware clients must accept the new
 `preflighting` overall status and `skipped` load/profiling outcomes. Historical
 snapshots use `preflight.status=not_run`. The extra invocation can execute tools
-and incur cost but is excluded from measurements and judging. This material
+and incur cost but is excluded from measured metrics, profiles, and quality results.
+Selected judges reuse its capture for separate readiness assessments. This material
 lifecycle change requires maintainer review of [ADR 0004](adr/0004-fail-fast-inference-preflight.md).
 
 This is a private alpha checkpoint, not a shared-service production sign-off. The six supplied implementation findings are addressed for the local single-run milestone:

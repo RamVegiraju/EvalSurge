@@ -29,7 +29,9 @@ class TargetReference(Model):
 class Case(Model):
     """One bounded workload case and caller-owned authoritative evidence."""
 
-    input: dict[str, Any]
+    input: dict[str, Any] = Field(
+        description="For fixed message protocols, exactly one nonempty query or messages array; extra top-level inference fields are rejected. For http-json, the raw nonempty POST body. Evaluation evidence belongs in reference."
+    )
     reference: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -220,6 +222,14 @@ class Report(Model):
     total: int
 
 
+class ValidationIssue(Model):
+    """Bounded schema guidance with public field names, never values or arbitrary keys."""
+
+    location: list[str | int] = Field(max_length=12)
+    code: str = Field(max_length=64)
+    message: str = Field(max_length=200)
+
+
 class V2ErrorDetail(Model):
     """Fixed safe error guidance; provider text and submitted values are excluded."""
 
@@ -229,6 +239,11 @@ class V2ErrorDetail(Model):
     phase: str
     retryable: bool
     guidance: str
+    errors: list[ValidationIssue] | None = Field(
+        default=None,
+        max_length=20,
+        description="At most 20 sanitized validation issues; arbitrary input keys are replaced by <extra>.",
+    )
 
 
 class V2ErrorResponse(Model):

@@ -2,7 +2,13 @@
 
 Use Python 3.11+ on Linux or macOS, Node.js 22+ for report/docs contract tests, and
 `uv sync --locked --extra agents --group dev`.
-Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest -q`, `uv run python scripts/export_openapi.py --check`, `uv run openapi-spec-validator docs/openapi.json`, `uv build --no-build-isolation`, and `uv run python scripts/verify_wheel.py` before proposing a change. Locust integration tests need localhost sockets and spawn subprocesses. No paid credentials are needed for tests.
+Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest -q`, `uv run python scripts/export_openapi.py --check`, `uv run openapi-spec-validator docs/openapi.json`, `uv build --no-build-isolation`, `uv run python scripts/verify_wheel.py`, and `uv run --no-sync python scripts/verify_remote_install.py --offline` before proposing a change. Locust integration tests need localhost sockets and spawn subprocesses. No paid credentials are needed for tests.
+
+The default package installs only the remote HTTP client and CLI (HTTPX/Pydantic).
+Local execution and the REST server require `evalsurge[server]`; `evalsurge[agents]`
+includes that stack plus both example frameworks. Keep the existing agents/dev sync
+for full development and verification. Test built-wheel remote isolation as well as
+the full environment so eager imports cannot reintroduce the load stack for clients.
 
 Keep dependencies explicit and minimal. Do not add a second load runner or provider routing framework without an architectural need. Maintain the shared streaming contract, frozen evaluation policy, evidence requirements, and separation between load and judging. Changes to timing or sampling definitions must update documentation and regression coverage.
 

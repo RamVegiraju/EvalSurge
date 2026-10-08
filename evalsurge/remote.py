@@ -403,7 +403,9 @@ class RemoteClient:
             ) from None
 
     @staticmethod
-    def _state(body: dict[str, Any], run_id: UUID | None = None) -> UUID:
+    def _state(
+        body: dict[str, Any], run_id: UUID | None = None, *, cancellation_ack: bool = False
+    ) -> UUID:
         """Validate lifecycle identity/status; never trust server-provided URLs."""
         try:
             identifier = _run_id(body.get("id"))
@@ -412,7 +414,10 @@ class RemoteClient:
         status = body.get("status")
         if (
             not isinstance(status, str)
-            or status not in _STATUSES
+            or (
+                status not in _STATUSES
+                and not (cancellation_ack and status == "cancellation_requested")
+            )
             or (run_id is not None and identifier != run_id)
         ):
             raise RemoteProtocolError("Service response has an invalid run lifecycle.")
@@ -508,7 +513,7 @@ class RemoteClient:
         """Send one cancellation request; transport failure never triggers a replay."""
         identifier = _run_id(run_id)
         body, _ = self._request("POST", f"/v2/runs/{identifier}/cancel")
-        self._state(body, identifier)
+        self._state(body, identifier, cancellation_ack=True)
         return body
 
     def capabilities(self) -> dict[str, Any]:

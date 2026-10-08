@@ -19,6 +19,10 @@ class InvalidResponse(ValueError):
     """A JSON contract failure carrying fixed guidance, never target response content."""
 
 
+class InvalidInput(ValueError):
+    """A fixed safe inference-envelope diagnostic without submitted keys or values."""
+
+
 class ResponseAdapter(Protocol):
     """Encode cases and decode caller-owned responses without opening connections."""
 
@@ -42,20 +46,29 @@ class SSEAdapter:
 
         Args:
             target: Model name, SSE protocol, and optional usage request setting.
-            sample: Workload inputs with query or messages; messages take precedence.
+            sample: Workload inputs containing exactly one of query or messages.
 
         Returns:
             A fresh OpenAI Chat or MLflow agent-server streaming request body.
-            Additional inputs remain evaluation metadata, not target fields.
+            Nested message fields are preserved, not interpreted as routing settings.
 
         Raises:
-            ValueError: Query is absent or messages are not nonempty role-bearing objects.
+            InvalidInput: Extra top-level fields, ambiguous alternatives, absent query,
+                or messages that are not nonempty role-bearing objects.
         """
+        if set(sample.inputs) - {"query", "messages"}:
+            raise InvalidInput(
+                "Unsupported inference fields: fixed message protocols accept only query or "
+                "messages. custom_inputs, actor, model, resume and other fields require an "
+                "explicitly supported operator-governed adapter; fields are never discarded."
+            )
+        if len(sample.inputs) != 1:
+            raise InvalidInput("Each sample needs exactly one of inputs.query or inputs.messages.")
         messages = sample.inputs.get("messages")
-        if messages is None:
+        if "query" in sample.inputs:
             query = sample.inputs.get("query")
             if not isinstance(query, str) or not query:
-                raise ValueError("Each sample needs inputs.query or inputs.messages.")
+                raise InvalidInput("inputs.query must be a nonempty string.")
             messages = [{"role": "user", "content": query}]
         if (
             not isinstance(messages, list)
@@ -65,7 +78,7 @@ class SSEAdapter:
                 for message in messages
             )
         ):
-            raise ValueError("inputs.messages must be a nonempty array of objects with a role")
+            raise InvalidInput("inputs.messages must be a nonempty array of objects with a role")
         if self.name == "mlflow-agent-server":
             return {"input": messages, "stream": True}
         body = {"model": target.model, "messages": messages, "stream": True}
@@ -258,7 +271,8 @@ def _runtime_text(output: Any) -> str:
         Plain text from a string, documented answer handler, or assistant messages.
 
     Raises:
-        InvalidResponse: Unsupported result, interrupted template, or absent text.
+        InvalidResponse: Unsupported result, unfinished handler/assistant message,
+            or absent text. Missing message status retains normalized-output compatibility.
 
     This adapter intentionally supports a bounded subset of handler schemas. Tool
     results, reasoning, user messages and arbitrary JSON never become answer text.
@@ -276,6 +290,8 @@ def _runtime_text(output: Any) -> str:
                 raise InvalidResponse("Invalid Agent Runtime output message")
             if message.get("role") != "assistant" or message.get("type", "message") != "message":
                 continue
+            if message.get("status", "completed") != "completed":
+                raise InvalidResponse("Agent Runtime output message did not complete")
             content = message.get("content")
             if isinstance(content, str):
                 parts.append(content)
@@ -309,14 +325,14 @@ class AgentRuntimeAdapter:
 
         Args:
             target: Operator session policy; model/usage settings are not injected.
-            sample: Query or messages. Other case fields remain evaluation metadata.
+            sample: Exactly one of query or messages; other input fields are rejected.
 
         Returns:
             A new UUID invocation, input messages, explicit false stream/background,
             and optional fixed or independently generated per-attempt session ID.
 
         Raises:
-            ValueError: Workload query/messages are invalid.
+            InvalidInput: Workload query/messages are invalid or unsupported fields exist.
 
         No retries, resume tokens, actor identities or background operations are added.
         The Locust caller replaces id with its journaled request identifier.

@@ -11,6 +11,8 @@ benchmarks. Run these modules from the repository root.
 | [framework_e2e.py](framework_e2e.py) | Actual LangGraph/OpenAI Agents, REST, Locust, MLflow, evaluation, and report integration. |
 | [databricks_validation.py](databricks_validation.py) | Opt-in paid planning, inference, and positive/negative judging check. |
 | [locust_databricks_e2e.py](locust_databricks_e2e.py) | Opt-in paid REST/Locust test against an authorized Databricks model. |
+| [databricks_app_smoke.py](databricks_app_smoke.py) | Dry-run-by-default, consent-gated check of an existing authorized App; one probe plus at most 500 measured calls, up to five users/180 seconds, no judging. |
+| [databricks_app_quality.py](databricks_app_quality.py) | Separate consent-gated native App quality integration; one synthetic policy/reference, up to two captured responses per relevance/correctness scorer, local native MLflow evidence. |
 
 For configurable local load against an already running authorized agent:
 
@@ -24,6 +26,19 @@ The REST client still requires an existing API server. See
 failure semantics. [Live integration guidance](../../docs/USAGE.md#bounded-live-validation)
 explains explicit profile selection and traffic budgets. Live tools can execute
 agent actions and incur model/judge costs; do not run them without authorization.
+The two older Databricks model-serving helpers require manual consent and an
+operator-selected environment profile; they do not have the App helpers' dry-run/
+consent flags. Their nominal target counts do not cap planner, judge-readiness,
+criteria selection, retries, or dollar spend. Review those separately frozen budgets.
+For current DurableAgentServer `/api/invocations` versus legacy MLflow `/responses`,
+required resources, and the App smoke budget, see
+[Databricks App validation](../../docs/DATABRICKS_APP_VALIDATION.md).
+
+The October 7 live App work passed an intentional fail-fast check, 500 measured
+requests at concurrency five, and a separate tiny explicit quality check. Its
+earlier real-model preflight failure is retained in [VALIDATION.md](../../VALIDATION.md).
+These helpers invoke an existing App through the local facade; they do not
+deploy EvalSurge or establish live `/v2` HTTP or sustainable-capacity evidence.
 
 The previous `examples.*` CLI and integration-runner module paths have moved to
 `scripts.validation.*`. `examples.python_benchmark` is now the minimal tutorial,

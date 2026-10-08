@@ -29,7 +29,6 @@ def test_should_preserve_hosted_agent_settings_and_allow_usage_opt_out():
 
     request = configuration()
     sample = request.evaluation.samples[0]
-    sample.inputs.update({"reasoning_effort": "low", "tools": [{"name": "private_tool"}]})
     default_body = payload(request, sample)
     assert default_body["stream_options"] == {"include_usage": True}
     assert set(default_body) == {"model", "messages", "stream", "stream_options"}

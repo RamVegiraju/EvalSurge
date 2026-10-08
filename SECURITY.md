@@ -11,6 +11,14 @@ before App resolution. See [v2 configuration](docs/V2_API.md).
 App configuration-file selectors must also agree between the API process and
 private runtime snapshot; SDK CLI credential subprocesses inherit process values.
 
+Fixed message adapters reject unsupported top-level inference fields instead of
+silently dropping them. This includes identity/routing/resume/custom-input fields;
+operator-governed mapping is deferred. V2 schema diagnostics expose only bounded
+public locations and fixed guidance, never values, arbitrary input keys, or raw
+validator context. Planless report fallback uses locally constructed same-origin
+paths and does not forward service keys elsewhere. The lightweight client changes
+installation/import boundaries, not API authorization or the runner trust model.
+
 EvalSurge 0.2 is a local, single-tenant prototype. Bind to loopback with proxy headers disabled. Set `BENCHMARK_API_KEY` when serving beyond loopback and terminate TLS before exposing any remote connection. A shared API key authenticates the service; it does not provide tenant authorization. Documentation endpoints and the OpenAPI schema are public metadata.
 
 Configure destination credentials only through server-owned `BENCHMARK_CONNECTIONS`. Each connection binds an authentication method to one exact URL. Unauthenticated remote targets need an exact allowlist entry. Redirects, URL credentials, fragments, and query strings are rejected. Databricks credentials are restricted to the configured HTTPS workspace. The load worker disables environment proxy and netrc credential discovery.

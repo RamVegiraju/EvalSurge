@@ -1,9 +1,10 @@
-"""Local Python API for hosted-agent benchmarks using the shared Locust engine."""
+"""Remote client by default; local execution lazily requires evalsurge[server]."""
 
-from benchmark_agents.connections import Connection
+from typing import TYPE_CHECKING, Any
+
 from benchmark_agents.models import Evaluation, Load, RunReport, Sample
 
-from .client import Agent, EvalSurge, RunFailed
+from .facade import EvalSurge, MissingServerDependenciesError, _local_module
 from .remote import (
     RemoteClient,
     RemoteConflictError,
@@ -16,6 +17,33 @@ from .remote import (
     RemoteTransportError,
     RemoteUnauthorizedError,
 )
+
+if TYPE_CHECKING:
+    from benchmark_agents.connections import Connection as Connection
+
+    from .client import Agent as Agent
+    from .client import RunFailed as RunFailed
+
+
+def __getattr__(name: str) -> Any:
+    """Preserve local public names without importing the server for remote access.
+
+    Args:
+        name: Requested module attribute; only three documented local names defer.
+
+    Returns:
+        The existing local class, cached after successful dependency validation.
+
+    Raises:
+        AttributeError: The name is not a documented lazy export.
+        MissingServerDependenciesError: A local export needs the server extra.
+    """
+    if name not in {"Agent", "Connection", "RunFailed"}:
+        raise AttributeError(f"module 'evalsurge' has no attribute {name!r}")
+    value = getattr(_local_module(), name)
+    globals()[name] = value
+    return value
+
 
 __all__ = [
     "Agent",
@@ -36,4 +64,5 @@ __all__ = [
     "RemoteTransportError",
     "RemoteTimeout",
     "RemoteRunFailed",
+    "MissingServerDependenciesError",
 ]

@@ -1,4 +1,11 @@
-"""Real REST API -> Locust -> Databricks streaming -> post-run FM judging."""
+"""Legacy manual REST -> Locust -> Databricks streaming -> captured-answer judging.
+
+This validates a model-serving Chat endpoint, not a Databricks App. Invocation
+requires explicit selected-profile and paid-call consent; there are no CLI consent
+flags. Four measured attempts plus one excluded target probe do not bound planner,
+judge-readiness, or post-load judging spend. Consult frozen budgets before running.
+Use the dedicated App helpers for consent-gated Runtime/App validation instead.
+"""
 
 import asyncio
 import json

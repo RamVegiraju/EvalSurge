@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 from openai import OpenAIError
 
+from .adapters import InvalidInput
 from .connections import Connection, resolve_connection, validate_connection
 from .evaluation_errors import evaluation_error
 from .evaluation_preflight import configuration_error, run_evaluation_preflight
@@ -110,6 +111,7 @@ class RunCoordinator:
                         "status",
                         "load_status",
                         "evaluation_status",
+                        "evaluation_mode",
                         "idempotency_key_hash",
                         "request_hash",
                     )
@@ -208,6 +210,7 @@ class RunCoordinator:
                 "status",
                 "load_status",
                 "evaluation_status",
+                "evaluation_mode",
                 "idempotency_key_hash",
                 "request_hash",
             )
@@ -440,6 +443,8 @@ class RunCoordinator:
             )
             for sample in request.evaluation.samples:
                 payload(request, sample)
+        except InvalidInput as error:
+            raise CoordinatorError(422, str(error)) from error
         except ValueError as error:
             raise CoordinatorError(422, "Invalid target connection or workload envelope") from error
         async with self.submission:
@@ -875,7 +880,7 @@ class RunCoordinator:
                 status=run["status"],
                 load_status=run["load_status"],
                 evaluation_status=run["evaluation_status"],
-                url=f"/v1/runs/{run_id}",
+                url=f"/{'v2' if run.get('evaluation_mode') is not None else 'v1'}/runs/{run_id}",
             )
             for run_id, run in sorted(self.index.items())
             if status is None or run["status"] == status
@@ -950,7 +955,7 @@ class RunCoordinator:
                 traced_requests=0,
                 coverage=0,
                 notes=[
-                    "No load test was started. Preflight is excluded from metrics, profiles, and judging."
+                    "No load test was started. The inference probe and judge-readiness checks are excluded from benchmark metrics, profiles, and quality results."
                 ],
             )
         elif not path.exists():

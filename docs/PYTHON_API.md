@@ -5,6 +5,15 @@ The distribution is `evalsurge`; the public import is `evalsurge`. The existing
 From a checkout, install with
 `uv sync --locked --default-index https://pypi.org/simple --extra agents --group dev`.
 
+The default `evalsurge` installation is the lightweight remote SDK/CLI, with only
+HTTPX and Pydantic as direct dependencies. `from evalsurge import EvalSurge` and
+`EvalSurge.remote()` do not load the server stack. Local examples below require
+`uv add 'evalsurge[server]'` (or `evalsurge[agents]` for the framework examples);
+the agents extra also includes the server dependencies. Existing `Agent`,
+`Connection`, and `RunFailed` imports are lazy and preserve their classes when
+the server extra is installed. Missing local dependencies produce explicit install
+guidance instead of starting a partial benchmark.
+
 The checkout uses an authentic public-PyPI recovery lock, with installation
 verified on macOS/Python 3.12 including agents/dev dependencies on October 5, 2026.
 It removes the private-mirror origins responsible for earlier CI install failures;
@@ -181,8 +190,13 @@ agent = Agent.http(
 
 Keep `AGENT_TOKEN` in the runner environment, not in source or report URLs.
 Remote connections require HTTPS. The Databricks workspace auth binding still
-requires an explicitly selected profile and the matching workspace host; App URL
-resolution and App OAuth onboarding are a separate milestone.
+requires an explicitly selected profile and the matching workspace host. Databricks
+App discovery and refreshed OAuth are implemented through operator-registered
+`databricks-app` targets in `/v2`; use the remote SDK with that API as shown in
+[the target guide](TARGETS.md). There is no `Agent.databricks_app()` convenience
+factory in this local interface. An explicit advanced local `Agent` binding can
+use the existing Runtime target/connection contracts, as the consent-gated App
+validation helper does; it does not permit caller credentials in public REST requests.
 
 ## Evaluation and profiling
 

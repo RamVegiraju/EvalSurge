@@ -15,6 +15,7 @@ from scripts.verify_wheel import REQUIRED_FILES, verify
         None,
         "evalsurge/__init__.py",
         "evalsurge/client.py",
+        "evalsurge/facade.py",
         "benchmark_agents/coordinator.py",
         "benchmark_agents/evaluation_errors.py",
         "benchmark_agents/evaluation_details.py",

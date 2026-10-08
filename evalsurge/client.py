@@ -28,7 +28,7 @@ from benchmark_agents.models import (
     Target,
 )
 
-from .remote import RemoteClient
+from .facade import EvalSurge as EvalSurge
 
 Protocol = Literal["openai-chat", "mlflow-agent-server", "http-json"]
 Result = TypeVar("Result")
@@ -545,43 +545,3 @@ class Client:
         """Request cancellation of load dispatch, retaining the safe acknowledgment."""
         self._require_open()
         return self._call(lambda: self._async_client.cancel(run_id))
-
-
-class EvalSurge:
-    """Factories for local contexts using one coordinator and one Locust engine."""
-
-    @staticmethod
-    def remote(base_url: str, *, api_key: str | None = None, **kwargs: Any) -> RemoteClient:
-        """Create a remote HTTP client; the API host remains the load generator.
-
-        Args:
-            base_url: Authorized HTTPS API origin, or HTTP loopback for local tests.
-            api_key: Optional in-memory service key; never included in URLs.
-            **kwargs: RemoteClient timeout, transport, and polling options.
-
-        Returns:
-            Unopened remote client. Enter its context to own and close HTTP resources.
-        """
-        return RemoteClient(base_url, api_key=api_key, **kwargs)
-
-    @staticmethod
-    def local(*, artifact_dir: str | Path = "artifacts") -> Client:
-        """Create a sync context; the current machine is the load generator.
-
-        Args:
-            artifact_dir: Protected persistent storage; its POSIX ownership lock
-                prevents concurrent use by another local or REST coordinator.
-
-        Returns:
-            Unopened context. Enter it before starting runs or reading history.
-        """
-        return Client(artifact_dir)
-
-    @staticmethod
-    def local_async(*, artifact_dir: str | Path = "artifacts") -> AsyncClient:
-        """Create a native-async context on the opening event loop.
-
-        Artifact ownership and traffic location match local; no HTTP server or
-        temporary process-global configuration is created by either interface.
-        """
-        return AsyncClient(artifact_dir)

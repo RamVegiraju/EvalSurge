@@ -19,12 +19,13 @@ def payload(request: RunRequest, sample: Sample, request_id: str | None = None) 
     Returns:
         The raw inputs object for http-json, or a streaming OpenAI Chat Completions
         or MLflow agent-server envelope, or a synchronous Agent Runtime invocation.
-        Extra agent input keys remain evaluation metadata. No reasoning, tool, or
+        Extra top-level agent input keys are rejected. No reasoning, tool, or
         sampling settings are injected. Streamed
         usage is requested only when target.request_usage is enabled for openai-chat.
 
     Raises:
-        ValueError: JSON inputs are empty, or SSE inputs lack a query or valid messages.
+        ValueError: JSON inputs are empty, or fixed-message inputs contain unsupported
+            fields or lack exactly one query/messages alternative.
             This validates the supported envelope, not all provider fields.
     """
     body = get_adapter(request.target.adapter).encode(request.target, sample)

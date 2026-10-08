@@ -3,6 +3,9 @@
 The current milestone is a reproducible single-run benchmark with durable partial records, correlated framework traces, a bounded visual report, and representative quality sampling. Shared hosting and capacity discovery remain separate release gates.
 
 The additive `/v2` façade selects registered targets and defaults evaluation to off.
+Registered targets can be ordinary HTTP endpoints (including runner-local agents)
+or deployed Databricks Apps. Hosting/discovery and invocation protocol are separate:
+both share the coordinator and sole Locust engine. See [target contracts](docs/TARGETS.md).
 It admits before asynchronous planning, then shares the same preflights, Locust,
 captured-answer evaluation, and evidence storage. Operator settings use private
 task-local snapshots; App discovery, OAuth, and synchronous invocation wire handling

@@ -4,6 +4,31 @@ Prefer the newest **compatible stable** release, not prereleases or an untested
 major upgrade. `pyproject.toml` expresses supported ranges; `uv.lock` records the
 exact reproducible environment. Widening a range is not proof of compatibility.
 
+## Remote and execution dependency surfaces
+
+The default distribution has only HTTPX and Pydantic as direct dependencies.
+`evalsurge[server]` installs the existing REST/local Locust, MLflow, provider and
+Databricks SDK stack; `evalsurge[agents]` includes server plus both example frameworks.
+The agents extra refers to the server extra in project metadata, preserving the
+existing full-development sync/audit commands. Hatchling expands this self-reference
+to ordinary extra-marked requirements in built-wheel metadata.
+
+Remote imports defer local-only modules. Tests build and install a real wheel into
+a fresh base-only uv environment, assert that server distributions are absent,
+exercise SDK submit/wait and CLI run/doctor through controlled HTTP transports, and
+check the installed entry point and helpful missing-server errors. Run
+`uv run --no-sync python scripts/verify_remote_install.py --offline` after a full
+locked sync and build; CI includes this gate on every supported Python version.
+This is remote-install isolation, not a published-release install or live service test.
+
+For this October 7 packaging migration, official public-index resolution still
+failed with TCP connection refused, including an approved outside-sandbox retry.
+Only the editable project's dependency/extra metadata in `uv.lock` was migrated;
+all registry package versions, sources, artifact URLs, hashes, and dependency graphs
+were retained. `uv lock --check --offline --default-index https://pypi.org/simple`
+and full agents/dev locked offline sync accepted the migrated metadata. This is a
+verified metadata migration, not a fresh latest-compatible dependency resolution.
+
 ## Update workflow
 
 1. Verify published versions and migration guidance using official PyPI metadata

@@ -1,9 +1,10 @@
 # EvalSurge
 
-A local-first Python library and REST API for benchmarking hosted agents.
+A local-first Python library and REST API for benchmarking locally hosted HTTP
+agents and deployed Databricks Apps.
 
-- **Performance:** latency, time to first answer token, throughput, and errors.
-- **Evaluation:** suggested judges, brought MLflow judges, and per-criterion results.
+- **Performance:** latency, throughput, errors, and answer-text TTFT for supported SSE.
+- **Evaluation:** opt-in suggested judges, brought MLflow judges, and per-criterion results.
 - **Profiling:** request heatmaps and tool/model/memory waterfalls from correlated MLflow traces.
 
 **Local alpha:** Linux/macOS, single tenant, one active run. Not a shared production
@@ -87,8 +88,17 @@ Agents** with tools, memory, and tracing, see the
 
 ## Benchmark your agent
 
+Bring an already running HTTP agent, or have the operator register a Databricks
+App with an explicitly selected OAuth profile. The same `/v2/runs` request works
+for either target by changing `target.connection_id`; evaluation defaults to off.
+EvalSurge does not deploy your agent or execute an arbitrary Python callable.
+“Localhost” is relative to the load generator: your machine for `EvalSurge.local()`,
+the API host for remote SDK/REST submissions. Supported input/response contracts,
+two-target operator setup, and limitations are in [the target guide](docs/TARGETS.md).
+
 Replace `target.url` with your authorized supported HTTP endpoint and supply workload
-samples. Set `target.model` if required by its protocol.
+samples when using `/v1`; v2 instead selects the registered connection.
+Set `target.model` if required by the v1 protocol.
 
 - **Suggested judges:** configure a planner, omit `evaluation.scorers`, and review
   `POST /v1/evaluation-plans` before submitting its `plan_id`.
@@ -142,6 +152,21 @@ outcomes. `/v1/evaluation-plans` remains available for suggestion/review before
 running; v2 automatic mode plans within the run.
 
 See [v2 operator setup, Databricks Apps, remote SDK, and CLI](docs/V2_API.md).
+
+The base distribution (`evalsurge`) supports remote SDK/CLI use with only HTTPX
+and Pydantic as mandatory dependencies. Use `evalsurge[server]` for local benchmarks
+or the API, and `evalsurge[agents]` for the framework examples. The checkout
+quickstart above already includes server and framework dependencies.
+
+Databricks Apps use `/api/invocations` by default for current DurableAgentServer
+deployments. Existing MLflow AgentServer Apps select `mlflow-agent-server` for
+`/responses`. See the [bounded App validation guide](docs/DATABRICKS_APP_VALIDATION.md)
+before sending live traffic. Fixed message adapters require exactly one `query`
+or `messages` field; extra inference fields are rejected, never silently dropped.
+The October 7 native App check passed 500 measured requests at concurrency five
+and a separate tiny relevance/correctness check. See [the validation record](VALIDATION.md)
+for the retained preflight failure, fix, exact bounds and limitations; this is
+wiring evidence, not a sustainable-capacity or general-quality guarantee.
 
 ### Python API
 

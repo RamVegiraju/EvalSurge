@@ -71,12 +71,50 @@ async def test_input_snapshot_wait_timeout_and_safe_report(
         assert observed[0].evaluation.samples[0].inputs["query"] == "Can I refund?"
         assert observed[1].auth == "none"
         assert report.run.load_status == "skipped"
+        assert "judge-readiness" in report.profiling.notes[0]
+        assert "quality results" in report.profiling.notes[0]
+        assert owner.list_runs().items[0].url == f"/v1/runs/{identifier}"
         report.run.plan.notes.append("mutated")
         assert "mutated" not in owner.get_run(identifier).plan.notes
         assert owner.tasks == owner.runs == owner.cancellations == {}
     finally:
         release.set()
         await owner.close()
+
+
+async def test_mixed_history_keeps_versioned_links_after_snapshot_index_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Persisted v2 metadata discriminates paths without changing v1 history links."""
+
+    async def probe(*args: Any, **kwargs: Any) -> PreflightResult:
+        return PreflightResult(
+            status="failed", error={"code": "target_http_error", "message": "Failed"}
+        )
+
+    monkeypatch.setattr(coordinator, "run_preflight", probe)
+    owner = RunCoordinator(tmp_path)
+    await owner.open()
+    try:
+        legacy = await owner.submit(configuration())
+        await owner.tasks[legacy.id]
+        modern = await owner.submit(configuration(), defer_planning=True, evaluation_mode="off")
+        await owner.tasks[modern.id]
+    finally:
+        await owner.close()
+    # Summaries are rebuilt from authoritative snapshots, including older snapshots
+    # whose existing evaluation_mode was not previously copied into compact indexes.
+    recovered = RunCoordinator(tmp_path)
+    await recovered.open()
+    try:
+        links = {entry.id: entry.url for entry in recovered.list_runs().items}
+        assert links == {
+            legacy.id: f"/v1/runs/{legacy.id}",
+            modern.id: f"/v2/runs/{modern.id}",
+        }
+        assert recovered.get_run(UUID(legacy.id)).status == "failed"
+    finally:
+        await recovered.close()
 
 
 async def test_domain_bounds_and_binding_before_admission(tmp_path: Path) -> None:

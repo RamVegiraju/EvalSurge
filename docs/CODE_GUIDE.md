@@ -11,6 +11,13 @@ without global mutation. `settings.py` and `diagnostics.py` perform bounded stat
 inspection. `target_resolver.py` separates App identity/OAuth resolution from
 `adapters.py` invocation semantics. `evalsurge/remote.py` and `cli.py` own HTTP
 polling and command output; they do not create another load engine.
+Both local HTTP agents and registered Databricks Apps are implemented targets;
+[the target guide](TARGETS.md) maps their public/operator boundaries. A Runtime
+session identifier is ordering state, not proof of transcript or long-term memory.
+`evalsurge/facade.py` exposes remote access without server dependencies and defers
+local execution imports until explicitly requested. Package-level `Agent`,
+`Connection`, and `RunFailed` remain compatible lazy exports requiring the server
+extra; the public Pydantic models and HTTP client need only the base installation.
 
 ## Request-to-report flow
 
@@ -51,6 +58,7 @@ polling and command output; they do not create another load engine.
 | `api.py` | `authorize()` enforces inbound service access; HTTP handlers delegate to the coordinator and translate domain errors to the existing envelope. |
 | `coordinator.py` | `RunCoordinator.open()/close()` own storage and drain; `submit()` freezes and schedules; `_execute()` advances phases; reads, reports, wait, and cancellation share one lifecycle. |
 | `evalsurge/` | `Agent.http()` separates protocol and connection; `EvalSurge.local()/local_async()` expose run handles without starting a server or nesting event loops. |
+| `evalsurge/facade.py` | `EvalSurge.remote()` stays dependency-light; local factories and lazy exports verify the explicit server extra before loading the existing local implementation. |
 | `adapters.py` | Supported response decoders bound input and validate completion/answer/usage/trace IDs; JSON never fabricates TTFT. |
 | `models.py` | Request and response contracts reject unknown model fields and bound load and assessment counts. Nested workload metadata remains flexible. |
 | `connections.py` | `resolve_connection()` validates exact operator-owned destinations; `authentication()` returns a refreshable header source. Connection records contain credential references, not copied secrets. |
@@ -76,6 +84,7 @@ polling and command output; they do not create another load engine.
 | `docs_ui/` | Public Swagger shell and external initializer use pinned local vendor assets. `api.legacy_docs()` redirects `/redoc` without inheriting API-operation authorization. |
 | `openapi.py` | `install_schema()` installs a cached renderer that adds common header documentation and request examples. |
 | `scripts/export_openapi.py` | `main()` exports the public schema or verifies the committed snapshot with `--check`. |
+| `scripts/verify_remote_install.py` | Builds an isolated base-only dependency environment, installs the actual wheel, checks absent server distributions, and exercises remote SDK/CLI behavior plus missing-extra guidance without target traffic. |
 
 ## Contracts worth preserving
 
@@ -131,6 +140,13 @@ polling and command output; they do not create another load engine.
   discrimination with an intentionally incorrect answer; it is not a load test.
 - `scripts/validation/locust_databricks_e2e.py` checks the full bounded hosted integration.
   Both Databricks examples require an explicitly configured workspace and are opt-in.
+- `scripts/validation/databricks_app_smoke.py` is dry-run by default and resolves one
+  explicitly selected App/profile only with live/paid consent. Its performance-only
+  run retains failures and distinguishes the excluded probe from measured attempts.
+- `scripts/validation/databricks_app_quality.py` separately gates two measured
+  captures with authoritative refund facts, explicit relevance/correctness, a frozen
+  mini judge, and native local MLflow. Use it as a CLI process: the backend's tracking
+  selector is process-global even though operator configuration is task-local.
 - `examples/framework_agent.py` owns real compiled LangGraph and OpenAI Agent streaming,
   traced memory, synthetic tools/retrieval, provider clients, and their lifecycles.
   `demo_chat_options()` scopes verified model settings to the provider/model pair;

@@ -45,7 +45,7 @@ class Sample(Model):
     """One workload case and optional authoritative reference evidence."""
 
     inputs: dict[str, Any] = Field(
-        description="For http-json, the raw nonempty object sent as the POST body. For SSE adapters, query or a nonempty messages array.",
+        description="For http-json, the raw nonempty object sent as the POST body. For fixed message adapters, exactly one query or nonempty messages array; other top-level fields are rejected, never discarded.",
         examples=[{"query": "Can I refund?"}],
     )
     expectations: dict[str, Any] = Field(

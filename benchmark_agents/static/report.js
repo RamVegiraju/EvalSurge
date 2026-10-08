@@ -43,14 +43,14 @@ function metric(title, value, unit, detail) {
 }
 
 function scorerName(recommendation) {
-  const reference = report.run.plan.registered_scorers?.find(candidate => `registered:${candidate.alias}` === recommendation.scorer);
+  const reference = report.run.plan?.registered_scorers?.find(candidate => `registered:${candidate.alias}` === recommendation.scorer);
   return reference?.name ?? humanize(recommendation.scorer);
 }
 
 function scorerSource(recommendation, result) {
-  const reference = report.run.plan.registered_scorers?.find(candidate => `registered:${candidate.alias}` === recommendation.scorer);
+  const reference = report.run.plan?.registered_scorers?.find(candidate => `registered:${candidate.alias}` === recommendation.scorer);
   if (reference) return `Registered MLflow · v${reference.version}`;
-  return `MLflow catalog · ${result?.version ?? report.run.plan.rubric_version}`;
+  return `MLflow catalog · ${result?.version ?? report.run.plan?.rubric_version ?? "not recorded"}`;
 }
 
 function drawMLflowLinks() {
@@ -81,9 +81,15 @@ function drawMLflowLinks() {
 
 function drawSuggestions() {
   const plan = report.run.plan;
-  document.getElementById("plan-source").textContent = `${plan.source === "llm" ? "LLM-suggested" : "Explicit selection"} · frozen plan ${plan.id.slice(0, 8)}`;
   const container = document.getElementById("suggestions");
   container.replaceChildren();
+  if (!plan) {
+    document.getElementById("plan-source").textContent = "Planning did not produce a frozen plan";
+    container.append(element("p", "No frozen evaluation plan is available. No quality criteria or target measurements are implied.", "muted"));
+    document.getElementById("plan-note").textContent = "Planning must complete before preflight or measured load.";
+    return;
+  }
+  document.getElementById("plan-source").textContent = `${plan.source === "llm" ? "LLM-suggested" : "Explicit selection"} · frozen plan ${plan.id.slice(0, 8)}`;
   for (const recommendation of plan.recommendations) {
     const card = element("article", undefined, "card suggestion");
     const heading = element("div", undefined, "section-heading");
@@ -131,6 +137,12 @@ function failureDiagnostic(error, phase = "evaluation") {
 
 function runFailures(run) {
   const failures = [];
+  if (run.planning_error) failures.push({
+    title: "Planning failed — load did not start",
+    status: run.phases?.planning ?? "failed",
+    error: run.planning_error,
+    phase: "planning",
+  });
   const preflight = run.evaluation_preflight;
   if (preflight?.status === "failed" || preflight?.error) failures.push({
     title: preflight.status === "failed" ? "Evaluation preflight failed — load never started" :
@@ -141,12 +153,12 @@ function runFailures(run) {
   if (run.load_error) failures.push({
     title: run.load_error.code === "worker_start_failed" ? "Load worker could not start" :
       run.load_error.code === "worker_timeout" ? "Load worker timed out" : "Load worker failed",
-    status: run.load_status,
+    status: run.load_status ?? run.phases?.load,
     error: run.load_error,
     phase: "load",
   });
   const evaluation = run.evaluation ?? {};
-  const status = evaluation.status ?? run.evaluation_status;
+  const status = evaluation.status ?? run.evaluation_status ?? run.phases?.evaluation;
   if (evaluation.error || evaluation.error_type || status === "failed") failures.push({
     title: "Evaluation failed",
     status,
@@ -166,8 +178,8 @@ function drawJudges() {
   const run = report.run;
   const evaluation = run.evaluation ?? {};
   const results = evaluation.results ?? [];
-  const recommendations = run.plan.recommendations;
-  const status = evaluation.status ?? run.evaluation_status;
+  const recommendations = run.plan?.recommendations ?? [];
+  const status = evaluation.status ?? run.evaluation_status ?? run.phases?.evaluation;
   document.getElementById("evaluation-status").replaceChildren(badge(status));
   const selectedAnswers = new Set(results.flatMap(result => result.request_ids ?? [])).size;
   const selectionsKnown = results.some(result => Array.isArray(result.request_ids));
@@ -225,8 +237,12 @@ function drawJudges() {
   }
   table.append(head, body);
   const container = document.getElementById("judges");
-  container.replaceChildren(recommendations.length ? table : element("p", "No evaluation was requested. Performance measurements remain available.", "muted"));
-  document.getElementById("sampling-note").textContent = `Sampling: ${run.plan.sampling_policy ?? "not recorded"} · at most ${run.plan.max_scored_requests ?? "—"} answers per criterion. Rates describe scored samples only, not the full workload. Catalog judge model: ${run.plan.judge_model ?? "not configured"}; registered judges use operator configuration.`;
+  container.replaceChildren(recommendations.length ? table : element("p", run.plan ?
+    "No evaluation was requested. Performance measurements remain available." :
+    "Evaluation did not start; no quality verdict is available.", "muted"));
+  document.getElementById("sampling-note").textContent = run.plan ?
+    `Sampling: ${run.plan.sampling_policy ?? "not recorded"} · at most ${run.plan.max_scored_requests ?? "—"} answers per criterion. Rates describe scored samples only, not the full workload. Catalog judge model: ${run.plan.judge_model ?? "not configured"}; registered judges use operator configuration.` :
+    "No plan or sampling policy was frozen. No target measurements or judge calls were started.";
   drawAssessmentDetails(results);
 }
 
@@ -379,12 +395,13 @@ function drawHeatmap() {
 
 function drawPerformance() {
   const run = report.run;
-  const timing = run.metrics.timing_successful_only ?? {};
+  const metrics = run.metrics ?? {};
+  const timing = metrics.timing_successful_only ?? {};
   document.getElementById("metrics").replaceChildren(
-    metric("Successful throughput", number(run.metrics.successful_tps, 2), "req/s", "Includes ramp-up and drain; not sustainable capacity"),
+    metric("Successful throughput", number(metrics.successful_tps, 2), "req/s", "Includes ramp-up and drain; not sustainable capacity"),
     metric("End-to-end latency · p95", number(timing.latency_ms?.p95), "ms", "Successful attempts only"),
     metric("Answer-text TTFT · p95", number(timing.ttft_ms?.p95), "ms", "First nonempty answer delta at this client"),
-    metric("Request error rate", percent(run.metrics.error_rate), "", `${run.metrics.successful_requests ?? 0} successful / ${run.metrics.requests ?? 0} attempts`)
+    metric("Request error rate", percent(metrics.error_rate), "", `${metrics.successful_requests ?? 0} successful / ${metrics.requests ?? 0} attempts`)
   );
   document.getElementById("coverage").textContent = `Trace coverage ${percent(report.profiling.coverage)}`;
   const anatomy = document.getElementById("anatomy");
@@ -420,18 +437,21 @@ function drawPerformance() {
 function render() {
   const run = report.run;
   const config = run.config;
-  document.getElementById("title").textContent = config.evaluation.agent_manifest?.name ?? "Hosted agent benchmark";
-  document.getElementById("subtitle").textContent = config.evaluation.description;
+  document.getElementById("title").textContent = config?.evaluation.agent_manifest?.name ?? run.name ?? "Hosted agent benchmark";
+  document.getElementById("subtitle").textContent = config?.evaluation.description ?? "Run lifecycle and safe failure evidence";
   document.getElementById("status").replaceChildren(badge(run.status));
   const context = document.getElementById("context");
   context.replaceChildren();
+  const phases = run.phases;
   const entries = [
+    ...(config ? [
     ["Target", `${config.target.framework ?? "Endpoint only"} · ${config.target.url}`],
-    ["Workload", `${config.evaluation.samples.length} cases · ${run.metrics.requests ?? 0} attempts`],
+    ["Workload", `${config.evaluation.samples.length} cases · ${run.metrics?.requests ?? 0} attempts`],
     ["Load", `${config.load.concurrency} closed-loop users · one load level`],
+    ] : [["Planning", humanize(phases?.planning ?? "not_run")]]),
     ["Inference preflight", humanize(run.preflight?.status ?? "not_run")],
     ["Evaluation preflight", humanize(run.evaluation_preflight?.status ?? "not_run")],
-    ["Phase outcomes", `Load: ${run.load_status ?? "unknown"} · traces: ${run.profiling_status ?? "unknown"} · eval: ${run.evaluation_status}`],
+    ["Phase outcomes", `Load: ${run.load_status ?? phases?.load ?? "unknown"} · traces: ${run.profiling_status ?? phases?.profiling ?? "unknown"} · eval: ${run.evaluation_status ?? phases?.evaluation ?? "unknown"}`],
   ];
   for (const [label, value] of entries) {
     const block = element("div");
@@ -464,7 +484,7 @@ function render() {
   drawJudges();
   drawPerformance();
   drawHeatmap();
-  const notes = [...report.profiling.notes, ...run.plan.notes, `Trace gaps: ${JSON.stringify(report.profiling.gaps)}. Run ID: ${run.id}.`];
+  const notes = [...report.profiling.notes, ...(run.plan?.notes ?? []), `Trace gaps: ${JSON.stringify(report.profiling.gaps)}. Run ID: ${run.id}.`];
   document.getElementById("notes").replaceChildren(...notes.map(note => element("li", note)));
   document.getElementById("report").hidden = false;
 }
@@ -492,8 +512,16 @@ async function load() {
   try {
     const key = document.getElementById("api-key").value;
     const url = new URL(`../v1/runs/${encodeURIComponent(runId)}/report?offset=${offset}&limit=25`, location.href);
-    const response = await fetch(url.pathname + url.search, {headers: key ? {"X-API-Key": key} : {}, cache: "no-store", credentials: "same-origin"});
-    const data = await response.json();
+    const options = {headers: key ? {"X-API-Key": key} : {}, cache: "no-store", credentials: "same-origin"};
+    let response = await fetch(url.pathname + url.search, options);
+    let data = await response.json();
+    // A v1 report requires a frozen plan; v2 preserves failures before that plan.
+    // Both paths are locally constructed, same-origin reads, never server links.
+    if (!response.ok && response.status === 409 && data.error?.code === "http_409") {
+      const fallback = new URL(`../v2/runs/${encodeURIComponent(runId)}/report?offset=${offset}&limit=25`, location.href);
+      response = await fetch(fallback.pathname + fallback.search, options);
+      data = await response.json();
+    }
     if (!response.ok) throw new Error(data.error?.message ?? `HTTP ${response.status}`);
     report = data;
     render();

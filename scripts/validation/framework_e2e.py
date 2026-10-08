@@ -65,8 +65,10 @@ async def validate(
 
     Live mode requires an explicitly chosen profile. It sends one inference preflight
     plus two measured synthetic requests per selected framework at concurrency two,
-    one planner call per framework, and at most one captured answer per selected
-    catalog scorer. Model calls have no provider
+    one planner call per framework, one readiness assessment on the captured probe
+    per selected criterion, and at most one measured capture per catalog scorer.
+    These are logical assessment counts, not a dollar or provider-attempt quota.
+    Model calls have no provider
     retries in the demos; planning/judging use their documented bounded retries.
     All traces and reports remain in the selected local artifact directory.
     Optional planner/judge overrides keep role capabilities explicit; they do not

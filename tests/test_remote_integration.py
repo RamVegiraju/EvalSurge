@@ -4,6 +4,7 @@ import asyncio
 import configparser
 import json
 import os
+import threading
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,7 @@ from benchmark_agents import coordinator
 from benchmark_agents.api import create_app
 from benchmark_agents.models import Evaluation, Plan, RunReport, RunResponse
 from evalsurge.cli import main
-from evalsurge.remote import RemoteClient, RemoteUnauthorizedError
+from evalsurge.remote import RemoteClient, RemoteRunFailed, RemoteUnauthorizedError
 
 SECRET = "synthetic-operator-service-key"
 
@@ -69,6 +70,46 @@ def client_factory(http: TestClient) -> Any:
         return RemoteClient(*args, **kwargs, http_client=http)
 
     return factory
+
+
+def test_sdk_cancel_accepts_actual_api_acknowledgment_and_waits_for_terminal_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cancellation acceptance is not itself the terminal cancelled lifecycle."""
+    clear_operator_environment(monkeypatch)
+    path = operator_file(tmp_path / "operator", url="http://127.0.0.1:9/no-traffic")
+    entered, release = threading.Event(), threading.Event()
+    original = coordinator.create_plan
+
+    async def paused(evaluation: Evaluation) -> Plan:
+        entered.set()
+        await asyncio.to_thread(release.wait)
+        return await original(evaluation)
+
+    async def forbidden(*args: Any, **kwargs: Any) -> None:
+        pytest.fail("A cancelled planning run must not invoke the target")
+
+    monkeypatch.setattr(coordinator, "create_plan", paused)
+    monkeypatch.setattr(coordinator, "run_preflight", forbidden)
+    app = create_app(config_path=path)
+    with (
+        TestClient(app, client=("127.0.0.1", 50000)) as http,
+        RemoteClient("http://127.0.0.1", api_key=SECRET, http_client=http) as sdk,
+    ):
+        try:
+            handle = sdk.start(request_body())
+            assert entered.wait(timeout=2)
+            acknowledgment = handle.cancel()
+            assert acknowledgment["id"] == str(handle.id)
+            assert acknowledgment["status"] == "cancellation_requested"
+            assert handle.status()["status"] == "planning"
+        finally:
+            release.set()
+        with pytest.raises(RemoteRunFailed) as failure:
+            handle.wait(timeout=5)
+        assert failure.value.report["run"]["status"] == "cancelled"
+        assert failure.value.report["run"]["phases"]["inference"] == "not_run"
+        assert SECRET not in str(failure.value)
 
 
 def test_cli_doctor_reads_toml_capabilities_without_initializing_providers(

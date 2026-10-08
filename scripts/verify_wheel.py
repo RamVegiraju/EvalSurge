@@ -6,6 +6,7 @@ from zipfile import ZipFile
 REQUIRED_FILES = {
     "evalsurge/__init__.py",
     "evalsurge/client.py",
+    "evalsurge/facade.py",
     "evalsurge/remote.py",
     "evalsurge/cli.py",
     "benchmark_agents/__init__.py",

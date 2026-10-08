@@ -2,25 +2,47 @@
 
 Provider independence is a boundary, not a promise that every API accepts the
 same parameters. A hosted agent owns its model, tools, memory, and provider client.
-EvalSurge observes that agent through a documented streaming contract.
+EvalSurge observes that agent through a documented streaming or synchronous JSON contract.
 
 ## Current support
 
 | Boundary | Supported contract | What this does not imply |
 | --- | --- | --- |
-| Hosted target | `openai-chat` and `mlflow-agent-server` streaming adapters; any underlying model/provider | Native Anthropic/Gemini request APIs or automatic remote instrumentation |
+| Hosted target | `openai-chat` and `mlflow-agent-server` streaming; synchronous `databricks-agent-runtime`; explicit `http-json`; any underlying model/provider | Native Anthropic/Gemini request APIs, arbitrary agent envelopes, or automatic remote instrumentation |
 | Planner | Operator-configured Databricks or OpenAI Chat Completions with JSON-object output | Arbitrary providers, JSON-schema support, or universal model compatibility |
 | Catalog judges | Direct SDK-authenticated Databricks Chat Completions; frozen model/profile/host and budgets | Provider-independent catalog judge transport |
 | Brought MLflow judges | Operator-allowlisted, exact-version native scorers and their provider configuration | Uploaded Python, caller-selected stores/credentials, or uniform transport budgets |
 | Synthetic demos | Fixture responses or explicitly selected Databricks endpoint; real frameworks | A general provider gateway or paid automatic capability probing |
 
 Locust never adds reasoning, tools, temperature, or token caps to the hosted agent
-request. Extra `samples.inputs` fields are evaluation metadata, not forwarded model
-settings. The `openai-chat` adapter requests streamed usage by default. Set
+request. Fixed message adapters require exactly one `query` or `messages` input;
+extra top-level fields are rejected, not retained as evaluation metadata or silently
+dropped. Evaluation evidence belongs in `expectations` (v1/Python) or `reference`
+(v2). `http-json` sends its raw body under a separate explicit response contract.
+The `openai-chat` adapter requests streamed usage by default. Set
 `target.request_usage=false` to omit `stream_options` for incompatible endpoints.
 Missing token usage remains null with a coverage fraction, not zero.
 
 ## Verified demo preset
+
+The current native App sample has a different contract from the framework demos
+below. Its October 7 check used `system.ai.gpt-oss-120b` via the MLflow Responses
+route and the actual `OpenAIResponsesModel`/`Runner.run`. The first MLflow Chat
+attempt failed because reasoning/text content blocks were incompatible with the
+non-streaming chat converter. The failure is retained; no converter patch or
+runtime fallback was added. Model-service metadata supported MLflow Chat/Responses,
+not the native OpenAI gateway route. The App still exposes `/api/invocations`;
+public agent protocol and internal model API are independent.
+
+Performance-only needs just the target's own model. The separate tiny quality
+check explicitly chose `databricks-gpt-5-4-mini` for relevance/correctness and used
+authoritative references; it used no planner. Automatic mode additionally needs
+an operator-configured compatible planner, which may share the judge endpoint
+but remains a separately frozen role. No omitted scorer policy enables paid calls
+by default on v2 or local Python. See [target setup](TARGETS.md) and
+[App validation](DATABRICKS_APP_VALIDATION.md) for exact boundaries.
+
+### Earlier framework demo preset — October 4
 
 On October 4, 2026, the selected workspace's `databricks-gpt-5-4-mini` rejected
 function tools with `reasoning_effort="low"` on Chat Completions. Its error required
@@ -99,7 +121,7 @@ default remains `--model`. They are not fallbacks after a failed provider call.
 These recommendations follow the [Agents SDK's provider integration and feature
 compatibility guidance](https://openai.github.io/openai-agents-python/models/).
 The installed SDK and LangChain request builders are also checked by wire-level
-regressions. Public upstream documentation can be newer than the mirror-backed
+regressions. Public upstream documentation can be newer than the compatible locked
 versions in the lock; consult [dependency limitations](DEPENDENCIES.md).
 
 See [ADR 0002](adr/0002-model-compatibility-boundaries.md) for the decision,

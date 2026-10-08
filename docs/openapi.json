@@ -260,6 +260,7 @@
         "properties": {
           "input": {
             "additionalProperties": true,
+            "description": "For fixed message protocols, exactly one nonempty query or messages array; extra top-level inference fields are rejected. For http-json, the raw nonempty POST body. Evaluation evidence belongs in reference.",
             "title": "Input",
             "type": "object"
           },
@@ -2127,7 +2128,7 @@
           },
           "inputs": {
             "additionalProperties": true,
-            "description": "For http-json, the raw nonempty object sent as the POST body. For SSE adapters, query or a nonempty messages array.",
+            "description": "For http-json, the raw nonempty object sent as the POST body. For fixed message adapters, exactly one query or nonempty messages array; other top-level fields are rejected, never discarded.",
             "examples": [
               {
                 "query": "Can I refund?"
@@ -2491,6 +2492,22 @@
             "title": "Code",
             "type": "string"
           },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ValidationIssue"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "At most 20 sanitized validation issues; arbitrary input keys are replaced by <extra>.",
+            "title": "Errors"
+          },
           "guidance": {
             "title": "Guidance",
             "type": "string"
@@ -2535,6 +2552,44 @@
           "error"
         ],
         "title": "V2ErrorResponse",
+        "type": "object"
+      },
+      "ValidationIssue": {
+        "additionalProperties": false,
+        "description": "Bounded schema guidance with public field names, never values or arbitrary keys.",
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "title": "Code",
+            "type": "string"
+          },
+          "location": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "maxItems": 12,
+            "title": "Location",
+            "type": "array"
+          },
+          "message": {
+            "maxLength": 200,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "location",
+          "code",
+          "message"
+        ],
+        "title": "ValidationIssue",
         "type": "object"
       }
     },

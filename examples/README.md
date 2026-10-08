@@ -4,6 +4,10 @@ Start here for the public Python API. These scripts call an existing agent;
 they do not start an EvalSurge server, implement polling, or manage credentials.
 Only benchmark endpoints and agent actions you are authorized to exercise.
 
+These examples use runner-local HTTP agents. Databricks Apps are also supported
+through registered targets in `/v2`; see [the target guide](../docs/TARGETS.md).
+The local Python interface has no App-specific convenience factory.
+
 | Example | Purpose |
 | --- | --- |
 | [python_benchmark.py](python_benchmark.py) | Credential-free mock quickstart: performance-only load and a JSON report. |

@@ -1,6 +1,7 @@
 """Real framework runners with synthetic tools, isolated memory, and MLflow tracing.
 
-Run with ``uv run --extra agents python -m examples.framework_agent``. By default
+After the locked agents/dev sync, run with
+``uv run --no-sync python -m examples.framework_agent``. By default
 only the provider HTTP response is deterministic; LangGraph, OpenAI Agents,
 streaming, memory, and tracing are real. Set EVALSURGE_DEMO_LIVE=true to call the
 operator-selected Databricks model. Tools contain synthetic policy data only.

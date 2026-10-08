@@ -38,6 +38,76 @@ api_key = APIKeyHeader(name="X-API-Key", auto_error=False)
 logger = logging.getLogger(__name__)
 
 
+def sanitized_validation_issues(error: RequestValidationError) -> list[dict[str, Any]]:
+    """Reduce schema errors to fixed public guidance without values or exception text.
+
+    Args:
+        error: FastAPI validation failure; its inputs/context remain protected.
+
+    Returns:
+        At most 20 issues, each with at most 12 public path components. Unknown
+        keys are replaced by ``<extra>``; numeric constraint metadata is bounded.
+        Custom-validator messages are disclosed only by exact fixed allowlist.
+    """
+    from .models import Load
+    from .v2_models import Case, EvaluationPolicy, RunCreate, TargetReference
+
+    fields = {"body", "query", "path", "header", "run_id", "offset", "limit", "idempotency-key"}
+    for model in (Load, Case, EvaluationPolicy, RunCreate, TargetReference):
+        fields.update(model.model_fields)
+    fixed_messages = {
+        "Explicit evaluation requires scorer IDs",
+        "Scorer IDs require explicit evaluation",
+        "Scorer IDs must be unique",
+        "Scorer IDs exceed the supported bounds",
+    }
+    messages = {
+        "missing": ("required_field", "Field is required"),
+        "extra_forbidden": ("unsupported_field", "Field is not supported"),
+        "literal_error": ("invalid_choice", "Use one of the documented allowed values"),
+        "string_pattern_mismatch": ("invalid_format", "Use the documented field format"),
+        "uuid_parsing": ("invalid_format", "Must be a valid UUID"),
+        "json_invalid": ("invalid_json", "Request body must be valid JSON"),
+    }
+    bounds = {
+        "greater_than_equal": ("ge", "Must be greater than or equal to"),
+        "less_than_equal": ("le", "Must be less than or equal to"),
+        "greater_than": ("gt", "Must be greater than"),
+        "less_than": ("lt", "Must be less than"),
+        "string_too_short": ("min_length", "Must contain at least"),
+        "string_too_long": ("max_length", "Must contain at most"),
+        "too_short": ("min_length", "Must contain at least"),
+        "too_long": ("max_length", "Must contain at most"),
+    }
+    issues = []
+    for failure in error.errors()[:20]:
+        location = [
+            part
+            if (type(part) is int and 0 <= part <= 8_000_000)
+            or (isinstance(part, str) and part in fields)
+            else "<extra>"
+            for part in failure.get("loc", ())[:12]
+        ]
+        kind = failure.get("type", "")
+        code, message = messages.get(kind, ("invalid_value", "Field has an invalid value"))
+        if kind.endswith(("_type", "_parsing")) and kind not in messages:
+            code, message = "invalid_type", "Use the documented field type"
+        if kind in bounds:
+            key, prefix = bounds[kind]
+            bound = failure.get("ctx", {}).get(key)
+            if type(bound) in {int, float} and 0 <= bound <= 8_000_000:
+                code, message = "out_of_bounds", f"{prefix} {bound}"
+                if "length" in key:
+                    message += " characters" if kind.startswith("string_") else " items"
+        if kind == "value_error":
+            for fixed in fixed_messages:
+                if failure.get("msg") == f"Value error, {fixed}":
+                    message = fixed
+                    break
+        issues.append({"location": location, "code": code, "message": message})
+    return issues
+
+
 async def authorize(request: Request, key: Annotated[str | None, Depends(api_key)]) -> None:
     """Enforce the single-tenant service's inbound access policy.
 
@@ -226,13 +296,17 @@ def create_app(artifact_dir: Path | None = None, *, config_path: Path | None = N
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
         """Return validation locations/messages without submitted input values."""
-        message = (
-            "Invalid request fields"
-            if request.url.path.startswith("/v2/")
-            else "; ".join(
-                ".".join(str(part) for part in failure["loc"]) + ": " + failure["msg"]
-                for failure in error.errors()
+        if request.url.path.startswith("/v2/"):
+            body = error_body(request, "validation_error", "Invalid request fields")
+            body["error"]["errors"] = sanitized_validation_issues(error)
+            body["error"]["guidance"] = (
+                "Correct the listed fields using the documented schema and submit again. "
+                "At most 20 issues are shown; unknown keys are redacted."
             )
+            return JSONResponse(body, status_code=422)
+        message = "; ".join(
+            ".".join(str(part) for part in failure["loc"]) + ": " + failure["msg"]
+            for failure in error.errors()
         )
         return JSONResponse(error_body(request, "validation_error", message), status_code=422)
 

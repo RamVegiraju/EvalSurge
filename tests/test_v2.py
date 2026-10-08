@@ -182,6 +182,31 @@ def test_planning_failure_report_and_restart_idempotency(
         assert report.json()["run"]["status"] == "failed"
         assert report.json()["run"]["planning_error"]["code"] == "planning_failed"
         assert "synthetic-secret" not in report.text
+        history = client.get("/v1/runs").json()
+        entry = next(item for item in history["items"] if item["id"] == identifier)
+        assert entry["url"] == f"/v2/runs/{identifier}"
+        assert client.get(entry["url"]).status_code == 200
+        from tests.test_report_ui import render
+
+        output = render(
+            report.json(),
+            responses=[
+                {
+                    "ok": False,
+                    "status": 409,
+                    "body": client.get(f"/v1/runs/{identifier}/report").json(),
+                },
+                {"ok": True, "body": report.json()},
+            ],
+        )
+        assert [call["url"] for call in output["calls"]] == [
+            f"/v1/runs/{identifier}/report?offset=0&limit=25",
+            f"/v2/runs/{identifier}/report?offset=0&limit=25",
+        ]
+        assert not output["nodes"]["report"]["hidden"]
+        assert "Planning failed" in output["nodes"]["context"]["text"]
+        assert "No frozen evaluation plan" in output["nodes"]["suggestions"]["text"]
+        assert "synthetic-secret" not in json.dumps(output)
         body["name"] = "different"
         assert (
             client.post("/v2/runs", json=body, headers={"Idempotency-Key": "failed"}).status_code
@@ -218,6 +243,77 @@ def test_off_rejects_ignored_scorers_and_undeclared_target_fields() -> None:
     body["target"]["profile"] = "user-profile"
     with pytest.raises(ValueError):
         RunCreate.model_validate(body)
+
+
+def test_v2_validation_reports_safe_fields_and_bounds_without_submitted_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    register(monkeypatch, "http://127.0.0.1:9/no-traffic")
+    body = request_body()
+    body["load"]["concurrency"] = 0
+    body["load"]["duration_seconds"] = "synthetic-secret-invalid-duration"
+    body["target"]["synthetic-secret-unknown-field"] = "private-token"
+    with TestClient(create_app(tmp_path), client=("127.0.0.1", 50000)) as client:
+        response = client.post("/v2/runs", json=body)
+        assert response.status_code == 422
+        detail = response.json()["error"]
+        assert detail["code"] == "invalid_request"
+        assert detail["retryable"] is False
+        errors = {tuple(item["location"]): item for item in detail["errors"]}
+        assert errors[("body", "load", "concurrency")]["message"] == (
+            "Must be greater than or equal to 1"
+        )
+        assert errors[("body", "load", "duration_seconds")]["code"] == "invalid_type"
+        assert errors[("body", "target", "<extra>")]["code"] == "unsupported_field"
+        assert "synthetic-secret" not in response.text
+        assert "private-token" not in response.text
+        assert response.headers["Cache-Control"] == "no-store"
+        many = request_body()
+        many["cases"] = [{"input": []} for _ in range(100)]
+        bounded = client.post("/v2/runs", json=many).json()["error"]
+        assert len(bounded["errors"]) == 20
+        assert all(len(item["location"]) <= 12 for item in bounded["errors"])
+
+
+def test_v2_validation_preserves_only_fixed_model_validator_guidance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    register(monkeypatch, "http://127.0.0.1:9/no-traffic")
+    body = request_body("explicit")
+    with TestClient(create_app(tmp_path), client=("127.0.0.1", 50000)) as client:
+        detail = client.post("/v2/runs", json=body).json()["error"]
+        assert detail["errors"][0]["location"] == ["body", "evaluation"]
+        assert detail["errors"][0]["message"] == "Explicit evaluation requires scorer IDs"
+
+
+def test_v2_validation_never_serializes_custom_exception_or_arbitrary_context(
+    tmp_path: Path,
+) -> None:
+    """Unrecognized validators must not export their error message/context/keys."""
+    from fastapi.exceptions import RequestValidationError
+
+    app = create_app(tmp_path)
+
+    @app.get("/v2/synthetic-invalid", include_in_schema=False)
+    async def invalid() -> None:
+        raise RequestValidationError(
+            [
+                {
+                    "type": "value_error",
+                    "loc": ("body", "cases", 0, "input", "synthetic-secret-key"),
+                    "msg": "Value error, synthetic-secret-provider-exception",
+                    "input": "synthetic-secret-submitted-value",
+                    "ctx": {"error": RuntimeError("synthetic-secret-context")},
+                }
+            ]
+        )
+
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
+        response = client.get("/v2/synthetic-invalid")
+        issue = response.json()["error"]["errors"][0]
+        assert issue["location"] == ["body", "cases", 0, "input", "<extra>"]
+        assert issue["message"] == "Field has an invalid value"
+        assert "synthetic-secret" not in response.text
 
 
 async def test_close_drains_deferred_planning_without_lock_deadlock(

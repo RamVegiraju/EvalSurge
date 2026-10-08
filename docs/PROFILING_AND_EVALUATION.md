@@ -13,6 +13,11 @@ MLflow traces. The demo framework integrations are real OSS examples, not remote
 auto-instrumentation. Their in-memory/checkpoint sessions are request-isolated and
 do not implement production durable multi-turn memory.
 
+This applies equally to runner-local HTTP agents and Databricks App targets;
+[supported targets](TARGETS.md) documents their different discovery/authentication
+but shared inference/load/evaluation path. An App Runtime Store/session ID does
+not supply agent memory or MLflow traces.
+
 ## Correlation
 
 EvalSurge forwards `X-Benchmark-Run-ID` and `X-Benchmark-Request-ID`. Inside the agent's
@@ -38,9 +43,14 @@ The metadata event starts first-event timing, **not answer-text TTFT**. Keep the
 alive through streaming, tools, and memory writes. Drain OpenAI Agent `stream_events()`
 until it finishes; final text alone is not runner completion.
 
-Enable `mlflow.langchain.autolog()` for LangGraph and
-`mlflow.openai.autolog(disable_openai_agent_tracer=True)` for OpenAI Agents. The latter
-replaces native export processors; configure this deliberately in an owned process.
+The shipped LangGraph demo enables `mlflow.langchain.autolog()`. Its OpenAI Agents
+counterpart wraps the public model-stream hook in one explicit MLflow span and
+disables both OpenAI autologging and native Agents trace export. This avoids duplicate
+instrumentation and a provider-null-ID reconstruction failure. Do not stack tracing
+strategies or assume a different provider works without checking actual traces.
+MLflow's native Agents/OpenAI integrations are alternatives to review deliberately
+in an owned agent process, not automatically enabled by EvalSurge. See
+[the verified model/instrumentation boundaries](MODEL_COMPATIBILITY.md).
 Mark custom memory I/O spans with `evalsurge.category=memory`. Retrieval spans should
 record actual documents for trace-aware judges, not only a count.
 
@@ -145,12 +155,17 @@ Rationales may quote private evaluation content; protect reports and do not trea
 these explanations as calibrated truth or content-free profiling. Historical
 reports without details are not silently backfilled or re-judged.
 
-The GPT-5.4 mini demo uses `reasoning_effort="none"` for tool-enabled Chat
-Completions. Its endpoint rejects reasoning-enabled function tools on that wire
+The October 4 selected-workspace GPT-5.4 mini demo uses `reasoning_effort="none"`
+for tool-enabled Chat Completions. That endpoint rejected reasoning-enabled function
+tools on that wire
 API; the LangGraph demo's non-tool model call can use low reasoning. Validate model
 capabilities before changing these settings; do not retry incompatible payloads.
 
 ## Planning and approval
+
+This section describes v1 plan inspection/reuse. V2 and local Python default
+evaluation to off; v2 automatic mode explicitly opts into planning inside the run.
+See [the v2 policy](V2_API.md#submit-and-retrieve-a-benchmark).
 
 `POST /v1/evaluation-plans` accepts an objective and optional `agent_manifest`. The
 LLM sees bounded previews, capabilities, and eligible aliases. Deterministic code

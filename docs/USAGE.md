@@ -6,6 +6,26 @@ The public Python import and distribution are `evalsurge`; existing
 `benchmark_agents` modules remain supported. See [local Python usage](PYTHON_API.md)
 for benchmarking without starting the REST server and the supported JSON contract.
 
+You can bring a locally hosted HTTP agent or a deployed Databricks App. See
+[supported targets and the shared v2 request](TARGETS.md) for operator registration,
+runner-relative localhost, protocol/input limits, and current live evidence.
+
+## Installation surfaces
+
+For a remote service client, install `evalsurge` (`uv add evalsurge` in an agent
+project). It requires HTTPX and Pydantic only; `EvalSurge.remote()`, `evalsurge run`,
+and remote `evalsurge doctor` do not load MLflow, Locust, or server/framework modules.
+The service host retains ownership of connections, load, and evaluation.
+
+For local benchmarking or hosting the API, use `uv add 'evalsurge[server]'`.
+For both example agent frameworks, use `uv add 'evalsurge[agents]'`; that extra also
+includes the server stack. Existing Python imports remain supported, but local
+factories and local-only exports explain the required extra in a base-only install.
+From this checkout, the full developer command remains
+`uv sync --locked --extra agents --group dev`. Installation does not configure
+credentials or authorize target traffic. See the [dependency gates](DEPENDENCIES.md)
+for release/index limitations.
+
 ## MLflow experiment links
 
 Reports link to the agent's authorized trace experiments and the actual experiment

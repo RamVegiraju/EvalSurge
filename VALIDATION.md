@@ -1,9 +1,489 @@
 # Validation — 0.2.0
 
-Validated locally on macOS/Python 3.12 on October 4–7, 2026. CI is configured for
+Validated locally on macOS/Python 3.12 on October 4–8, 2026. CI is configured for
 Linux/Python 3.11–3.14. Observed main jobs failed during private-mirror installation;
 there is no remote CI result for these local changes. Branch-protection
 settings have not been verified/enabled by this local work.
+
+## Documentation and source publication review — October 7–8, 2026
+
+Reviewed the first-party API/coordinator, models/settings/diagnostics, connection
+and App resolution, protocol adapters, sole Locust engine, persistence/recovery,
+planning/readiness/judging/profiling, local/remote SDK and CLI, report presentation,
+examples, validation helpers, packaging, and release checks. Stale-contract scans
+exclude vendored Swagger and historical schema-review fixtures. This is a focused
+source/contract review, not proof that all code is defect-free or a security audit.
+No additional live/paid agent or judge traffic was generated for this review.
+
+The README and target/API guides now explicitly support both an already running
+HTTP agent and an operator-registered Databricks App. They explain runner-relative
+localhost, lightweight versus server installs, strict message input envelopes,
+evaluation opt-in/model roles, current Runtime versus legacy MLflow protocols,
+session ordering versus memory, and live-evidence limits. New `docs/TARGETS.md`
+TOML/JSON examples validate through the actual settings, v2 translation, and
+protocol encoders without discovery or traffic. Relative navigation checked **27
+documents / 143 links**, with no missing destinations. Public documentation now
+omits exact selected workspace/profile/App URL and temporary-source identifiers;
+they remain in protected evidence. Historical failures, run IDs and metrics remain.
+
+Source review found a Runtime response-completion bug: a completed outer invocation
+and handler could hide an explicitly unfinished assistant message. Four new
+regressions (`in_progress`, `incomplete`, `failed`, null) failed before the fix,
+**4 failed in 0.13 seconds**. The decoder now rejects those states without publishing
+any partial answer; missing status remains compatible with normalized output and
+explicit completed messages have a positive control. Focused protocol verification
+passed **25 tests in 1.02 seconds**. ADR 0010/API review document the behavioral
+tightening. No polling, target retry, fallback, or altered timing is introduced.
+
+The initial target-guide test had one incorrect test assumption about a nonexistent
+`ConnectionSettings.invocation_path` property (**1 failed, 29 passed**). It was
+corrected to inspect the real declared protocol; documentation/configuration was
+not weakened. The corrected guide/protocol suite passed **30 tests in 4.31 seconds**.
+Ruff also identified one nested-context style error in the new regression, corrected
+before final lint. A stale report note now excludes probes/readiness from benchmark
+quality results, rather than incorrectly claiming the probe is never judged.
+Legacy manual model-serving helper docstrings now distinguish logical assessments
+from retry/provider/spend budgets and consent-gated App checks.
+
+The bare required sync command selected the ambient private index and refused to
+update the authentic public lock under `--locked`. Explicit public-index sync
+succeeded (**190 resolved, 182 checked**) without a graph upgrade. Subsequent
+commands use `--no-sync` against that verified agents/dev environment:
+
+```bash
+uv sync --locked --extra agents --group dev
+uv sync --locked --extra agents --group dev --default-index https://pypi.org/simple
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pytest -q \
+  --junitxml=artifacts/prepush-20261007/final-review-junit.xml
+uv run --no-sync python scripts/export_openapi.py --check
+uv run --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --no-sync python scripts/verify_wheel.py
+uv run --no-sync python scripts/verify_remote_install.py --offline
+uv run --no-sync python scripts/check_ci_prerequisites.py
+uv export --quiet --locked --default-index https://pypi.org/simple \
+  --extra agents --group dev --no-emit-project \
+  --output-file artifacts/prepush-20261007/final-review-audit-requirements.txt
+uv run --no-sync pip-audit --disable-pip --require-hashes --progress-spinner off \
+  --vulnerability-service osv \
+  --requirement artifacts/prepush-20261007/final-review-audit-requirements.txt
+git diff --check
+```
+
+Full suite checkpoint: **674 passed, no skips, 42 upstream warnings, 198.61 seconds**.
+The final publication rerun, including the corrected report-note regression,
+passed **674 tests, no skips, 42 warnings in 194.14 seconds** with
+`uv run --no-sync pytest -q --junitxml=artifacts/prepush-20261007/publication-junit.xml`.
+Final documentation also aligns the tracing guide with the shipped explicit Agents
+model-span strategy rather than recommending duplicate autologging, and clarifies
+the Runtime session boundary in ADR 0009. Lint/format, schema checks, rebuilt
+distributions, wheel assets and isolated-client verification passed again.
+After final documentation edits, `uv run --no-sync pytest -q tests/test_readme.py
+tests/test_validation_tools.py --tb=short` passed **13 tests, one upstream warning
+in 9.05 seconds**; final lint/format and staged whitespace checks also passed.
+Warnings concern MLflow's deprecated SQLAlchemy loader and positional pandas API.
+Ruff lint and formatting (**131 files**), OpenAPI equality/schema validation,
+sdist/wheel build, packaged asset checks, and an actual isolated base-only wheel
+SDK/CLI/missing-extra check passed. The isolated check installed eleven base
+dependencies plus EvalSurge, verified compatible installed metadata and absence of
+the server/load distributions; its expected VIRTUAL_ENV mismatch warning confirms
+it used the separate environment. Static CI provenance checked **189 registry
+packages**. The complete hashed agents/dev/build export had **no known OSV
+advisories**; hash presence is checked by OSV, artifact integrity by uv.
+
+This publishes the existing follow-up fixes plus the decoder regression and current
+documentation, not a new production release or agent deployment. API compatibility
+review preserves v1 envelopes, lazy local signatures with the server extra, and
+versioned history; intentional input/response tightening and packaging migration
+are documented. ADR/public-contract designated maintainer review remains pending.
+The official upstream version gaps in `docs/DEPENDENCIES.md` remain: no fresh
+latest-compatible resolution or dependency-version/provenance rewrite is claimed.
+Local verification is not evidence of the post-push Linux CI matrix. Private
+captures, JUnit/audit artifacts, profile configuration, and the temporary deployed
+sample source are excluded from the commit. Publication starts from `main` at
+`fc66f6a7dc4e6d3f74bcb3d26cf7453b1312fecd`, matching fetched `origin/main`;
+normal commit/push results are reported in the thread, not predicted here.
+
+## Native App redeployment and bounded live results — October 7, 2026
+
+The user explicitly authorized redeployment and the previously selected OAuth
+profile/workspace, one App instance with its required managed Runtime Store,
+concurrency five, and a few-minute bounded test. Exact selected profile/workspace
+identifiers remain in protected evidence; public examples below use placeholders.
+This section supersedes the pending/live-unavailable checkpoint below, without
+changing its historical results. No optional agent memory, transcript-history
+store, tracing experiment, tools or automatic recovery were enabled.
+
+### Deployment, retained failure and minimal correction
+
+Recreating the missing original App produced a new identity, but deployment
+correctly refused to reuse its earlier Runtime Store because the store did not
+belong to that App identity. No ownership guard was bypassed; the old store was
+not deleted or rebound. The newly created, undeployed original-name App
+`agent-bricks-test-eval-ram` was stopped and retained. A fresh-name deployment,
+`agent-bricks-test-eval-ram-v2`, succeeded with its own required Runtime Store.
+Its first immutable revision was `01f1c28d4eaf13ca9242b6f990c5f0b8`.
+
+The first intentional failure check confirmed one excluded failed probe and zero
+measured requests. The first real-model attempt then failed inference preflight
+with HTTP 500 before any measured load. Private App logs and an offline test
+reproduced `ResponseOutputText` receiving a list instead of text: the MLflow
+Chat Completions route returned structured reasoning/text content, while the
+non-streaming Agents chat converter required a string. This failed paid attempt
+is retained; it is not relabeled as a passing performance test.
+
+Official Unity Gateway quickstart and installed Databricks/OpenAI/Agents source
+were checked against actual model-service metadata retrieved with
+`databricks api get /api/2.1/unity-catalog/model-services/system.ai.gpt-oss-120b
+--profile <selected-profile>`. Supported API types were only
+`mlflow/v1/chat/completions` and `mlflow/v1/responses`. The SDK's
+`use_ai_gateway_native_api=True` option was therefore not used: SDK support alone
+does not establish that this model supports the native `openai/v1` route.
+
+The temporary native sample now uses the real `OpenAIResponsesModel` with
+`Runner.run` through `/ai-gateway/mlflow/v1/responses`. The public App contract
+remains synchronous `/api/invocations`. Model/prompt/load bounds are unchanged:
+`system.ai.gpt-oss-120b`, low reasoning, 512 maximum output tokens, one turn,
+30-second model HTTP timeout, zero model retries/redirects, no tools or session.
+Explicit `store=false` prevents provider-side response storage; the required
+Runtime Store still persists invocation requests/events/results. The supported
+SDK rejects failed/incomplete responses; sample guards also reject unfinished
+message items and empty/malformed final answers. Reasoning is not flattened into
+answers; no SDK converters were patched and no model/route fallback was added.
+
+The corrected sample was redeployed in place with:
+
+```bash
+uv tool run --from databricks-agentbricks==0.4.0 agentbricks \
+  --profile <selected-profile> \
+  deploy test-eval-ram-v2 \
+  --source <protected-sample-source> --instances 1
+uv run --no-sync python artifacts/native-app-redeploy-20261007/verify_deployment.py \
+  --record deployment-responses.json
+```
+
+Final revision: `01f1c28f4d441ee9bf6a2d61891edf74`, `SUCCEEDED` with traffic switched.
+App `RUNNING`, compute `ACTIVE`, one MEDIUM instance. The exact App URL remains
+in the protected deployment record rather than public documentation.
+Authenticated `/status` returned 200 with expected controls. Eleven checked
+runtime/config/documentation/test files matched the immutable deployed snapshot
+byte-for-byte. This verifies those files, not transitive deployed package versions:
+native deployment resolves dependencies without the developer's lockfile.
+The App was still running on the same revision after both successful checks.
+
+### Live checks and measurement boundaries
+
+All use the sole Locust engine from the operator's macOS machine, outside the App,
+with fresh invocation/session IDs, synchronous foreground JSON, no target retries,
+and new protected directories under `artifacts/native-app-redeploy-20261007/`.
+Commands below abbreviate only the exact selected profile and the synthetic prompt
+recorded in the protected configuration:
+
+```bash
+uv run --no-sync python -m scripts.validation.databricks_app_smoke \
+  --profile <selected-profile> --app-name agent-bricks-test-eval-ram-v2 \
+  --prompt '__evalsurge_fail_preflight__' --concurrency 5 \
+  --max-requests 2 --duration 10 --timeout 60 \
+  --artifact-dir artifacts/native-app-redeploy-20261007/fail-fast-responses \
+  --live --accept-paid-traffic
+uv run --no-sync python -m scripts.validation.databricks_app_smoke \
+  --profile <selected-profile> --app-name agent-bricks-test-eval-ram-v2 \
+  --prompt '<synthetic refund-policy question>' --concurrency 5 \
+  --max-requests 500 --duration 180 --timeout 60 \
+  --artifact-dir artifacts/native-app-redeploy-20261007/performance-responses \
+  --live --accept-paid-traffic
+uv run --no-sync python -m scripts.validation.databricks_app_quality \
+  --profile <selected-profile> --app-name agent-bricks-test-eval-ram-v2 \
+  --concurrency 5 --max-requests 2 --duration 10 --timeout 60 \
+  --artifact-dir artifacts/native-app-redeploy-20261007/quality-responses \
+  --live --accept-paid-traffic
+```
+
+| Check | Run ID | Result |
+| --- | --- | --- |
+| Initial intentional failure | `22b19f48-f023-48d4-979c-86d2da20f1cd` | Expected HTTP 500; one excluded probe, zero measured requests; fail-fast confirmed |
+| Initial real-model failure | `7f742a19-c28c-4e20-979c-c976fd5211de` | HTTP 500 at inference preflight; one excluded probe, zero measured requests; later phases skipped |
+| Corrected intentional failure | `5b76b597-2047-46ae-81c0-a67f3a871483` | Expected HTTP 500; one excluded probe, zero measured requests; later phases skipped; CLI exit 1 |
+| Corrected performance | `10d6e4a6-f3a7-4c11-ae33-24ce45cc65e8` | Passed probe plus 500/500 measured successes; no failures/incomplete measurements; CLI exit 0 |
+| Separate explicit quality | `0411fd38-3705-469a-8039-69d293f580af` | Passed inference and both judge-readiness checks; 2/2 measured successes; all four quality verdicts true; CLI exit 0 |
+
+Performance configured/observed peak HTTP concurrency was **5/5**. The request
+cap stopped dispatch after **129.208 seconds**, before the 180-second ceiling;
+elapsed including drain was **130.369 seconds**. Observed successful throughput
+was **3.835 requests/second**; successful latency p50 **1146.795 ms**, p95
+**2173.947 ms**, p99 **2460.319 ms**. Exactly one excluded successful probe was
+additional to the 500 measured attempts. Evaluation was off (`no_ready_scorers`).
+Profiling bookkeeping completed, but remote trace coverage was zero because
+tracing was disabled. JSON supplies no answer-text TTFT/first-event measurements
+and no output-token usage, so those values remain unavailable rather than zero.
+
+Quality used **`databricks-gpt-5-4-mini`**, explicit **relevance/correctness**, the
+authoritative fact “Opened items cannot be refunded.”, and **no planner calls**.
+One excluded target probe supported two zero-retry readiness assessments; two
+measured captures supported two assessments per scorer, with zero judge errors
+and boolean pass rates 1.0 for each. The captured synthetic answer was inspected:
+“No, an opened item cannot be refunded.” Judging did not reinvoke the target.
+Configured concurrency was five, but a two-request quality cap is not five-user
+capacity evidence. The documented frozen budget allowed at most fourteen judge
+provider attempts, 2048 output tokens per attempt, and two quality retries; actual
+network retry counts/cost were not independently audited. Local native MLflow
+stores protected captures/rationales separately from content-free summaries.
+
+### Offline verification and handoff limits
+
+The original content-block regression failed before changing the sample. The
+expanded suite initially had one incorrect exception expectation for reasoning-only
+output; the guard correctly rejected it with `ValueError`. The expectation was
+corrected without weakening answer rejection or the one-call/cleanup assertions.
+Final actual-framework/client/native-server sample suite: **29 passed** (parent
+rerun 5.29 seconds; final agent rerun 5.41 seconds). Static native doctor: **7/7**.
+Changed sample Python files pass root Ruff lint/format. Sample runtime, manifest
+and dependency declarations were not changed by the Responses fix.
+
+Root App-harness/documentation regression command
+`uv run --no-sync pytest -q tests/test_databricks_app_smoke.py
+tests/test_databricks_app_quality.py tests/test_validation_tools.py
+tests/test_readme.py --tb=short` passed **43 tests, 13 upstream warnings, 23.04
+seconds**. Root Ruff lint/format (130 files), OpenAPI snapshot equality/schema
+validation, and whitespace checks passed. The last full root suite/build/isolated
+wheel checks remain the 669-test checkpoint below; this continuation changed no
+root production Python behavior or dependency graph.
+
+After recording these live results, the final validation-tool/README rerun passed
+**12 tests, one upstream warning, 8.97 seconds**. Root Ruff lint/format and
+whitespace checks passed again.
+
+The sample App and required Runtime Store remain available and incur ongoing
+resource cost. The stopped unused original-name App and earlier store were retained;
+no store was deleted/rebound. No benchmark process remains running. Prior failed
+evidence was not overwritten. No sustainable capacity, judge calibration, model
+token throughput/TTFT, remote tracing, transitive deployed version parity, hard
+wall-clock/spend deadline, remote CI or independent maintainer approval is claimed.
+All unrelated dirty-tree work is preserved; no commit or push occurred.
+
+## Native App source review and local verification — October 7, 2026
+
+Resumed the approved native sample provisioning and bounded validation workstream.
+Read current official Agent Server, Query Agents, and Agent Bricks CLI documentation
+directly (all pages updated October 6), and checked the installed stable
+`databricks-agentbricks==0.4.0` implementation against official
+`databricks/databricks-ai-bridge` source at
+`c2046018d6fa3f382bf18f89a44ea5b7943776ba` (October 7). The snapshot identifies itself
+as `0.5.0.dev0`, not a released stable replacement. Its migration skill, OpenAI
+integration contract, and deployment implementation match the installed package;
+its newer event-reader/stream polling changes are outside this sample's synchronous
+`stream=false`, `background=false` check. No development package was installed.
+The runbook now documents this source/skill boundary and the overview's stale
+Python 3.10 requirement versus the package/templates' Python 3.11 minimum.
+
+The source/docs confirm `/api/invocations` as the current default and `/responses`
+as legacy compatibility. Lakebase's managed Runtime Store is invocation execution
+state, not agent transcript history or long-term memory. The tailored sample uses
+the actual OpenAI Agents Runner, `system.ai.gpt-oss-120b`, one model turn, 512 maximum
+output tokens, a 30-second HTTP timeout, zero model retries, no tools, no session
+history, no memory, and no automatic recovery handler. The intentional failure
+prompt raises before model dispatch. HTTP/authentication budgets are not hard
+overall deadlines; queued first attempts can outlive client disconnection.
+
+The prior native deployment completed successfully with one MEDIUM instance, an
+App named `agent-bricks-test-eval-ram`, and its required managed Runtime Store.
+No optional Session/Memory Store or trace experiment was bound. The pending
+authenticated `/status` read returned HTTP 200 and the intended content-free
+controls. Subsequent read-only CLI and SDK lookups both returned App `NotFound`;
+the selected profile still resolves to the approved workspace and active user.
+The App was absent from the bounded App list. Deployed source hash comparison
+therefore could not complete. No replacement deployment, inference, judge, or
+planner traffic was sent at this checkpoint. Whether the App was intentionally
+deleted/moved requires operator clarification; no cause is asserted. The Runtime
+Store's current existence was not independently checked, and nothing was deleted.
+Local sample docs/tests were updated after upload; deployed docs/test snapshot
+parity is not claimed even though the runtime source was unchanged locally.
+
+The full root run first reported **12 failed, 657 passed, 42 warnings in 202.66
+seconds**. New quality tests leaked native MLflow's process-global tracking URI
+into later safe-report tests. The smallest ordered pair reproduced the failure
+(one failed/one passed). A test-only fixture now restores raw tracking/experiment
+selectors and exact environment presence; the pair passed, and the ordered
+quality/evaluation-preflight/preflight suite passed **48 tests in 45.51 seconds**.
+No production error-redaction assertion was weakened. The helper's documentation
+now discloses this existing backend's global MLflow side effect and recommends
+separate CLI-process execution.
+
+Final local commands/results:
+
+```bash
+uv sync --locked --extra agents --group dev \
+  --default-index https://pypi.org/simple --offline --no-build-isolation
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pytest -q --tb=short \
+  --junitxml=artifacts/native-app-20261007-local/junit-recheck.xml
+uv run --no-sync python scripts/export_openapi.py --check
+uv run --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --no-sync python scripts/verify_wheel.py
+uv run --no-sync python scripts/verify_remote_install.py --offline
+git diff --check
+```
+
+Locked offline sync resolved 190 and checked 182 installed packages. Full root
+suite: **669 passed, no skips, 42 upstream warnings, 194.40 seconds**. Ruff lint
+and formatting (130 files), OpenAPI equality/schema validation, sdist/wheel build,
+packaged assets, and actual isolated base-only wheel SDK/CLI checks passed. The
+isolated native sample suite separately passed **19 tests in 4.25 seconds**;
+its prior static doctor passed 7/7. These use real framework/native MLflow/server
+APIs with controlled provider boundaries, not live model calls.
+
+After the final runbook/validation and helper-docstring edits,
+`uv run --no-sync pytest -q tests/test_databricks_app_quality.py
+tests/test_validation_tools.py tests/test_readme.py --tb=short` passed **27 tests,
+13 upstream warnings, 19.21 seconds**. Ruff lint/format and whitespace checks passed;
+the distributions were rebuilt and final wheel assets verified. The full 669-test
+run preceded only those documentation/docstring edits.
+
+Protected failure/success JUnit records are retained under
+`artifacts/native-app-20261007-local/`. The pending live checks remain separate:
+intentional fail-fast, concurrency five/180-second dispatch/500-attempt-cap
+performance-only, and a new tiny explicit relevance/correctness run using the
+mini judge and captured answers (no planner). No live pass, sustainable capacity,
+TTFT for native JSON, quality calibration, fresh upstream-latest dependency
+resolution, remote CI result, or independent maintainer approval is claimed.
+The dirty implementation remains preserved; no commit or push occurred here.
+
+## Selected-profile discovery and five-user preparation — October 7, 2026
+
+The user explicitly selected the previously listed OAuth profile and proposed
+`test-eval-ram`, concurrency five, and a few-minute workload. Initial CLI reads
+failed because the older token cache was incompatible with CLI 1.17.0. An approved
+`databricks auth login --host <selected-workspace> --profile <selected-profile>
+--timeout 2m` refreshed only that profile. Reads inside the sandbox still could
+not access the secure credential store; approved outside-sandbox retries of
+`databricks current-user me` and `databricks apps list --limit 100`, both with the
+exact selected profile, succeeded. The identity was active and the proposed App
+was not among the 24 returned Apps. No raw credentials were printed or credential
+storage security weakened. These were read-only workspace operations, not inference.
+
+The existing harness now accepts explicit `--concurrency 5 --duration 180
+--max-requests 500`, retaining its small dry-run defaults and live-consent gate.
+It records safe probe diagnostics, independent phase outcomes, separate observed
+probe/measured counts, and fail-fast confirmation. Native localhost tests exercise
+five-user load and an intentional failed probe: exactly one excluded attempt,
+zero measured requests, skipped load. A 500-request cap can stop dispatch before
+three minutes; the probe and drain add time outside that dispatch window.
+
+`uv run --no-sync pytest -q tests/test_databricks_app_smoke.py --tb=short` passed
+**16 tests in 2.62 seconds**. The first local attempt was blocked by sandbox access
+to uv's cache; the approved retry passed. Full framework-enabled
+`uv run --no-sync pytest -q --tb=short` passed **654 tests, no skips, 30 upstream
+warnings, in 181.28 seconds**. Locked offline agents/dev sync checked 182 installed
+packages and resolved 190. Ruff lint and formatting (128 files), OpenAPI snapshot
+check and independent schema validation, sdist/wheel build, required wheel assets,
+and whitespace checks passed using the same commands/options as the prior section.
+
+Current official Agent Server/Agent Bricks CLI documentation confirms that the
+new deployment workflow provisions a managed Runtime Store in addition to the App.
+The Agent Bricks CLI is not installed locally. Sample type, an exact endpoint if
+LLM-backed, and consent/budget for deployment resources and bounded inference remain
+pending. No App/runtime store, managed session/memory resource, model call, paid
+judge/planner call, or deployment was created or executed. No commit/push or GitHub
+operation occurred. Local fail-fast verification does not establish a passing live
+App test. The earlier no-workspace-access statement below describes that earlier
+checkpoint, before the user selected a profile.
+
+## Client/input/failure fixes and App test preparation — October 7, 2026
+
+Three user-requested workstreams addressed cancellation, history/report navigation,
+safe v2 validation, silent input loss, and remote-client dependencies. Initial
+regressions reproduced the defects before the fixes. The App-default review premise
+was checked against official documentation (pages updated October 6): current
+DurableAgentServer/Agent Bricks deployments use `/api/invocations`; MLflow
+AgentServer `/responses` is explicit legacy compatibility. The Runtime default
+therefore remains, with documented/tested legacy configuration. See
+[ADR 0010](docs/adr/0010-client-input-and-failure-contracts.md), still requiring
+designated maintainer review.
+
+The shipped renderer now handles terminal planless reports without inventing a
+plan or measurements; recovered v2 history links are usable. Cancellation
+acknowledgments are accepted only on cancel responses. Fixed message adapters
+reject extra top-level fields before planning/inference and preserve nested
+messages. V2 schema failures disclose bounded safe locations/messages, not values,
+arbitrary keys, validator context, or exception text. An independent cross-workstream
+read-only review found no additional confirmed actionable regressions; this is not
+an independent security audit or maintainer approval.
+
+Focused workstream evidence:
+
+- Lifecycle/error integration: **117 passed in 12.11 seconds**, including actual
+  SDK/API cancellation, recovered mixed-version history, shipped-DOM planless
+  report rendering, validation bounds, and raw-validator redaction.
+- App/input/local integration: **245 passed in 31.69 seconds**. The final App
+  harness-only rerun passed **13 tests in 2.61 seconds**, including failed probe
+  stops with exactly one invocation and no measured load. No paid traffic occurred.
+- Remote packaging/CLI/Python: **139 passed in 24.05 seconds**; final wheel-only
+  tests passed **13 tests**. The real built wheel installs with only 11 base
+  transitive packages plus EvalSurge, no server distributions, and passes SDK
+  submit/wait, CLI run/doctor, installed entrypoint, lazy exports, and missing-extra
+  checks through controlled HTTP transports.
+
+Integrated root verification on macOS/Python 3.12.13:
+
+```bash
+uv sync --locked --extra agents --group dev \
+  --default-index https://pypi.org/simple --offline --no-build-isolation
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pytest -q --tb=short
+uv run --no-sync python scripts/export_openapi.py
+uv run --no-sync python scripts/export_openapi.py --check
+uv run --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --no-sync python scripts/verify_wheel.py
+uv run --no-sync python scripts/verify_remote_install.py --offline
+uv lock --check --offline --default-index https://pypi.org/simple
+uv run --no-sync python scripts/check_ci_prerequisites.py
+node --check benchmark_agents/static/report.js
+git diff --check
+```
+
+Results: locked sync/check resolved **190 packages** and checked **182 installed
+packages**; Ruff lint passed and **128 files** were already formatted. Full suite:
+**651 passed, no skips, 30 upstream warnings, 183.51 seconds**. Warnings are existing
+MLflow/pandas/SQLAlchemy notices. After the final case-schema description edit,
+`uv run --no-sync pytest -q tests/test_v2.py tests/test_readme.py tests/test_docs_ui.py
+--tb=short` passed **19 tests in 6.87 seconds**. Its first invocation referenced a
+nonexistent `tests/test_docs.py` and ran no tests; the corrected invocation above
+passed. Snapshot export/check and independent OpenAPI validation passed. Sdist/wheel
+were rebuilt after that description edit; required-asset and isolated remote-install
+verification passed. Independent archive reads confirmed byte-for-byte parity for
+**47 packaged runtime/UI files**. JavaScript syntax and whitespace checks passed.
+
+Manual public-contract review found only documentation changes to existing input
+schemas, an optional v2 `error.errors` property, and its new bounded component in
+the OpenAPI diff. Runtime compatibility still intentionally tightens formerly
+ignored inputs, versions mixed history links, and requires the server extra for
+local execution; schema equality alone would not detect those changes. Existing
+v1 envelopes and the shared Locust/evaluation pipeline remain.
+
+All **189 non-root lock records** compare equal to HEAD, including dependency graphs,
+versions, sources, URLs, and hashes. Public provenance checks passed. Public PyPI
+resolution remained blocked with TCP connection refused even outside the sandbox;
+the migration edits only the editable root dependency/extra metadata and passes
+locked/offline consistency checks. This is not a fresh dependency upgrade, new
+advisory audit, or clean online supported-interpreter installation. The existing
+`agents` install continues to include server plus framework dependencies.
+
+Added [the App validation runbook](docs/DATABRICKS_APP_VALIDATION.md) and a
+dry-run-by-default harness. Only local profile names/hosts were listed with
+`databricks auth profiles --skip-validate -o json`; that is not authentication
+validation. The requested workspace is known, but the exact profile, deployed App,
+safe prompt, and bounded traffic/internal spend/recovery consent remain unselected.
+No workspace lookup, live inference, paid planning/judging, App deployment, GitHub
+access, commits, or pushes were performed. Remote CI and maintainer approval have
+not been checked for this patch. Tiny local controlled tests do not establish
+live App health, full production input equivalence, quality calibration, sustainable
+capacity, or shared-hosting readiness.
 
 ## Pre-push repository review — October 7, 2026
 
@@ -866,9 +1346,8 @@ The processes exited normally and no demo servers are left running.
 
 ### Bounded live evidence on the selected workspace
 
-Workspace: `https://dbc-a5d4177a-49dc.cloud.databricks.com`.
-User-selected profile:
-`ug-oauth-dbc-a5d4177a-49dc.cloud.databricks.com-4f7af981-8977-4042-b90e-a5dea5b62e19`.
+Exact user-selected workspace/profile identifiers remain in protected evidence.
+This public record omits them; no profile is auto-selected.
 SDK/keyring authentication is used; no plaintext auth storage. The verified
 `databricks-gpt-5-4-mini` endpoint was READY/NOT_UPDATING. Pricing-catalog fetching
 was disabled with `MLFLOW_MODEL_CATALOG_URI=''`; cost was not benchmarked.

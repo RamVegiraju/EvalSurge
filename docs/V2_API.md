@@ -3,7 +3,20 @@
 `/v2` provides admission, lightweight status, typed results, paginated reports,
 cancellation, and static capabilities over the existing coordinator and Locust
 engine. The runner remains a local single-owner service. `/v1` and the local
-Python API remain available. Start the API with proxy headers disabled:
+Python API remain available.
+
+End users can select either a locally hosted HTTP agent or a Databricks App from
+the operator registry. Both use the same request and execution pipeline; see
+[the two-target guide](TARGETS.md). Localhost refers to the API/load-generator
+host, not a remote submitter's laptop.
+
+Plain `evalsurge` installs only the remote SDK/CLI and their HTTPX/Pydantic
+dependencies. Install `evalsurge[server]` to run local
+benchmarks or the API. `evalsurge[agents]` includes server plus framework dependencies;
+the existing checkout `uv sync --locked --extra agents --group dev` remains valid.
+Local imports/factories report a missing-extra diagnostic in a remote-only install.
+
+Start the API with proxy headers disabled:
 
 ```bash
 BENCHMARK_CONFIG=operator.toml uv run --no-sync uvicorn benchmark_agents.api:app \
@@ -56,6 +69,13 @@ profile = "YOUR_EXPLICIT_PROFILE"
 protocols = ["databricks-agent-runtime"]
 ```
 
+This is the App default for DurableAgentServer/Agent Bricks CLI deployments.
+The [current official query guide](https://docs.databricks.com/aws/en/agents/query-llms)
+(checked October 7, 2026) distinguishes that invocation API from legacy MLflow
+AgentServer and LongRunningAgentServer Apps. For an existing MLflow App, use the
+same registration with `protocols = ["mlflow-agent-server"]` to select `/responses`.
+No protocol detection, fallback traffic, or alternate engine is used.
+
 App URLs come from `WorkspaceClient.apps.get(name=...)`; the public request cannot
 choose workspace hosts, profiles, App URLs, or OAuth tokens. Authentication requires
 SDK OAuth, refreshes per attempt, and stays bound to the discovered exact origin.
@@ -64,7 +84,10 @@ therefore rejects conflicting `DATABRICKS_HOST` or SDK credential overrides in b
 process and captured runtime settings. Run with an isolated profile-based operator
 environment; profile/config-file selectors are allowed. PAT authentication is not
 accepted for Apps. These controls are covered with the native SDK and controlled
-HTTP boundaries; no deployed App validation is implied.
+HTTP boundaries. A separate bounded native App check passed using the local
+facade/registered resolver; it did not deploy EvalSurge or exercise live `/v2`
+HTTP submission. See [the validation record](../VALIDATION.md); this does not
+establish universal App compatibility or production readiness.
 App profiles require the same configuration-file selector in the API process and
 frozen worker environment because SDK CLI OAuth subprocesses inherit the process
 environment. Different selectors fail closed before SDK resolution; static local
@@ -90,10 +113,26 @@ and first-event timing are unavailable; token usage is currently unknown for thi
 adapter. Legacy `/responses` accepts returned MLflow trace
 metadata, including the native final trace event, without synthesizing internal spans.
 
-An optional operator `session_id` deliberately shares a stateful conversation.
-This can serialize requests or change answers across users. The default isolated
+An optional operator `session_id` deliberately shares invocation ordering.
+It can serialize requests and change answers when the target implements history;
+the identifier alone does not configure memory. The default isolated
 sessions avoid accidental shared conversation state; the probe still performs an
 extra invocation and can warm caches or execute external actions.
+
+For `openai-chat`, `mlflow-agent-server`, and `databricks-agent-runtime`, every
+case's `input` must contain exactly one of `query` (a nonempty string) or `messages`
+(a nonempty list of role-bearing message objects). Nested messages are transmitted
+unchanged. Extra top-level fields are rejected before planning/inference, never
+discarded. This includes `custom_inputs`, `actor`, per-case `model`, and `resume`:
+although upstream servers support some of these, EvalSurge's fixed adapters do not
+yet have an operator-governed mapping for them. Put evaluation references in
+`reference`, not `input`. The explicit `http-json` contract sends its raw input body
+unchanged and requires its documented response shape; it is not an arbitrary
+AgentServer compatibility adapter.
+
+For live App testing, follow the [bounded smoke-test guide](DATABRICKS_APP_VALIDATION.md).
+It requires a selected profile, App/protocol, safe prompt, and traffic/spend consent;
+its default dry run makes no workspace or inference calls.
 
 ## Submit and retrieve a benchmark
 
@@ -120,6 +159,9 @@ protected dictionaries. Service keys are held in memory and sent only in headers
 The SDK constructs paths from validated IDs, does not follow returned links or
 redirects, honors polling guidance, and never automatically retries mutations.
 Waiting timeouts leave server work running; cancellation is an explicit operation.
+`run.cancel()` can return `status: "cancellation_requested"`; this acknowledges
+the request, not completed cancellation. Poll for the persisted terminal state.
+Already dispatched calls drain and their side effects are not rolled back.
 
 Evaluation defaults to `off` and cannot call the planner or judges. `automatic`
 opts into bounded catalog and allowlisted-scorer planning; `explicit` requires `scorers`, using catalog
@@ -179,7 +221,23 @@ Errors include safe `code`, `phase`, `retryable`, `guidance`, and request correl
 Reusing an idempotency key binds the complete canonical request, including its name.
 Restart recovery never repeats planning or agent actions. SDK report links open the
 existing protected report shell for runs with frozen plans; deferred planning
-failures are available through the v2 JSON report.
+failures render through its same-origin v2 fallback as well. History retains v1
+links for v1 runs and advertises v2 links for v2 runs, including planless failures.
+
+V2 schema failures also include at most 20 sanitized `error.errors` entries, e.g.:
+
+```json
+{
+  "location": ["body", "load", "concurrency"],
+  "code": "out_of_bounds",
+  "message": "Must be greater than or equal to 1"
+}
+```
+
+These entries contain public field names and safe constraints, never submitted
+values or raw validator errors. Unknown input keys become `<extra>`. Correct the
+listed fields and resubmit; later issues may be omitted by the bound. V1's error
+envelope remains unchanged.
 
 ```bash
 EVALSURGE_URL=http://127.0.0.1:8000 uv run --no-sync evalsurge doctor

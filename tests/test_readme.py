@@ -4,6 +4,7 @@ import asyncio
 import json
 import re
 import shlex
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,9 @@ import pandas as pd
 import pytest
 
 from benchmark_agents.evaluation_details import assessment_details
-from benchmark_agents.models import Evaluation, RunReport
+from benchmark_agents.models import Evaluation, RunReport, Target
+from benchmark_agents.runner import payload
+from benchmark_agents.settings import Settings
 from benchmark_agents.v2_models import RunCreate
 from evalsurge import EvalSurge, Sample
 
@@ -133,6 +136,43 @@ def test_readme_automatic_request_matches_v2_contract() -> None:
     assert request.load.max_requests == 20
     assert "url" not in requests[0]["target"]
     assert "profile" not in requests[0]["target"]
+
+
+def test_target_guide_examples_validate_without_discovery_or_traffic() -> None:
+    """Validate both operator bindings and their shared public request natively."""
+    guide = (ROOT / "docs" / "TARGETS.md").read_text()
+    operator_blocks = re.findall(r"```toml\n(.*?)```", guide, re.DOTALL)
+    request_blocks = re.findall(r"```json\n(.*?)```", guide, re.DOTALL)
+    assert len(operator_blocks) == len(request_blocks) == 1
+    settings = Settings.model_validate(tomllib.loads(operator_blocks[0]))
+    request_body = json.loads(request_blocks[0])
+    local = settings.connections["local-agent"]
+    app = settings.connections["app-agent"]
+    assert local.kind == "http"
+    assert app.kind == "databricks-app"
+    assert app.protocols == ("databricks-agent-runtime",)
+    assert app.profile == "YOUR_SELECTED_OAUTH_PROFILE"
+    for connection_id, url in (
+        ("local-agent", local.url),
+        ("app-agent", "https://your-app.aws.databricksapps.com/api/invocations"),
+    ):
+        binding = settings.connections[connection_id]
+        request = RunCreate.model_validate(
+            {**request_body, "target": {"connection_id": connection_id}}
+        )
+        target = Target(url=url, adapter=binding.protocols[0], connection_id=connection_id)
+        translated = request.translate(target, set())
+        assert request.evaluation.mode == "off"
+        assert translated.evaluation.scorers == []
+        assert translated.evaluation.registered_scorers == []
+        assert translated.load.concurrency == 5
+        assert translated.load.duration_seconds == 180
+        assert translated.load.max_requests == 500
+        wire = payload(translated, translated.evaluation.samples[0])
+        messages = wire["messages"] if binding.kind == "http" else wire["input"]
+        assert messages == [{"role": "user", "content": "Reply with a short greeting."}]
+        if binding.kind == "databricks-app":
+            assert wire["stream"] is wire["background"] is False
 
 
 def test_readme_relative_documentation_links_and_anchors_resolve() -> None:

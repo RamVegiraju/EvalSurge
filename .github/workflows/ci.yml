@@ -45,6 +45,7 @@ jobs:
       - run: uv run --no-sync openapi-spec-validator docs/openapi.json
       - run: uv build --no-build-isolation
       - run: uv run --no-sync python scripts/verify_wheel.py
+      - run: uv run --no-sync python scripts/verify_remote_install.py --offline
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -38,7 +38,7 @@ def test_runtime_payload_uses_wire_id_and_isolated_sessions():
         session_per_request=True,
     )
     request_id = str(uuid4())
-    first = payload(request, Sample(inputs={"query": "Hello", "actor": "untrusted"}), request_id)
+    first = payload(request, Sample(inputs={"query": "Hello"}), request_id)
     second = payload(request, Sample(inputs={"query": "Hello"}))
     assert first["id"] == request_id
     assert UUID(second["id"])
@@ -65,6 +65,7 @@ def test_runtime_payload_uses_wire_id_and_isolated_sessions():
                 {
                     "type": "message",
                     "role": "assistant",
+                    "status": "completed",
                     "content": [{"type": "output_text", "text": "Answer—yes"}],
                 },
             ],
@@ -99,6 +100,32 @@ def test_unsupported_or_interrupted_handler_outputs_are_safe(output):
     with pytest.raises(InvalidResponse) as failure:
         runtime_decode(output)
     assert "private" not in str(failure.value)
+
+
+@pytest.mark.parametrize("status", ["in_progress", "incomplete", "failed", None])
+def test_explicit_unfinished_assistant_messages_do_not_publish_partial_answers(status):
+    """A completed invocation cannot turn explicitly unfinished text into success."""
+    identifier = str(uuid4())
+    row = {**measurement(), "request_id": identifier}
+    document = {
+        "id": identifier,
+        "status": "completed",
+        "output": {
+            "status": "completed",
+            "output": [
+                {"role": "assistant", "content": "private completed prefix"},
+                {"role": "assistant", "status": status, "content": "private partial text"},
+            ],
+        },
+    }
+    with (
+        response(json.dumps(document).encode()) as received,
+        pytest.raises(InvalidResponse) as failure,
+    ):
+        get_adapter("databricks-agent-runtime").decode(received, row, time.perf_counter())
+    assert "private" not in str(failure.value)
+    assert row["outputs"] == ""
+    assert row["ttft_ms"] is row["first_event_ms"] is None
 
 
 def test_background_and_mismatched_ids_are_rejected_without_publishing_text():

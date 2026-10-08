@@ -144,6 +144,21 @@ def test_legacy_responses_and_operator_fixed_sessions(monkeypatch):
     assert runtime.adapter == "databricks-agent-runtime"
 
 
+def test_explicit_legacy_only_registration_defaults_to_responses(monkeypatch):
+    """MLflow AgentServer Apps need one explicit operator setting, no caller override."""
+    _, profiles, names = app_workspace(monkeypatch)
+    preset = ConnectionSettings(
+        kind="databricks-app",
+        profile="chosen",
+        app_name="agent-test",
+        protocols=("mlflow-agent-server",),
+    )
+    target, connection = resolve_registered_target("support", {"support": preset})
+    assert str(target.url) == connection.url == "https://agent-test.databricksapps.com/responses"
+    assert target.adapter == "mlflow-agent-server"
+    assert profiles == ["chosen"] and names == ["agent-test"]
+
+
 def test_unknown_or_disallowed_presets_do_not_resolve_sdk(monkeypatch):
     def forbidden(*args, **kwargs):
         raise AssertionError("SDK must not be reached")

@@ -194,8 +194,9 @@ def resolve_registered_target(
         ValueError: Invalid operator HTTP connection configuration.
 
     SDK lookup blocks; async callers must offload this function to a thread. App
-    sessions are isolated per attempt unless an operator explicitly fixes one;
-    fixed sessions serialize invocation ordering and retain target conversation state.
+    sessions are isolated per attempt unless an operator explicitly fixes one.
+    Fixed sessions can serialize invocation ordering and change answers when the
+    target implements history; a session identifier alone does not create memory.
     """
     preset = connections.get(name)
     if preset is None:

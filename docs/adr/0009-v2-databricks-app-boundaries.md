@@ -137,4 +137,11 @@ SDK source inspection established that ambient host/credential fields take prece
 over named profile fields. App resolution fails closed on those overrides instead
 of mutating the process environment or guessing credential provenance. Configured
 protocol order selects the operator default. Default App sessions are per attempt;
-fixed operator sessions explicitly opt into stateful conversation behavior.
+fixed operator sessions explicitly share invocation ordering. Conversation-history
+effects depend on the target's configured Session Store/history implementation;
+the identifier alone does not enable memory.
+
+The client/input/failure follow-up is recorded in
+[ADR 0010](0010-client-input-and-failure-contracts.md). Current official agent
+guidance confirms the Runtime invocation default; MLflow `/responses` remains
+explicit legacy compatibility, not an automatically detected fallback.

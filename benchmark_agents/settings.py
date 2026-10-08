@@ -98,7 +98,13 @@ class ProviderSettings(OperatorModel):
 
 
 class ConnectionSettings(OperatorModel):
-    """Registered target presets; only protocol names are ordinary public metadata."""
+    """Registered targets; DurableAgentServer is the current App protocol default.
+
+    Legacy MLflow AgentServer deployments must explicitly select
+    ``protocols=("mlflow-agent-server",)`` for their ``/responses`` endpoint.
+    Protocol order determines the operator default; hosting does not infer which
+    server an existing App runs. Only protocol names are ordinary public metadata.
+    """
 
     kind: Literal["http", "databricks-app"] = "http"
     url: str | None = _private(min_length=1, max_length=2048)
