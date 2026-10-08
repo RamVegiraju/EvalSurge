@@ -329,13 +329,35 @@ def demo_request_usage(value: str | None = None) -> bool:
     return value != "false"
 
 
-def create_app(live: bool = False) -> FastAPI:
-    """Create localhost demo endpoints; initialize owned provider and tracing resources in lifespan."""
+def create_app(live: bool = False, *, workspace: Any | None = None) -> FastAPI:
+    """Create native framework endpoints with explicit optional driver authentication.
+
+    Args:
+        live: True executes real model inference; False uses the disclosed offline
+            provider fixture and is never a substitute for live validation.
+        workspace: Optional caller-owned Databricks SDK client for live notebook
+            driver authentication. The caller must verify its workspace origin.
+            Omission preserves the operator-configured profile/host helper.
+
+    Returns:
+        A FastAPI app whose lifespan owns model transports, memory and tracing.
+
+    Raises:
+        ValueError: A driver client is supplied to controlled-inference mode.
+
+    Side Effects:
+        Lifespan configures process-local MLflow and opens/always closes model
+        transports. SDK authentication remains caller owned; no token is copied
+        into requests, benchmark configuration or artifacts. Live tools/model
+        calls may incur spend. Do not share this demo's process with other agents.
+    """
+    if workspace is not None and not live:
+        raise ValueError("Driver authentication requires explicit live inference")
     resources: dict[str, Any] = {}
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        """Configure real OSS integrations and close clients after all requests drain."""
+        """Configure OSS integrations; close owned clients even if startup fails."""
         uri = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///artifacts/demo-mlflow.db")
         Path("artifacts").mkdir(exist_ok=True)
         mlflow.set_tracking_uri(uri)
@@ -348,8 +370,8 @@ def create_app(live: bool = False) -> FastAPI:
         mlflow.langchain.autolog()
         mlflow.openai.autolog(disable=True)
         if live:
-            workspace = workspace_client()
-            base_url = workspace.config.host.rstrip("/") + "/serving-endpoints"
+            selected_workspace = workspace if workspace is not None else workspace_client()
+            base_url = selected_workspace.config.host.rstrip("/") + "/serving-endpoints"
             model_name = os.getenv("EVALSURGE_DEMO_MODEL", DEFAULT_FM_ENDPOINT)
         else:
             base_url, model_name = "http://fixture", "fixture"
@@ -363,42 +385,47 @@ def create_app(live: bool = False) -> FastAPI:
         agent_options = demo_chat_options(**options, tools=True)
         request_usage = demo_request_usage(os.getenv("EVALSURGE_DEMO_REQUEST_USAGE"))
         http = (
-            httpx.AsyncClient(auth=DatabricksAuth(workspace), trust_env=False, timeout=30)
+            httpx.AsyncClient(auth=DatabricksAuth(selected_workspace), trust_env=False, timeout=30)
             if live
             else httpx.AsyncClient(transport=httpx.MockTransport(fixture_provider))
         )
-        client = AsyncOpenAI(
-            base_url=base_url, api_key="sdk-auth", http_client=http, max_retries=0, timeout=30
-        )
-        langchain_model = ChatOpenAI(
-            model=model_name,
-            base_url=base_url,
-            api_key="sdk-auth",
-            http_async_client=http,
-            max_retries=0,
-            timeout=30,
-            extra_body=graph_options,
-            use_responses_api=False,
-            stream_usage=request_usage,
-        )
-        resources["checkpointer"] = TracedCheckpointer()
-        resources["graph"] = build_graph(langchain_model, resources["checkpointer"])
-        resources["agent"] = Agent(
-            name="Refund assistant",
-            instructions="Always call policy_db before answering. Answer only using its refund policy.",
-            model=TracedChatModel(model=model_name, openai_client=client),
-            tools=[function_tool(policy_db)],
-            model_settings=ModelSettings(
-                extra_body=agent_options, include_usage=True if request_usage else None
-            ),
-        )
+        client: AsyncOpenAI | None = None
         try:
+            client = AsyncOpenAI(
+                base_url=base_url, api_key="sdk-auth", http_client=http, max_retries=0, timeout=30
+            )
+            langchain_model = ChatOpenAI(
+                model=model_name,
+                base_url=base_url,
+                api_key="sdk-auth",
+                http_async_client=http,
+                max_retries=0,
+                timeout=30,
+                extra_body=graph_options,
+                use_responses_api=False,
+                stream_usage=request_usage,
+            )
+            resources["checkpointer"] = TracedCheckpointer()
+            resources["graph"] = build_graph(langchain_model, resources["checkpointer"])
+            resources["agent"] = Agent(
+                name="Refund assistant",
+                instructions="Always call policy_db before answering. Answer only using its refund policy.",
+                model=TracedChatModel(model=model_name, openai_client=client),
+                tools=[function_tool(policy_db)],
+                model_settings=ModelSettings(
+                    extra_body=agent_options, include_usage=True if request_usage else None
+                ),
+            )
             yield
         finally:
             try:
                 await asyncio.to_thread(mlflow.flush_trace_async_logging)
             finally:
-                await client.close()
+                try:
+                    if client is not None:
+                        await client.close()
+                finally:
+                    await http.aclose()
 
     app = FastAPI(lifespan=lifespan, title="Synthetic instrumented framework demos")
 

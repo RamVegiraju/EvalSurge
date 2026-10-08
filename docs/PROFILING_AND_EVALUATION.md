@@ -8,6 +8,13 @@ cannot reveal their timing. Without instrumentation the report remains client-on
 `framework` is descriptive; it does not cause the benchmark server to import a remote
 agent or guess its setup.
 
+Answer-based judging can use captured inputs, outputs and authoritative references
+without internal traces. Traces are required for internal profiling and explicitly
+trace-dependent registered scorers, not for evaluation as a whole. HTTP protocol
+compatibility and MLflow evidence compatibility are independent. Start with the
+[end-to-end integration recipe](AGENT_INTEGRATION.md) for the minimum server
+contract and optional trace checklist.
+
 Optional: a reviewed manifest, references, trusted registered judges, and instrumented
 MLflow traces. The demo framework integrations are real OSS examples, not remote
 auto-instrumentation. Their in-memory/checkpoint sessions are request-isolated and
@@ -163,8 +170,12 @@ capabilities before changing these settings; do not retry incompatible payloads.
 
 ## Planning and approval
 
-This section describes v1 plan inspection/reuse. V2 and local Python default
-evaluation to off; v2 automatic mode explicitly opts into planning inside the run.
+This section describes v1 plan inspection/reuse. V2 and the unified direct
+`RunCreate` policy default evaluation to off; automatic mode explicitly opts into
+planning inside the run. Legacy local `Evaluation(scorers=None)` instead requests
+planning; use `scorers=[]` to disable it. For explicit catalog criteria, your own
+reviewed registered judge, client-loaded datasets, and evidence edge cases, see
+[the quality samples](../examples/quality/README.md).
 See [the v2 policy](V2_API.md#submit-and-retrieve-a-benchmark).
 
 `POST /v1/evaluation-plans` accepts an objective and optional `agent_manifest`. The

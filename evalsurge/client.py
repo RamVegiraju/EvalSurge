@@ -27,10 +27,12 @@ from benchmark_agents.models import (
     Sample,
     Target,
 )
+from benchmark_agents.settings import ConnectionSettings
+from benchmark_agents.v2_models import Report
 
 from .facade import EvalSurge as EvalSurge
 
-Protocol = Literal["openai-chat", "mlflow-agent-server", "http-json"]
+Protocol = Literal["openai-chat", "mlflow-agent-server", "http-json", "databricks-agent-runtime"]
 Result = TypeVar("Result")
 
 
@@ -59,6 +61,29 @@ class Agent:
             else Connection(url=str(self._target.url))
         )
         self._connection = validate_connection(self._target, binding)
+        self._registration = (
+            ConnectionSettings(
+                url=str(self._target.url),
+                auth=binding.auth,
+                token_env=binding.token_env,
+                protocols=(self._target.adapter,),
+                model=self._target.model,
+                framework=self._target.framework,
+                request_usage=self._target.request_usage,
+                session_id=self._target.session_id,
+            )
+            if binding.auth != "databricks-app"
+            else ConnectionSettings(
+                kind="databricks-app",
+                app_name=binding.app_name,
+                profile=binding.profile,
+                protocols=(self._target.adapter,),
+                model=self._target.model,
+                framework=self._target.framework,
+                request_usage=self._target.request_usage,
+                session_id=self._target.session_id,
+            )
+        )
 
     @classmethod
     def http(
@@ -101,18 +126,68 @@ class Agent:
     @property
     def target(self) -> Target:
         """Return a detached wire contract, with no resolved credential values."""
+        if self._target is None:
+            raise ValueError("Databricks App targets resolve during unified run admission")
         return self._target.model_copy(deep=True)
 
     @property
     def connection(self) -> Connection:
         """Return a detached exact-URL operator binding."""
+        if self._connection is None:
+            raise ValueError("Databricks App targets resolve during unified run admission")
         return self._connection.model_copy(deep=True)
+
+    @classmethod
+    def databricks_app(
+        cls,
+        name: str,
+        *,
+        profile: str,
+        protocol: Literal[
+            "databricks-agent-runtime", "mlflow-agent-server"
+        ] = "databricks-agent-runtime",
+        model: str = "agent",
+        session_id: str | None = None,
+    ) -> "Agent":
+        """Configure an App without discovery, token resolution, or model calls.
+
+        Args:
+            name: Operator-selected App resource name, not an arbitrary App URL.
+            profile: Exact explicitly selected SDK profile; no default selection.
+            protocol: Native Runtime JSON, or explicit legacy AgentServer compatibility.
+            model: Invocation model label; this does not choose the App's LLM.
+            session_id: Optional fixed ordering session; omission isolates attempts.
+
+        Returns:
+            Detached operator binding resolved by the existing host resolver at admission.
+
+        Raises:
+            ValueError: Invalid configuration. No network/authentication is attempted.
+        """
+        preset = ConnectionSettings(
+            kind="databricks-app",
+            app_name=name,
+            profile=profile,
+            protocols=(protocol,),
+            model=model,
+            session_id=session_id,
+        )
+        agent = cls.__new__(cls)
+        agent._target = None
+        agent._connection = None
+        agent._registration = preset
+        return agent
+
+    @property
+    def registration(self) -> ConnectionSettings:
+        """Return detached private operator settings; never include them in a request."""
+        return ConnectionSettings.model_validate(self._registration.operator_record())
 
 
 class RunFailed(RuntimeError):
     """A terminal failure with its detached report, not private provider errors."""
 
-    def __init__(self, report: RunReport) -> None:
+    def __init__(self, report: RunReport | Report) -> None:
         self.report = report.model_copy(deep=True)
         message = f"Benchmark run {report.run.id} {report.run.status}."
         if report.run.preflight.error is not None:

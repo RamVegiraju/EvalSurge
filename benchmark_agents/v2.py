@@ -1,124 +1,25 @@
 """Versioned HTTP façade over one coordinator, with safe result presentation."""
 
 import asyncio
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, FastAPI, Header, Query, Response
 
 from .coordinator import CoordinatorError, RunCoordinator
 from .diagnostics import Capabilities, build_capabilities
-from .models import ProfilingSummary
 from .planner import fingerprint
+from .run_views import TERMINAL, report_view, result_view, status_view
 from .settings import load_settings
 from .v2_models import (
     Acknowledgment,
-    DecisionSummary,
     Links,
-    Performance,
-    PhaseStates,
     Report,
     Result,
     RunCreate,
     RunStatus,
     V2ErrorResponse,
 )
-
-TERMINAL = {"completed", "completed_with_gaps", "failed", "interrupted", "cancelled"}
-
-
-def status_view(run: dict[str, Any]) -> RunStatus:
-    """Reduce a persisted run to lightweight public phase status.
-
-    Args:
-        run: Coordinator-owned detached snapshot or active state.
-
-    Returns:
-        No operator destinations, credentials, workload, or assessment contents.
-    """
-    planning = run.get("planning_status", "completed")
-    status = "planning" if run["status"] == "queued" and planning == "running" else run["status"]
-    return RunStatus(
-        id=run["id"],
-        status=status,
-        name=run.get("name"),
-        links=Links.for_run(run["id"]),
-        phases=PhaseStates(
-            planning=planning,
-            inference=run.get("preflight", {}).get("status", "not_run"),
-            evaluation_readiness=run.get("evaluation_preflight", {}).get("status", "not_run"),
-            load=run["load_status"],
-            profiling=run.get("profiling_status", "pending"),
-            evaluation=run["evaluation_status"],
-        ),
-        poll_after_seconds=0 if status in TERMINAL else 1,
-    )
-
-
-def result_view(run: dict[str, Any], profiling: ProfilingSummary | None = None) -> Result:
-    """Compute descriptive completion and gaps without assigning quality thresholds.
-
-    Args:
-        run: Coordinator state with independently retained evidence.
-        profiling: Optional verified profile coverage, read from existing artifacts.
-
-    Returns:
-        Typed metrics and protected assessments; no target configuration or plan secrets.
-    """
-    status = status_view(run)
-    metrics = run.get("metrics") or None
-    performance = (
-        "complete"
-        if metrics and metrics.get("measurement_complete") and run["load_status"] == "completed"
-        else "incomplete"
-        if metrics
-        else "not_run"
-        if run["status"] in TERMINAL
-        else "pending"
-    )
-    off = run.get("evaluation_mode") == "off" or (
-        run.get("evaluation_mode") is None
-        and run["config"]["evaluation"].get("scorers") == []
-        and not (run.get("plan") or {}).get("recommendations")
-    )
-    quality = (
-        "off"
-        if off
-        else "available"
-        if run["evaluation_status"] == "completed"
-        else "unavailable"
-        if run["status"] in TERMINAL
-        else "pending"
-    )
-    gaps = []
-    if performance == "incomplete":
-        gaps.append("incomplete_measurements")
-    if quality == "unavailable":
-        gaps.append("evaluation_unavailable")
-    if run.get("planning_error"):
-        gaps.append("planning_failed")
-    if (
-        profiling
-        and profiling.total_requests
-        and profiling.traced_requests < profiling.total_requests
-    ):
-        gaps.append("internal_trace_coverage")
-    if run.get("profiling_status") == "failed":
-        gaps.append("profiling_failed")
-    return Result(
-        **status.model_dump(exclude={"poll_after_seconds"}),
-        summary=DecisionSummary(performance=performance, quality=quality, evidence_gaps=gaps),
-        metrics=Performance.model_validate(
-            {key: value for key, value in metrics.items() if key in Performance.model_fields}
-        )
-        if metrics
-        else None,
-        preflight=run.get("preflight", {"status": "not_run"}),
-        evaluation_preflight=run.get("evaluation_preflight", {"status": "not_run"}),
-        evaluation=run.get("evaluation", {}),
-        load_error=run.get("load_error"),
-        planning_error=run.get("planning_error"),
-    )
 
 
 def install_routes(app: FastAPI, coordinator: RunCoordinator) -> None:
@@ -168,7 +69,7 @@ def install_routes(app: FastAPI, coordinator: RunCoordinator) -> None:
                         raise CoordinatorError(
                             409, "Idempotency-Key was used with a different body"
                         )
-                    stored = coordinator._read_run(UUID(prior["id"]))
+                    stored = coordinator.read_run(UUID(prior["id"]))
                     ack = Acknowledgment(
                         id=stored["id"], status=stored["status"], links=Links.for_run(stored["id"])
                     )
@@ -218,14 +119,14 @@ def install_routes(app: FastAPI, coordinator: RunCoordinator) -> None:
     @router.get("/runs/{run_id}", response_model=RunStatus)
     async def status(run_id: UUID, response: Response) -> RunStatus:
         """Poll lifecycle and independent phases without transferring report contents."""
-        view = status_view(coordinator._read_run(run_id))
+        view = status_view(coordinator.read_run(run_id))
         response.headers["Retry-After"] = str(int(view.poll_after_seconds))
         return view
 
     @router.get("/runs/{run_id}/result", response_model=Result)
     async def result(run_id: UUID) -> Result:
         """Read measured performance and protected quality evidence, including partial failures."""
-        run = coordinator._read_run(run_id)
+        run = coordinator.read_run(run_id)
         profiling = None
         if run["status"] in TERMINAL and run.get("plan"):
             profiling = coordinator.get_report(run_id).profiling
@@ -238,33 +139,7 @@ def install_routes(app: FastAPI, coordinator: RunCoordinator) -> None:
         limit: Annotated[int, Query(ge=1, le=100)] = 25,
     ) -> Report:
         """Read a bounded content-free profile page alongside protected assessment results."""
-        run = coordinator._read_run(run_id)
-        if run.get("plan") is None:
-            if run["status"] not in TERMINAL:
-                raise CoordinatorError(409, "Report is not ready", {"Retry-After": "1"})
-            profiling = ProfilingSummary(
-                total_requests=0,
-                traced_requests=0,
-                coverage=0,
-                notes=["Planning did not permit target traffic."],
-            )
-            return Report(
-                run=result_view(run, profiling),
-                profiling=profiling,
-                requests=[],
-                offset=offset,
-                limit=limit,
-                total=0,
-            )
-        legacy = coordinator.get_report(run_id, offset, limit)
-        return Report(
-            run=result_view(run, legacy.profiling),
-            profiling=legacy.profiling,
-            requests=legacy.requests,
-            offset=offset,
-            limit=limit,
-            total=legacy.total,
-        )
+        return report_view(coordinator, run_id, offset, limit)
 
     @router.post("/runs/{run_id}/cancel", response_model=Acknowledgment)
     async def cancel(run_id: UUID) -> Acknowledgment:

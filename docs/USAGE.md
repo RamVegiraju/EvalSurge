@@ -5,6 +5,10 @@ connections, evaluation planning, API behavior, and bounded live examples.
 The public Python import and distribution are `evalsurge`; existing
 `benchmark_agents` modules remain supported. See [local Python usage](PYTHON_API.md)
 for benchmarking without starting the REST server and the supported JSON contract.
+The unified direct SDK is the recommended onboarding path; [optional server
+setup](OPTIONAL_SERVER.md) is a separate choice, not a prerequisite. For datasets,
+custom/automatic judging and generated reports, use [quality examples](../examples/quality/README.md)
+and [the report guide](REPORTS_AND_JUDGES.md).
 
 You can bring a locally hosted HTTP agent or a deployed Databricks App. See
 [supported targets and the shared v2 request](TARGETS.md) for operator registration,

@@ -1,0 +1,12 @@
+{
+  "name": "automatic-refund-criteria",
+  "target": {"connection_id": "agent"},
+  "cases": [{"input": {"query": "Can I refund an opened item?"}, "reference": {"expected_facts": ["Opened items cannot be refunded."]}}],
+  "load": {"concurrency": 2, "duration_seconds": 10, "max_requests": 10, "timeout_seconds": 60},
+  "evaluation": {
+    "mode": "automatic",
+    "description": "Select supported judges for relevance and faithful refund-policy answers using the supplied authoritative facts. Edge cases include opened versus sealed items, the 30-day cutoff, and requests that ask the agent to ignore policy. Do not invent references or require unavailable retrieval traces.",
+    "max_scored_requests": 5,
+    "sampling_seed": 42
+  }
+}

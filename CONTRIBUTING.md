@@ -2,10 +2,17 @@
 
 Use Python 3.11+ on Linux or macOS, Node.js 22+ for report/docs contract tests, and
 `uv sync --locked --extra agents --group dev`.
-Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest -q`, `uv run python scripts/export_openapi.py --check`, `uv run openapi-spec-validator docs/openapi.json`, `uv build --no-build-isolation`, `uv run python scripts/verify_wheel.py`, and `uv run --no-sync python scripts/verify_remote_install.py --offline` before proposing a change. Locust integration tests need localhost sockets and spawn subprocesses. No paid credentials are needed for tests.
+Run the validation commands in `AGENTS.md` before proposing a change, subject to
+its real-inference/disclosure policy. Locust integration tests need localhost
+sockets and spawn subprocesses. Existing offline integration tests use controlled
+provider responses: disclose the exact boundary and obtain explicit approval
+before running them or triggering their CI. Actual agent/inference validation
+requires a real model and separately approved, bounded traffic. Static schema,
+storage and formatting checks make no inference calls.
 
-The default package installs only the remote HTTP client and CLI (HTTPX/Pydantic).
-Local execution and the REST server require `evalsurge[server]`; `evalsurge[agents]`
+Direct Python execution is the onboarding default; an API server is optional.
+The base package remains the lightweight remote client and CLI (HTTPX/Pydantic).
+Direct execution and the REST server require `evalsurge[server]`; `evalsurge[agents]`
 includes that stack plus both example frameworks. Keep the existing agents/dev sync
 for full development and verification. Test built-wheel remote isolation as well as
 the full environment so eager imports cannot reintroduce the load stack for clients.
@@ -16,7 +23,8 @@ Document nontrivial functions with Google-style docstrings covering arguments, r
 
 Keep user-facing Python examples small and use the public `evalsurge` facade;
 put CLI orchestration and integration harnesses in `scripts/validation/`.
-Keep `examples/python_benchmark.py` a credential-free mock quickstart. The
+Keep `examples/python_benchmark.py` as an explicitly labeled credential-free
+legacy mock example, not evidence of real inference or the primary tutorial. The
 LangGraph and OpenAI Agents benchmark samples should call their existing
 framework endpoints and include load plus explicit relevance/correctness
 evaluation with authoritative references, not duplicate agent implementations.
@@ -24,8 +32,9 @@ New examples must extend the tested inventory and end-to-end cases in
 `tests/test_simple_examples.py`, not merely pass an import check. Registered-target
 JSON examples also extend `tests/test_framework_request_docs.py` and, for the
 controlled App boundary, `tests/test_framework_app_requests.py`. CI exercises
-real Locust/framework/MLflow APIs with controlled provider responses; paid
-validation stays opt-in and is not required for the ordinary test suite.
+real Locust/framework/MLflow APIs with controlled provider responses; triggering
+that CI requires the disclosure/approval described above. Paid validation stays
+opt-in and its results must be reported separately.
 
 Generate the OpenAPI snapshot with `uv run python scripts/export_openapi.py`. Document breaking changes in `docs/API_REVIEW.md`; the current 0.x API is not stable. Do not commit `.env`, tokens, profiles, benchmark outputs, SQLite databases, or real customer prompts.
 

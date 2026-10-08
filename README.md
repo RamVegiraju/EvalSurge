@@ -1,325 +1,214 @@
 # EvalSurge
 
-A local-first Python library and REST API for benchmarking locally hosted HTTP
-agents and deployed Databricks Apps.
+Framework-agnostic load testing and evaluation for hosted agents.
 
-- **Performance:** latency, throughput, errors, and answer-text TTFT for supported SSE.
-- **Evaluation:** opt-in suggested judges, brought MLflow judges, and per-criterion results.
-- **Profiling:** request heatmaps and tool/model/memory waterfalls from correlated MLflow traces.
+**Bring your agent. Give us an endpoint and test cases. EvalSurge measures its
+performance under load and evaluates its captured answers when you enable judging.**
 
-**Local alpha:** Linux/macOS, single tenant, one active run. Not a shared production
-service, and a single load level does not establish sustainable capacity.
+Use any agent framework or your own implementation. The integration boundary is
+the hosted endpoint's input/answer contract, not the framework inside it. Run
+directly from Python; an EvalSurge API server is optional.
 
-## Recommended request: registered targets (v2)
+- Performance: latency, throughput, errors, and answer-text TTFT for supported SSE.
+- Evaluation: opt-in catalog or reviewed MLflow judges, with per-judge coverage.
+- Profiling: heatmaps and waterfalls when the agent exports correlated MLflow traces.
 
-Have the operator register an already running HTTP agent or a Databricks App,
-then submit the same request shape for either hosting option:
+Local alpha: Linux/macOS, single tenant, one active run per artifact owner. A single
+load level is an observation, not proof of sustainable capacity.
 
-```json
-{
-  "name": "refund-performance-baseline",
-  "target": {"connection_id": "refund-agent"},
-  "cases": [{"input": {"query": "Can I refund an opened item?"}}],
-  "load": {"concurrency": 3, "duration_seconds": 10, "max_requests": 20}
-}
-```
+## Bring your agent
 
-Send it to `POST /v2/runs` through REST, the remote SDK, or the CLI. Evaluation
-defaults to off: no planner or judge calls. The target itself can still incur
-cost. Profiles, URLs, credentials and protocols stay in operator configuration,
-not public requests. Start with [the four framework/hosting examples](docs/FRAMEWORK_TARGET_EXAMPLES.md)
-for local LangGraph/OpenAI Agents or deployed Apps; see
-[v2 setup and submission](docs/V2_API.md) for authentication and lifecycle details.
+You do **not** need to know your agent's supported concurrency before testing.
+Concurrency is the number of simultaneous clients you want EvalSurge to try.
+Start small, inspect latency/errors, and increase the bounded load deliberately.
+Automatic capacity discovery is not implemented yet.
 
-## Credential-free quickstart (legacy v1)
+- **Your HTTP server:** expose a reachable POST endpoint that accepts your case
+  input as JSON and returns `{"outputs": "the completed answer"}`. Use
+  `protocol="http-json"`; existing compatible streaming endpoints are also supported.
+- **Your Databricks App:** deploy with DurableAgentServer and bind the App name
+  and an explicitly selected OAuth profile. EvalSurge handles discovery and authentication.
+- **Evaluation:** inputs and captured answers are enough for answer-based judges;
+  correctness also needs your references. Internal traces are optional, not a
+  prerequisite for all evaluation.
 
-The following standalone mock tutorial preserves the supported `/v1` contract.
-Prefer `/v2` for new registered-target integrations; local Python retains its
-existing compatible facade below.
+Follow the [end-to-end hosted-agent recipe](docs/AGENT_INTEGRATION.md) for any
+framework. It shows the thin server wrapper, shared benchmark request, optional
+judging, and trace requirements. LangGraph, OpenAI Agents and CrewAI are examples,
+not a framework allowlist; another framework needs no new EvalSurge adapter if
+its endpoint already satisfies the same contract.
+EvalSurge does not import a graph, deploy your agent, or automatically instrument
+its internals. Keep endpoint/provider credentials outside the benchmark request.
 
-Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and `jq` for the sample
-request. No model credentials or paid calls are needed.
+## Start in Python
 
-### 1. Install and start the API
-
-```bash
-git clone https://github.com/RamVegiraju/EvalSurge.git
-cd EvalSurge
-uv sync --locked --default-index https://pypi.org/simple --extra agents --group dev
-uv run --no-sync uvicorn benchmark_agents.api:app --host 127.0.0.1 --port 8000 --no-proxy-headers
-```
-
-API docs: `http://127.0.0.1:8000/docs/`. Keep one API worker.
-The API host also runs the Locust load generator. A laptop is suitable for this
-quickstart; use a separate, dedicated runner for repeatable load measurements.
-Runner size and network location affect the result. See [where to run
-EvalSurge](docs/USAGE.md#where-to-run-evalsurge).
-
-The quickstart selects public PyPI explicitly and reuses the installed environment.
-See [dependency setup and update limits](docs/DEPENDENCIES.md) if your network restricts package access.
-
-### 2. Start the sample agent
-
-In a second terminal, from the repository:
+Requires Python 3.11+ and an authorized agent that already uses a real model.
+Install the execution dependencies in your project:
 
 ```bash
-uv run --no-sync uvicorn examples.mock_agent:app --host 127.0.0.1 --port 9001 --no-proxy-headers
+uv add 'evalsurge[server]'
 ```
 
-### 3. Send a benchmark request
-
-In a third terminal:
-
-```bash
-RUN_ID=$(curl --fail-with-body -sS http://127.0.0.1:8000/v1/runs \
-  -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: first-local-run' \
-  -d '{
-    "target": {"url": "http://127.0.0.1:9001/chat"},
-    "evaluation": {
-      "description": "Answer refund questions accurately",
-      "scorers": [],
-      "samples": [{"inputs": {"query": "Can I refund an opened item?"}}]
-    },
-    "load": {"concurrency": 3, "max_requests": 20, "duration_seconds": 10}
-  }' | jq -er '.id')
-echo "$RUN_ID"
-```
-
-The API returns **202 Accepted**. `scorers: []` disables planning and judging.
-Use a new idempotency key for a new run; the same key and body replay the original.
-
-Before load, the API checks evaluation setup, invokes the first sample once, and
-checks each selected judge against that captured answer. Failure stops load and
-shows corrective guidance in the API and report. These extra checks can incur
-cost; they are excluded from benchmark metrics and quality scores.
-
-### 4. View the result
-
-Poll until `completed` or `completed_with_gaps`:
-
-```bash
-curl --fail-with-body -sS "http://127.0.0.1:8000/v1/runs/$RUN_ID" \
-  | jq '{status, preflight, evaluation_preflight, load_status, load_error, evaluation_status, metrics}'
-```
-
-`failed`, `cancelled`, and `interrupted` are also terminal; inspect their phase
-statuses. Open `http://127.0.0.1:8000/reports/?run=YOUR_RUN_ID` with the returned ID.
-For JSON, use `GET /v1/runs/{run_id}/report`.
-
-The mock makes no LLM calls and has no internal traces. For **LangGraph and OpenAI
-Agents** with tools, memory, and tracing, see the
-[framework agent benchmarks](examples/README.md#framework-agent-benchmarks).
-
-## Benchmark your agent
-
-Bring an already running HTTP agent, or have the operator register a Databricks
-App with an explicitly selected OAuth profile. The same `/v2/runs` request works
-for either target by changing `target.connection_id`; evaluation defaults to off.
-EvalSurge does not deploy your agent or execute an arbitrary Python callable.
-“Localhost” is relative to the load generator: your machine for `EvalSurge.local()`,
-the API host for remote SDK/REST submissions. Supported input/response contracts,
-two-target operator setup, and limitations are in [the target guide](docs/TARGETS.md).
-For copyable LangGraph and OpenAI Agents requests under both hosting options, see
-[the four framework-target examples](docs/FRAMEWORK_TARGET_EXAMPLES.md).
-
-Replace `target.url` with your authorized supported HTTP endpoint and supply workload
-samples when using `/v1`; v2 instead selects the registered connection.
-Set `target.model` if required by the v1 protocol.
-
-- **Suggested judges:** configure a planner, omit `evaluation.scorers`, and review
-  `POST /v1/evaluation-plans` before submitting its `plan_id`.
-- **Your judges and data:** supply samples/references and select operator-allowlisted
-  MLflow aliases through `evaluation.registered_scorers`.
-- **Internal profiling:** correlate agent-side MLflow traces; an endpoint alone
-  cannot reveal tool or memory timing.
-
-The report separates judge rationale/readiness from scored outcomes, coverage,
-and errors. Missing evidence never counts as a pass. Catalog judging currently
-requires Databricks; see [provider compatibility](docs/MODEL_COMPATIBILITY.md).
-
-Remote/authenticated agents require [server-owned connections](docs/USAGE.md#connections-and-authentication).
-If `BENCHMARK_API_KEY` is configured, add `X-API-Key` to API calls or enter it in
-the report form. Only benchmark agents you are authorized to exercise.
-
-### Registered targets and automatic judging (v2)
-
-For the simpler API, the operator registers a target such as `refund-agent` and
-configures the planner and judge provider. Clients submit `POST /v2/runs` without
-sending endpoint URLs, Databricks profiles, or OAuth tokens:
-
-```json
-{
-  "name": "refund-quality-baseline",
-  "target": {"connection_id": "refund-agent"},
-  "cases": [{
-    "input": {"query": "Can I refund an opened item?"},
-    "reference": {"expected_response": "Opened items are not refundable."}
-  }],
-  "load": {"concurrency": 3, "duration_seconds": 10, "max_requests": 20},
-  "evaluation": {
-    "mode": "automatic",
-    "description": "Answer refund questions accurately according to the refund policy.",
-    "max_scored_requests": 20
-  }
-}
-```
-
-This reference is illustrative; replace it with your authoritative policy.
-`automatic` lets the configured LLM recommend supported judges and operator-approved
-registered scorers. EvalSurge validates evidence/readiness and freezes the plan;
-the model cannot create scorer code or change load limits. Planning and judging
-can incur cost, and the sample budget is per selected judge. Judging reuses captured
-answers; one additional inference probe occurs before measured load.
-
-Omit `evaluation` or use `mode: "off"` for performance-only runs. Use
-`mode: "explicit"` with `scorers` to choose criteria yourself. V2 returns `202`
-before planning; poll the returned status link and inspect independent phase
-outcomes. `/v1/evaluation-plans` remains available for suggestion/review before
-running; v2 automatic mode plans within the run.
-
-See [v2 operator setup, Databricks Apps, remote SDK, and CLI](docs/V2_API.md).
-
-The base distribution (`evalsurge`) supports remote SDK/CLI use with only HTTPX
-and Pydantic as mandatory dependencies. Use `evalsurge[server]` for local benchmarks
-or the API, and `evalsurge[agents]` for the framework examples. The checkout
-quickstart above already includes server and framework dependencies.
-
-Databricks Apps use `/api/invocations` by default for current DurableAgentServer
-deployments. Existing MLflow AgentServer Apps select `mlflow-agent-server` for
-`/responses`. See the [bounded App validation guide](docs/DATABRICKS_APP_VALIDATION.md)
-before sending live traffic. Fixed message adapters require exactly one `query`
-or `messages` field; extra inference fields are rejected, never silently dropped.
-On October 8, separate native LangGraph and OpenAI Agents Apps each passed 500
-measured requests at five configured users with zero errors, plus intentional
-failed-preflight checks proving zero measured traffic afterward. Those live
-samples were stateless/tool-free and quality-off; native JSON TTFT/token usage
-and internal tracing were unavailable. The earlier October 7 small quality check
-is separate historical evidence, not proof of a currently deployed App. See
-[the validation record](VALIDATION.md) for revisions, preserved failures and
-coverage limits. These checks do not establish sustainable capacity or judge
-calibration.
-
-### Python API
-
-With your agent running, no EvalSurge web server is required:
+No EvalSurge server, operator TOML, or REST polling is needed:
 
 ```python
-from evalsurge import Agent, EvalSurge, Load, Sample
+from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference
 
-with EvalSurge.local(artifact_dir="artifacts/python") as client:
-    run = client.start(
-        agent=Agent.http("http://127.0.0.1:9001/chat"),
-        cases=[
-            Sample(
-                inputs={"query": "Can I refund an opened item?"},
-                expectations={"expected_response": "Opened items are not refundable."},
-            )
-        ],
-        load=Load(concurrency=3, max_requests=20, duration_seconds=10),
-    )
-    report = run.wait(timeout=120)
+request = RunCreate(
+    name="first-benchmark",
+    target=TargetReference(connection_id="agent"),
+    cases=[Case(input={"query": "Give a short greeting."})],
+    load=Load(concurrency=2, duration_seconds=10, max_requests=10),
+)
+
+with EvalSurge(
+    artifact_dir="artifacts/first-benchmark",
+    targets={"agent": Agent.http("http://127.0.0.1:9001/invoke", protocol="http-json")},
+) as client:
+    run = client.start(request)
+    report = run.wait(timeout=300)
     print(report.model_dump_json(indent=2))
 ```
 
-The default is performance-only; enable judging explicitly. `wait()` raises
-`RunFailed` with the report if preflight or the run fails. Use `EvalSurge.local_async()` in
-async applications. See [Python usage and the JSON contract](docs/PYTHON_API.md).
-Local Python runs generate load on this machine; REST runs generate load on the API host.
+Evaluation defaults to off: no planner or judge calls. The agent itself can incur
+cost and execute tools. Before measured load, one extra first-case invocation
+checks readiness. It is excluded from the metrics; failure stops load. The request
+cap can end dispatch before ten seconds. Startup, preflight, drain, and optional
+profiling/judging add time.
 
-Start with the credential-free [mock Python quickstart](examples/python_benchmark.py).
-For load plus explicit relevance/correctness evaluation of framework agents, use
-[LangGraph](examples/langgraph_benchmark.py) or
-[OpenAI Agents](examples/openai_agents_benchmark.py); see the
-[example guide](examples/README.md#framework-agent-benchmarks) for agent startup,
-judge configuration, and costs. Advanced CLI and integration runners live
-separately under `scripts/validation/`.
-For a three-minute run and report UI, see [the Python example](docs/PYTHON_API.md#three-minute-example).
-For an existing REST server, use the [Python Requests example](docs/USAGE.md#python-requests-client).
-Duration limits dispatch, not total runtime; the request cap may stop it sooner.
-See [runtime and timeouts](docs/USAGE.md#how-long-does-a-run-take).
+The HTTP example sends `{"query": "Give a short greeting."}` unchanged and expects
+`application/json` with a nonempty `outputs` string. It does not provide TTFT.
+If your existing endpoint speaks streaming Chat Completions, explicitly use
+`protocol="openai-chat"` instead. See [supported target protocols](docs/TARGETS.md#supported-wire-contracts)
+and [the streaming HTTP script](examples/journeys/direct_http.py).
 
-### Optional quality evaluation
+## Target a Databricks App
 
-Configure the [judge and MLflow tracking settings](docs/USAGE.md#planning-and-evaluation),
-then pass this policy as `evaluation=evaluation` to `client.start(...)`:
+Keep App identity and the explicitly selected OAuth profile in target
+configuration, outside the benchmark request. Use the same `request` as above:
 
 ```python
-from evalsurge import Evaluation
+with EvalSurge(
+    artifact_dir="artifacts/app-benchmark",
+    targets={
+        "agent": Agent.databricks_app("your-deployed-app", profile="YOUR_SELECTED_OAUTH_PROFILE")
+    },
+) as client:
+    report = client.start(request).wait(timeout=300)
+    print(report.model_dump_json(indent=2))
+```
 
-evaluation = Evaluation(
-    description="Apply the refund policy correctly.",
-    scorers=["relevance", "correctness"],
-    registered_scorers=[],
-    max_scored_requests=20,
+The default is DurableAgentServer's synchronous `/api/invocations` contract.
+EvalSurge resolves the App through the selected Databricks SDK
+profile and refreshes OAuth; it does not deploy the agent, provision Lakebase,
+negotiate protocols, or retry model requests. Native invocation JSON does not
+provide answer-text TTFT or token usage. See [the App script](examples/journeys/direct_app.py)
+and [framework/hosting examples](docs/FRAMEWORK_TARGET_EXAMPLES.md).
+
+## From a Databricks notebook
+
+Use the same Python request and App binding on the notebook driver. Start with
+classic compute; serverless validation is separate. The [notebook source
+example](examples/journeys/classic_notebook.py) is consent-gated and includes
+context-managed cleanup. Configure an explicitly selected OAuth profile on the
+driver first; a profile on your laptop is not automatically present in a notebook.
+App access and the spawned worker's authentication must both be verified.
+
+These new journey samples have static contract coverage; their presence is not
+evidence that all notebook/hosting combinations passed live validation. Consult
+[the validation record](VALIDATION.md) for actual model, hosting, and traffic bounds.
+The October 8 serverless HTTP/API validation failed without a final receipt;
+notebook-to-App worker authentication and current deployed-App journeys remain
+unverified. The notebook example is not a supported-serverless claim.
+
+## Where requests originate
+
+Direct Python sends benchmark traffic from the Python caller's machine: your
+laptop, or the notebook driver. Optional remote SDK/REST execution sends traffic
+from the EvalSurge API host, not the submitting laptop. Thus `127.0.0.1` means
+the runner's loopback. Network location and runner resources affect the result.
+Use a runner separate from the target for repeatable measurements.
+
+## Add your dataset and judges
+
+Use `Case(input=..., reference=...)` or load your own JSON dataset into `cases`.
+References are your authoritative facts, not answers generated by the planner:
+
+```python
+from evalsurge import EvaluationPolicy
+
+judged = request.model_copy(
+    update={
+        "cases": [
+            Case(
+                input={"query": "Can an opened item be refunded?"},
+                reference={"expected_facts": ["Opened items cannot be refunded."]},
+            )
+        ],
+        "evaluation": EvaluationPolicy(
+            mode="explicit",
+            description="Apply the stated refund policy faithfully.",
+            scorers=["relevance", "correctness"],
+            max_scored_requests=5,
+        ),
+    }
 )
 ```
 
-Correctness uses the authoritative `expectations` supplied in each case.
-`max_scored_requests` is EvalSurge's sample budget **per judge**, not a load limit
-or an MLflow requirement. Judges reuse captured answers, never reinvoke the agent.
+Configure the catalog judge provider separately before submitting this request.
+For automatic selection, use `EvaluationPolicy(mode="automatic", description=...)`
+without scorer IDs. The planner selects from supported criteria and approved
+registered aliases; it cannot invent ground truth or judge code. You can also
+select your already reviewed, operator-registered judge as `registered:policy`.
+See [copyable dataset, explicit, custom, automatic, and edge-case samples](examples/quality/README.md).
 
-### Example report output
+Judging reuses captured answers, never invokes the agent again. Each selected
+judge also performs an extra excluded readiness assessment. `max_scored_requests`
+is a sample budget per judge, not a dollar/token/retry cap.
 
-Illustrative JSON excerpt **with judging enabled**, showing one failed assessment.
-IDs/timings vary; configuration, other assessments, and profile fields are omitted.
-The performance-only quickstart instead returns `evaluation.status: "no_ready_scorers"`.
+For internal waterfalls or judges that inspect tools/retrieval/memory, export
+correlated MLflow traces from the agent and configure authorized tracking access
+in EvalSurge. A protocol, framework name, App Runtime Store, or returned trace ID
+alone does not supply internal traces. Missing trace coverage is reported, not inferred.
+See [the optional tracing recipe](docs/AGENT_INTEGRATION.md#optional-internal-tracing).
 
-```json
-{
-  "run": {
-    "id": "00000000-0000-4000-8000-000000000001",
-    "status": "completed",
-    "metrics": {
-      "requests": 20,
-      "successful_requests": 20,
-      "error_rate": 0.0,
-      "successful_tps": 40.0,
-      "timing_successful_only": {
-        "latency_ms": {"count": 20, "p50": 52.0, "p95": 55.0, "p99": 58.0},
-        "ttft_ms": {"count": 20, "p50": 26.0, "p95": 28.0, "p99": 30.0}
-      }
-    },
-    "evaluation": {
-      "status": "completed",
-      "results": [{
-        "scorer": "correctness",
-        "attempted": 20,
-        "scored": 20,
-        "judge_errors": 0,
-        "pass_rate": 0.8,
-        "assessments": [{
-          "request_id": "00000000-0000-4000-8000-000000000002",
-          "case_id": 0,
-          "status": "failed",
-          "value": false,
-          "rationale": "The answer allowed a refund for an opened item.",
-          "rationale_truncated": false,
-          "error": null
-        }]
-      }]
-    }
-  }
-}
-```
+## Read the report
 
-Lifecycle `completed` is not a quality pass. Judge execution errors show safe
-diagnostics instead of quality verdicts. Heatmaps require correlated agent-side
-traces; the Python API returns data, not a running report server.
-Protect reports: judge rationales can quote private inputs, answers, and references.
+Both direct and typed remote run handles expose `status()`, `result()`, `report()`,
+`wait()`, and `cancel()`. Results separate load completion, quality outcomes, and
+evidence gaps. A completed run can have failed quality assessments; missing
+TTFT/traces remain unknown. See [reports and judges](docs/REPORTS_AND_JUDGES.md)
+for the generated structure and browser sections.
+
+The Python API returns typed data, not a running report web server. If you want
+the browser report, close the direct client and then serve its retained artifact
+directory using [the optional server guide](docs/OPTIONAL_SERVER.md#open-a-retained-report).
+Reports can contain prompts, answers, references, and judge rationales; protect them.
+
+## Optional server and compatibility
+
+Use [optional server execution](docs/OPTIONAL_SERVER.md) to move the runner off
+your laptop. `EvalSurge.remote(url, typed=True).start(request)` accepts the same
+v2 model; the server owns target registration and credentials. The base
+`evalsurge` install remains a lightweight remote client/CLI.
+
+Existing `/v1`, `EvalSurge.local().start(agent=..., cases=..., ...)`, and dictionary
+remote SDK calls remain compatibility interfaces. The legacy [credential-free
+mock tutorial](examples/README.md#credential-free-mock-quickstart) is retained and
+explicitly does not validate real model inference.
+Existing MLflow AgentServer `/responses` bindings remain
+[advanced compatibility](docs/TARGETS.md#legacy-protocol-compatibility), not the
+recommended Databricks deployment path.
 
 ## Documentation
 
-- [Registered-target v2 API, remote SDK/CLI, and Databricks Apps](docs/V2_API.md)
-- [Configuration, API operations, and live examples](docs/USAGE.md)
-- [Traces, manifests, MLflow judges, and datasets](docs/PROFILING_AND_EVALUATION.md)
-- [Architecture](ARCHITECTURE.md) · [Code guide](docs/CODE_GUIDE.md) · [Validation](VALIDATION.md)
-- [Dependencies](docs/DEPENDENCIES.md) · [Security](SECURITY.md) · [Deployment gates](docs/PRODUCTION_READINESS.md)
+- [Python request, lifecycle, auth, and compatibility](docs/PYTHON_API.md)
+- [Bring any agent framework: end-to-end](docs/AGENT_INTEGRATION.md)
+- [Framework/hosting examples](docs/FRAMEWORK_TARGET_EXAMPLES.md) · [Examples index](examples/README.md)
+- [v2 REST and CLI](docs/V2_API.md) · [Optional server](docs/OPTIONAL_SERVER.md)
+- [Traces, registered judges, and evidence](docs/PROFILING_AND_EVALUATION.md)
+- [Architecture](ARCHITECTURE.md) · [Validation](VALIDATION.md)
+- [Dependencies](docs/DEPENDENCIES.md) · [Security](SECURITY.md) · [Production gates](docs/PRODUCTION_READINESS.md)
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and checks. Report bugs or ask
-questions in [GitHub Issues](https://github.com/RamVegiraju/EvalSurge/issues);
-report security issues privately as described in [SECURITY.md](SECURITY.md).
-
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development checks and inference disclosure.
 Licensed under [MIT](LICENSE).

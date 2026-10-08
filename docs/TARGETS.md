@@ -1,5 +1,9 @@
 # Bring a local HTTP agent or a Databricks App
 
+Agent frameworks are not the integration boundary. Any framework or custom
+implementation can be benchmarked when its hosted endpoint satisfies a supported
+wire contract. Named framework examples are not a supported-framework allowlist.
+
 Both are supported through the same coordinator, fail-fast preflights, sole
 Locust engine, and captured-answer evaluation. Your agent must already be running,
 reachable from the runner, and compatible with a supported input/response contract.
@@ -7,11 +11,28 @@ EvalSurge does not deploy agents, import remote source, run arbitrary Python
 callables, or automatically instrument an agent's internal model/tools/memory.
 Copyable LangGraph and OpenAI Agents requests for both hosting options are in
 [the four framework-target examples](FRAMEWORK_TARGET_EXAMPLES.md).
+For the minimal JSON contract and a thin wrapper around an existing LangGraph,
+OpenAI agent, or CrewAI crew, start with [the hosted-agent recipe](AGENT_INTEGRATION.md).
+Users choose the bounded concurrency to test; knowing the target's capacity is
+not an admission requirement. A successful first-case probe proves protocol
+readiness for that case, not capacity or every case's compatibility.
+
+## Direct Python setup
+
+Use `EvalSurge(targets={"agent": Agent.http(url)})` or bind an existing App with
+`Agent.databricks_app(name, profile="YOUR_SELECTED_OAUTH_PROFILE")` outside the
+benchmark request. `client.start(RunCreate(...))` selects the alias through
+`target.connection_id` in either case. No API server or operator TOML is required.
+See [the Python guide](PYTHON_API.md) and [journey scripts](../examples/README.md).
+The direct caller is the operator; profiles and credentials remain configuration,
+not public request fields. Hosting/authentication resolution remains independent
+of the selected wire protocol.
 
 ## Choose where load runs
 
-- `EvalSurge.local()` / `local_async()`: install `evalsurge[server]`; your Python
-  process's machine runs Locust. Bind an authorized HTTP endpoint with `Agent.http()`.
+- `EvalSurge(...)` / `EvalSurge.local()` / `local_async()`: install
+  `evalsurge[server]`; your Python caller's machine runs the load. Bind an authorized
+  HTTP endpoint or deployed App outside the v2 request.
 - `/v2` with the remote SDK/CLI: the lightweight `evalsurge` client submits work to
   a separately installed API server. The API host runs Locust; the operator registers
   either target type and end users select `target.connection_id`.
@@ -25,7 +46,10 @@ Configure service authentication/TLS for remote EvalSurge access. See
 [Python usage](PYTHON_API.md), [v2 setup](V2_API.md), and
 [runner placement](USAGE.md#where-to-run-evalsurge).
 
-## Register both targets
+## Optional server: register both targets
+
+The following registration is only needed for [server execution](OPTIONAL_SERVER.md),
+not the direct Python setup above.
 
 Illustrative operator TOML, with no credentials. Replace the App/profile placeholders
 only after explicitly selecting an authorized profile. Registration does not deploy
@@ -93,13 +117,11 @@ never reinvoke the target.
 
 | Protocol | Request | Response / timing |
 | --- | --- | --- |
-| `openai-chat` | Exactly `query` or `messages`; Chat messages/model, `stream=true` | Supported Chat Completions SSE; answer-text TTFT |
-| `mlflow-agent-server` | Exactly `query` or `messages`; `input` messages, `stream=true` | Supported Responses-style SSE; answer-text TTFT |
-| `databricks-agent-runtime` | Exactly `query` or `messages`; generated invocation/session IDs, `stream=false`, `background=false` | Completed invocation with string, `answer`, or supported completed assistant messages; no JSON TTFT/first-event or token usage |
 | `http-json` | Raw nonempty case input object, unchanged | Complete JSON object with nonempty `outputs` text, optional validated usage/trace ID; no TTFT/first-event |
+| `openai-chat` | Exactly `query` or `messages`; Chat messages/model, `stream=true` | Supported Chat Completions SSE; answer-text TTFT |
+| `databricks-agent-runtime` | Exactly `query` or `messages`; generated invocation/session IDs, `stream=false`, `background=false` | Completed invocation with string, `answer`, or supported completed assistant messages; no JSON TTFT/first-event or token usage |
 
-The App default is current DurableAgentServer `/api/invocations`. Existing MLflow
-AgentServer Apps explicitly select `mlflow-agent-server` for `/responses`. No
+The App default is current DurableAgentServer `/api/invocations`. No
 protocol negotiation, fallback traffic, hidden polling, or target retry occurs.
 
 Fixed message adapters reject extra top-level fields: `custom_inputs`, actor identity,
@@ -115,6 +137,20 @@ history. Runtime Store execution persistence is distinct from Session Store tran
 history and Memory Store cross-session facts. The App's internal model API is also
 separate from its public protocol: our sample uses a Responses model internally
 while exposing `/api/invocations`. Verify model API support independently.
+
+## Legacy protocol compatibility
+
+Existing MLflow AgentServer Apps can explicitly select `mlflow-agent-server`
+for `/responses`. This adapter accepts exactly `query` or `messages`, sends
+`{"input": [...], "stream": true}`, and requires supported Responses-style SSE
+with answer text and terminal completion. It remains available for existing
+HTTP/App bindings, not as a recommended path for new App deployments.
+
+Official [Agent Server guidance](https://docs.databricks.com/aws/en/agents/deploy/agent-server),
+checked October 8, 2026, labels MLflow AgentServer **legacy** and recommends
+DurableAgentServer. It does not state a removal date on that page. Removing
+EvalSurge's public adapter requires a migration/release decision and maintainer
+review; hiding it from onboarding does not silently change existing requests.
 
 ## Verification boundaries
 

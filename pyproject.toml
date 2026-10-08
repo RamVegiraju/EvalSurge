@@ -48,3 +48,6 @@ dev-mode-dirs = ["."]
 
 [tool.hatch.build.targets.wheel]
 packages = ["benchmark_agents", "evalsurge"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/.isaac"]

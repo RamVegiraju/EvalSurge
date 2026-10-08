@@ -21,8 +21,10 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 import httpx
+from pydantic import ValidationError
 
-from benchmark_agents.v2_models import RunCreate
+from benchmark_agents.v2_models import Acknowledgment, Report, Result, RunCreate, RunStatus
+from benchmark_agents.validation import encode_request
 
 MAX_REQUEST_BYTES = 8_000_000
 _ACTIVE = {"queued", "planning", "preflighting", "running", "profiling", "evaluating"}
@@ -81,7 +83,7 @@ class RemoteTimeout(RemoteError):
 class RemoteRunFailed(RemoteError):
     """Failed lifecycle with protected report retained only on the attribute."""
 
-    def __init__(self, report: dict[str, Any]) -> None:
+    def __init__(self, report: dict[str, Any] | Report) -> None:
         self.report = report
         super().__init__("Benchmark run failed, was cancelled, or was interrupted; inspect report.")
 
@@ -439,17 +441,7 @@ class RemoteClient:
             ValueError: Configuration/header is invalid or exceeds eight million bytes.
             RemoteError: Service/transport failure. Uncertain POSTs are never replayed.
         """
-        if isinstance(config, RunCreate):
-            config = config.model_dump(mode="json", exclude_unset=True)
-        if not isinstance(config, Mapping) or not config:
-            raise ValueError("Configuration must be a nonempty JSON object")
-        try:
-            RunCreate.model_validate(dict(config))
-            content = json.dumps(dict(config), allow_nan=False, ensure_ascii=False).encode("utf-8")
-        except (TypeError, ValueError, OverflowError, RecursionError):
-            raise ValueError("Configuration must contain finite JSON-compatible values") from None
-        if len(content) > MAX_REQUEST_BYTES:
-            raise ValueError("Configuration exceeds the eight-million-byte limit")
+        _, content = encode_request(config)
         headers = {}
         if idempotency_key is not None:
             if not isinstance(idempotency_key, str) or not re.fullmatch(
@@ -604,3 +596,87 @@ class RemoteClient:
                     if exc.retry_after_seconds is not None
                     else self._poll_interval
                 )
+
+
+def _typed_response(model: type[Any], body: dict[str, Any]) -> Any:
+    """Validate a protected response without putting native validation values in errors."""
+    try:
+        return model.model_validate(body)
+    except ValidationError:
+        raise RemoteProtocolError(
+            "Service response does not match the documented typed contract."
+        ) from None
+
+
+@dataclass(frozen=True, slots=True)
+class TypedRemoteRun:
+    """A typed service-owned handle; closing its client does not cancel its work."""
+
+    id: UUID
+    _client: "TypedRemoteClient" = field(repr=False)
+    _poll_after_seconds: float = field(default=0, repr=False)
+
+    @property
+    def report_url(self) -> str:
+        """Return the credential-free browser shell address."""
+        return self._client.report_url(self.id)
+
+    def status(self) -> RunStatus:
+        """Read independent lifecycle phases without protected request contents."""
+        return self._client.status(self.id)
+
+    def wait(self, timeout: float | None = None) -> Report:
+        """Wait in seconds; completion does not imply a passing quality verdict."""
+        return self._client.wait(self.id, timeout=timeout, _initial_delay=self._poll_after_seconds)
+
+    def result(self) -> Result:
+        """Read available performance and protected quality evidence."""
+        return self._client.result(self.id)
+
+    def report(self, *, offset: int = 0, limit: int = 25) -> Report:
+        """Read a bounded profile page alongside protected assessments."""
+        return self._client.report(self.id, offset=offset, limit=limit)
+
+    def cancel(self) -> Acknowledgment:
+        """Request dispatch cancellation once; active requests drain."""
+        return self._client.cancel(self.id)
+
+
+class TypedRemoteClient(RemoteClient):
+    """Additive typed v2 adapter; legacy RemoteClient dictionary methods stay intact."""
+
+    def start(
+        self, config: Mapping[str, Any] | RunCreate, *, idempotency_key: str | None = None
+    ) -> TypedRemoteRun:
+        """Validate and submit once using the existing bounded HTTP transport."""
+        run = super().start(config, idempotency_key=idempotency_key)
+        return TypedRemoteRun(run.id, self, run._poll_after_seconds)
+
+    def status(self, run_id: UUID | str) -> RunStatus:
+        """Read a validated lightweight status; never follow response links."""
+        return _typed_response(RunStatus, super().status(run_id))
+
+    def result(self, run_id: UUID | str) -> Result:
+        """Read typed independent outcomes; no new model calls occur here."""
+        return _typed_response(Result, super().result(run_id))
+
+    def report(self, run_id: UUID | str, *, offset: int = 0, limit: int = 25) -> Report:
+        """Read typed protected report data with bounded pagination."""
+        return _typed_response(Report, super().report(run_id, offset=offset, limit=limit))
+
+    def cancel(self, run_id: UUID | str) -> Acknowledgment:
+        """Validate cancellation acknowledgment without replaying mutations."""
+        return _typed_response(Acknowledgment, super().cancel(run_id))
+
+    def wait(
+        self, run_id: UUID | str, timeout: float | None = None, *, _initial_delay: float = 0
+    ) -> Report:
+        """Return a typed report; failed lifecycles retain typed evidence on the error.
+
+        Timeout leaves service work active. False judge verdicts are returned normally.
+        """
+        try:
+            body = super().wait(run_id, timeout, _initial_delay=_initial_delay)
+        except RemoteRunFailed as error:
+            raise RemoteRunFailed(_typed_response(Report, error.report)) from None
+        return _typed_response(Report, body)

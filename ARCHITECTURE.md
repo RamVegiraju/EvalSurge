@@ -2,6 +2,15 @@
 
 The current milestone is a reproducible single-run benchmark with durable partial records, correlated framework traces, a bounded visual report, and representative quality sampling. Shared hosting and capacity discovery remain separate release gates.
 
+Direct Python execution is the onboarding default. `EvalSurge(...)` binds
+operator-owned `Agent.http(...)` or `Agent.databricks_app(...)` targets outside
+the v2 `RunCreate`; `EvalSurge.remote(..., typed=True)` submits that same request
+to an optional API host. New handles share typed status/result/report/cancel
+contracts. Legacy local keyword calls, dictionary-returning remote calls and
+`/v1` remain compatible. See [ADR 0011](docs/adr/0011-unified-direct-and-remote-sdk.md)
+and [the Python guide](docs/PYTHON_API.md). Maintainer review and new live journey
+validation remain separate gates, not claims established by schema checks.
+
 The additive `/v2` façade selects registered targets and defaults evaluation to off.
 Registered targets can be ordinary HTTP endpoints (including runner-local agents)
 or deployed Databricks Apps. Hosting/discovery and invocation protocol are separate:
@@ -12,6 +21,13 @@ task-local snapshots; App discovery, OAuth, and synchronous invocation wire hand
 remain separate from load execution. See [the v2 guide](docs/V2_API.md) and
 [ADR 0009](docs/adr/0009-v2-databricks-app-boundaries.md). Lifecycle/retention and
 capacity campaigns in that ADR remain deferred.
+
+The minimal hosted-agent onboarding contract is documented in
+[the framework-neutral integration recipe](docs/AGENT_INTEGRATION.md).
+[Proposed ADR 0012](docs/adr/0012-hosted-agent-integration-contract.md) separates
+hosting/authentication, invocation and trace evidence for future serving options.
+It changes documentation only: no new runtime backend, capacity discovery,
+automatic instrumentation or legacy protocol removal is implemented.
 
 ```mermaid
 flowchart LR
@@ -42,7 +58,9 @@ flowchart LR
 
 - `api.py`: REST authorization, validation, response metadata, safe HTTP errors, and presentation over the shared coordinator.
 - `coordinator.py`: single-owner storage, admission, idempotency/recovery, frozen plans, task/phase transitions, paginated results, cancellation, and drain.
-- `evalsurge/`: public sync/async local Python facade over the same coordinator and Locust engine; explicit URL-bound operator connections.
+- `evalsurge/`: default sync/native-async direct v2 facade and optional typed remote adapter; legacy interfaces remain, with one coordinator/Locust engine and explicit operator target bindings.
+- `run_views.py`: FastAPI-independent typed status/result/report presentation shared by direct execution and v2 routes; no new evaluator or worker.
+- `validation.py`: bounded value-free request diagnostics shared by REST, SDK and CLI; schema errors remain distinct from JSON-encoding errors.
 - `connections.py`: operator-owned credential references bound to exact target URLs. API callers cannot select arbitrary environment secrets.
 - `planner.py`: bounded optional LLM selection from catalog IDs and operator-allowlisted aliases, using opt-in manifests. Deterministic validation decides readiness. The model cannot change load limits, destinations, credentials, rubric implementations, or evidence requirements.
 - `models.py`: strict request contracts with unknown fields rejected and bounded workloads.

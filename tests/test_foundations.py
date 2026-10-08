@@ -1,29 +1,25 @@
 """Regression tests for interrupted storage and public error behavior."""
 
 import json
-import re
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from benchmark_agents import api, coordinator
-from benchmark_agents.models import RunRequest
 from benchmark_agents.planner import PlannerResponseError, fingerprint
 from benchmark_agents.storage import append_event, atomic_json, recover_rows
 from tests.test_template import configuration
 
 
 def test_should_accept_readme_sample_as_performance_only_request() -> None:
-    """Check the published curl body without invoking a planner or model."""
-    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
-    sample = re.search(r"-d '(\{.*?\})' \| jq", readme, re.DOTALL)
-    assert sample is not None
-    config = RunRequest.model_validate_json(sample.group(1))
-    assert config.evaluation.scorers == []
-    assert config.evaluation.samples and config.load.max_requests == 20
-    assert str(config.target.url) == "http://127.0.0.1:9001/chat"
+    """Check the direct v2 golden path without invoking a planner or model."""
+    from tests.test_readme import _readme_request
+
+    config = _readme_request()
+    assert config.evaluation.mode == "off"
+    assert config.cases and config.load.max_requests == 10
+    assert config.target.connection_id == "agent"
 
 
 def test_recovery_survives_torn_multibyte_and_bad_shapes(tmp_path):

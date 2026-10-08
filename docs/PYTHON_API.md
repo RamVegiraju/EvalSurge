@@ -1,223 +1,196 @@
-# Python API
+# Python API: direct execution first
 
-The distribution is `evalsurge`; the public import is `evalsurge`. The existing
-`benchmark_agents` modules remain available for the REST application and compatibility.
-From a checkout, install with
-`uv sync --locked --default-index https://pypi.org/simple --extra agents --group dev`.
+Install `evalsurge[server]` for direct execution; `evalsurge[agents]` additionally
+includes LangGraph and OpenAI Agents for the repository demos. The base package
+contains lightweight remote SDK/CLI dependencies. Public request/result models
+are available from `evalsurge` without loading the execution stack.
 
-The default `evalsurge` installation is the lightweight remote SDK/CLI, with only
-HTTPX and Pydantic as direct dependencies. `from evalsurge import EvalSurge` and
-`EvalSurge.remote()` do not load the server stack. Local examples below require
-`uv add 'evalsurge[server]'` (or `evalsurge[agents]` for the framework examples);
-the agents extra also includes the server dependencies. Existing `Agent`,
-`Connection`, and `RunFailed` imports are lazy and preserve their classes when
-the server extra is installed. Missing local dependencies produce explicit install
-guidance instead of starting a partial benchmark.
-
-The checkout uses an authentic public-PyPI recovery lock, with installation
-verified on macOS/Python 3.12 including agents/dev dependencies on October 5, 2026.
-It removes the private-mirror origins responsible for earlier CI install failures;
-it is not a fresh latest-compatible resolution or a current Linux CI result.
-Latest-compatible upgrades, the supported Linux/Python matrix, and clean published
-release installation remain subject to the [dependency release gates](DEPENDENCIES.md).
-
-## Local benchmark
-
-Start the deterministic sample agent from a checkout:
-
-```bash
-uv run --no-sync uvicorn examples.mock_agent:app --host 127.0.0.1 --port 9001 --no-proxy-headers
-```
-
-Then run:
+## One request, two targets
 
 ```python
-from evalsurge import Agent, EvalSurge, Load, RunFailed, Sample
+from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference
 
-with EvalSurge.local(artifact_dir="artifacts/python") as client:
-    run = client.start(
-        agent=Agent.http("http://127.0.0.1:9001/chat"),
-        cases=[Sample(inputs={"query": "Can I refund an opened item?"})],
-        load=Load(concurrency=2, duration_seconds=5, max_requests=3),
-        idempotency_key="first-python-run",
-    )
-    try:
-        report = run.wait(timeout=120)
-    except RunFailed as failure:
-        print(failure)
-        report = failure.report
+request = RunCreate(
+    name="baseline",
+    target=TargetReference(connection_id="agent"),
+    cases=[Case(input={"query": "Give a short greeting."})],
+    load=Load(concurrency=2, duration_seconds=10, max_requests=10),
+)
+
+agent = Agent.http("http://127.0.0.1:9001/chat")
+# Instead, for an already deployed DurableAgentServer App:
+# agent = Agent.databricks_app("your-app", profile="YOUR_SELECTED_OAUTH_PROFILE")
+
+with EvalSurge(artifact_dir="artifacts/baseline", targets={"agent": agent}) as client:
+    run = client.start(request, idempotency_key="baseline-1")
+    report = run.wait(timeout=300)
     print(report.model_dump_json(indent=2))
 ```
 
-`start()` freezes a plan and schedules preflight; it does not guarantee inference
-success. `wait()` returns a typed `RunReport`, or raises `RunFailed` for a failed,
-cancelled, or interrupted run. `completed_with_gaps` is returned normally: inspect
-evaluation and trace coverage, not just the lifecycle status.
+`EvalSurge(...)` is direct execution; `EvalSurge.local(...)` is its explicit alias.
+The caller owns target settings and the artifact directory. The request contains
+only an alias, cases, load, and evaluation policy. No server is started.
+`start()` also accepts finite JSON-compatible mappings through the same schema.
+Both modes apply the same eight-million-byte UTF-8 limit without ASCII-escaping
+Unicode. Raw mappings cannot contain Python-only values such as `datetime`; a
+validated `RunCreate` uses its public Pydantic JSON serialization in both modes.
+Unknown fields and invalid values receive bounded field-specific guidance.
 
-The first sample is one extra invocation beyond `max_requests`. It may execute
-tools, mutate memory, and incur spend. It is excluded from benchmark metrics and
-quality scores; selected judges reuse its answer for readiness before load.
-`RunFailed` includes safe guidance for inference, judge readiness, or worker failure.
-No retries, redirect following, model substitution, or automatic parameter repair.
+An explicit `artifact_dir` overrides operator settings. If omitted, supplied
+`Settings.artifact_dir` is used, or settings are loaded once from the operator file
+and environment. Without configuration the legacy default remains `artifacts`.
+The coordinator and private worker snapshot use the same
+selected directory. Target bindings and settings are copied before work starts.
 
-`run.report(offset=0, limit=25)` reads a bounded profile page. It may be unavailable
-before profiling. Pages are limited to 100 rows; the initial report is not the
-entire large-run waterfall. `run.cancel()` requests dispatch stop and drain during
-preflight/load, not judging cancellation. A wait timeout only stops waiting.
-
-The context owns one POSIX artifact directory, requests cancellation on exit,
-and drains its work before releasing ownership. Do not open the same directory
-in a simultaneous REST server or another local client. Context exit can wait for
-active requests and post-load work; scorer code has no hard execution sandbox.
-Artifacts retain prompts, outputs, and references; protect them and set retention.
-
-### Three-minute example
-
-From this checkout, start the sample agent in one terminal:
-
-```bash
-uv run --no-sync uvicorn examples.mock_agent:app --host 127.0.0.1 --port 9001 --no-proxy-headers
-```
-
-In another terminal, run the [minimal Python example](../examples/python_benchmark.py):
-
-```bash
-uv run --no-sync python -m examples.python_benchmark
-```
-
-It uses five concurrent users and at most 10,000 measured requests, plus one excluded
-preflight. Dispatch ends when duration or the request cap is reached, whichever
-comes first; startup and drain add time. Judging is off, the mock makes no model
-calls, and an endpoint without traces cannot show internal tool/model timings.
-The command prints report JSON, including `run.id` and `run.metrics`, and retains
-the run under `artifacts/python-benchmark/`. That JSON contains the first bounded
-request page; journals retain all attempts. Edit the endpoint, cases, and `Load`
-directly in the example; there is no EvalSurge server setup or polling code to copy.
-
-To view the existing report UI after the Python command exits:
-
-```bash
-BENCHMARK_ARTIFACT_DIR=artifacts/python-benchmark uv run --no-sync uvicorn \
-  benchmark_agents.api:app --host 127.0.0.1 --port 9002 --no-proxy-headers
-```
-
-Open `http://127.0.0.1:9002/reports/?run=YOUR_RUN_ID` with the printed `run.id`.
-If the service has an API key configured, enter it in the report form.
-Only use an authorized endpoint; replacing the mock URL can execute agent actions
-and incur model/tool costs. For CLI flags such as `--duration` or `--concurrency`,
-use the [advanced validation CLI](../scripts/validation/README.md).
-
-For load plus explicit relevance/correctness evaluation of framework agents, use
-the [LangGraph sample](../examples/langgraph_benchmark.py) or
-[OpenAI Agents sample](../examples/openai_agents_benchmark.py). Both use this
-facade against the corresponding `examples/framework_agent.py` endpoint, supply
-authoritative references, and cap post-load scoring at five answers per judge.
-The framework target defaults to fixture model responses, but configured judges
-can still incur costs. See the
-[framework example guide](../examples/README.md#framework-agent-benchmarks) for
-server startup, judge/tracking configuration, endpoint URLs, and artifact paths.
-Local tests use controlled provider boundaries, not paid/live validation.
-
-For the REST API with ordinary Python `requests`, use the
-[request-to-report example](USAGE.md#python-requests-client). Total runtime includes
-setup, readiness, drain, profiling, and judging in addition to dispatch:
-see [runtime and timeouts](USAGE.md#how-long-does-a-run-take).
-
-## Async applications and notebooks
-
-```python
-async with EvalSurge.local_async(artifact_dir="artifacts/async") as client:
-    run = await client.start(
-        agent=Agent.http("http://127.0.0.1:9001/chat"),
-        cases=[Sample(inputs={"query": "Can I refund?"})],
-        load=Load(concurrency=1, duration_seconds=5, max_requests=1),
-    )
-    report = await run.wait(timeout=120)
-```
-
-Use the async form when the target runs on the same event loop. The synchronous
-form uses a dedicated coordinator thread/loop, not nested `asyncio.run`, but its
-blocking calls can still block your notebook/application loop.
-
-Serialized UTF-8 workloads/policies are capped at eight million bytes before
-planning, in addition to case/load/page bounds. Persistence failures stop new
-admission. A terminal in-process receipt can remain readable with an explicit
-durability warning, but it is not guaranteed to survive restart; restore storage
-and reopen the runner. Restart never resumes or replays target actions.
+`cases[].input` holds agent inputs; `reference` holds authoritative evaluation
+evidence. Fixed message adapters require exactly `query` or `messages`; custom
+routing, actor, resume, or other top-level inputs are rejected, not discarded.
+Raw `http-json` inputs follow their separate contract.
 
 ## Protocol and connection
 
-`Agent.http(url, protocol=..., connection=...)` keeps the wire format independent
-from reachability/authentication. Supported protocols:
+`Agent.http(url, protocol="openai-chat")` selects the wire envelope independently
+of hosting. Supported alternatives are `mlflow-agent-server`, `databricks-agent-runtime`,
+and `http-json`; see [target wire contracts](TARGETS.md#supported-wire-contracts).
+Framework names do not select a protocol automatically.
 
-| Protocol | Request | Response | TTFT |
-| --- | --- | --- | --- |
-| `openai-chat` (default) | Chat messages, model, `stream: true` | Chat Completions SSE | First answer-text delta |
-| `mlflow-agent-server` | `input` messages, `stream: true` | Responses-style SSE | First answer-text delta |
-| `http-json` | Exact `Sample.inputs` object | JSON object with `outputs` text | Unavailable |
-
-For `http-json`, a sample `Sample(inputs={"query": "Hello", "session_id": "demo"})`
-sends exactly `{"query":"Hello","session_id":"demo"}`. A successful response is:
-
-```json
-{"outputs":"Hello!","usage":{"output_tokens":3},"trace_id":"tr-optional"}
-```
-
-`outputs` must be a nonblank string. If `usage` is present, `usage.output_tokens`
-must be a nonnegative integer, not a Boolean; absent usage remains unknown, not
-zero. Optional trace IDs must be nonblank strings of at most 128 characters and
-agree with `X-MLflow-Trace-ID` when both are supplied. Responses require 2xx,
-`application/json` content type (parameters allowed; `+json` types are not
-supported), valid UTF-8, and a complete body within the two-million-byte decoded
-limit and request deadline. Malformed, empty, oversized, or wrong-type responses
-fail preflight before load.
-This is a documented contract, not support for arbitrary JSON layouts or user
-plugins. JSON has latency/throughput, but `ttft_ms` and `first_event_ms` stay null.
-
-The local caller is the operator. Its explicit connection is URL-bound and never
-temporarily changes global connection configuration:
+Unauthenticated loopback HTTP needs only the explicit URL. An HTTPS bearer target
+uses an operator-owned environment reference, never a token in the request:
 
 ```python
-from evalsurge import Agent, Connection
+from evalsurge import Connection
 
-url = "https://agent.example/invoke"
 agent = Agent.http(
-    url,
-    protocol="http-json",
-    connection=Connection(url=url, auth="bearer", token_env="AGENT_TOKEN"),
+    "https://your-authorized-agent.example/chat",
+    connection=Connection(
+        url="https://your-authorized-agent.example/chat",
+        auth="bearer",
+        token_env="AGENT_BEARER_TOKEN",
+    ),
 )
 ```
 
-Keep `AGENT_TOKEN` in the runner environment, not in source or report URLs.
-Remote connections require HTTPS. The Databricks workspace auth binding still
-requires an explicitly selected profile and the matching workspace host. Databricks
-App discovery and refreshed OAuth are implemented through operator-registered
-`databricks-app` targets in `/v2`; use the remote SDK with that API as shown in
-[the target guide](TARGETS.md). There is no `Agent.databricks_app()` convenience
-factory in this local interface. An explicit advanced local `Agent` binding can
-use the existing Runtime target/connection contracts, as the consent-gated App
-validation helper does; it does not permit caller credentials in public REST requests.
+Databricks Apps use `Agent.databricks_app(name, profile=...)`; no arbitrary App URL
+or workspace host belongs in `RunCreate`. Binding construction does not invoke
+the agent. Resolution/authentication uses the explicit profile and existing
+operator resolver; OAuth refresh stays bound to the discovered origin. PAT App
+access, contradictory ambient SDK settings, and protocol fallback are unsupported.
+An existing legacy AgentServer App uses `protocol="mlflow-agent-server"` explicitly.
 
-## Evaluation and profiling
+## Typed lifecycle
 
-Python defaults to `scorers=[]` and `registered_scorers=[]`: no implicit paid
-planner/judge call. Pass `Evaluation(description=..., samples=cases, ...)`
-explicitly to request configured suggestions or judges. Cases and evaluation
-samples must agree. Planner, judge, trusted scorer registry, and trace source
-remain operator-configured; see [integration](PROFILING_AND_EVALUATION.md).
-The facade does not reinvoke the target during judging.
+| Method | Unified return | Meaning |
+| --- | --- | --- |
+| `client.start(request)` | Run handle | Admission and background work, not inference success |
+| `run.status()` | `RunStatus` | Current independent phase states |
+| `run.result()` | `Result` | Typed metrics, evaluation outcomes, coverage, and gaps |
+| `run.report(offset=0, limit=25)` | `Report` | Result plus one bounded profile page |
+| `run.wait(timeout=None)` | `Report` | Wait for terminal outcome; `None` has no client wait deadline |
+| `run.cancel()` | `Acknowledgment` | Request stop/drain; not proof that work has stopped |
 
-Endpoint-only reports provide black-box metrics. Internal heatmaps need existing
-agent-side correlated MLflow traces; an endpoint cannot reveal tool/memory time.
-The Python API returns report data, not a running browser/report server.
-After closing the client, a REST server can open the same artifact directory to
-inspect saved runs through the existing report UI.
+Use an explicit finite wait budget in interactive work. A client wait timeout
+does not cancel the run. Failure exceptions retain the report; inspect independent
+preflight, evaluation-readiness, load, and evidence outcomes. Successful lifecycle
+completion is not a quality pass. `completed_with_gaps` preserves available evidence.
 
-## Where load runs
+Cancellation stops new preflight/load dispatch and drains active work; it cannot
+undo model/tool actions and does not promise to interrupt native judging. Report
+pages are limited to 100 profiles; the initial report is not every trace in a run.
 
-Local Python uses this process's machine for Locust; REST uses the API host,
-not the remote submitter. Use a laptop for smoke checks and a dedicated runner
-separate from the agent for repeatable load tests. Record runner location, machine
-size, network path, and dependency versions. Runner saturation and network latency
-can distort results; this milestone does not automatically diagnose generator
-saturation or establish sustainable capacity from one short concurrency level.
+The context closes its owned work and releases storage ownership on normal exit
+or error. Cleanup can wait for active requests and post-load work. Do not share
+one artifact directory with another client/API owner. Persisted interrupted work
+is not automatically resumed. Protect retained prompts, answers, and references.
+
+## Evaluation and your dataset
+
+Evaluation is off when omitted. Use `EvaluationPolicy(mode="explicit", scorers=...)`
+for fixed criteria or `mode="automatic"` for opt-in selection. Target inference,
+planning, and judging are separate model roles; configure providers outside the
+request. See [quality samples](../examples/quality/README.md) for JSON datasets,
+catalog criteria, brought reviewed judges, and fail-fast evidence edges.
+
+The first case incurs one excluded inference probe. Selected judges reuse it for
+one extra readiness assessment each, then judge sampled captured answers after
+load. No target reinvocation during evaluation. A false quality verdict is a valid
+assessment, not a readiness execution failure. Missing correctness references,
+required traces, or provider configuration remain explicit failures/gaps.
+
+## Databricks notebook
+
+Import [the classic notebook source](../examples/journeys/classic_notebook.py),
+install the package on an explicitly selected classic cluster, and configure an
+explicit OAuth profile on that driver. The notebook defaults to no traffic until
+consent is set. Its request uses the same public model and context cleanup as a
+laptop run. A laptop profile is not notebook authentication, and driver-only
+credential success is not evidence the spawned worker can authenticate.
+
+Serverless notebook execution is a separate validation gate: subprocess execution,
+credential availability, local storage locking, egress, and notebook shutdown all
+need real checks. Neither sample code nor classic success proves serverless support.
+No notebook runtime, App, or model was provisioned by these samples.
+
+The October 8 serverless HTTP/API job failed: its Python kernel exited and its
+output included an MLflow experiment/store startup mismatch. It returned no final
+receipt, so request counts, active cancellation and cleanup are not established.
+The harness's experiment-ID leak and native Uvicorn startup-exit path are covered
+by local storage/lifespan regressions, but have not been revalidated live.
+Independent-worker OAuth and
+notebook-to-deployed-App validation remain open. See [validation](../VALIDATION.md).
+
+## Optional remote execution
+
+```python
+with EvalSurge.remote("http://127.0.0.1:8000", typed=True) as client:
+    report = client.start(request).wait(timeout=300)
+    print(report.model_dump_json(indent=2))
+```
+
+The server must register `agent` itself. Local `targets` are not uploaded.
+Traffic originates on the API host; `127.0.0.1` in a registered endpoint means
+that host. Configure remote service credentials outside the request, and use TLS
+beyond loopback. [Optional server setup](OPTIONAL_SERVER.md) covers registration,
+CLI, and authentication.
+
+### Open a retained report
+
+Direct execution returns JSON/models, not an HTTP server. After closing the
+client, serve the same artifact directory using [the report instructions](OPTIONAL_SERVER.md#open-a-retained-report).
+The browser displays frozen suggestions and actual assessments separately. V2
+`Report` intentionally omits the frozen plan; see [report details](REPORTS_AND_JUDGES.md).
+
+## Compatibility interfaces
+
+`/v1` and existing local keyword calls remain supported:
+
+```python
+from evalsurge import Sample
+
+with EvalSurge.local(artifact_dir="artifacts/legacy") as client:
+    run = client.start(
+        agent=Agent.http("http://127.0.0.1:9001/chat"),
+        cases=[Sample(inputs={"query": "Give a short greeting."})],
+        load=Load(concurrency=2, duration_seconds=10, max_requests=10),
+    )
+    legacy_report = run.wait(timeout=300)
+```
+
+These calls return legacy `RunReport`. Legacy `Evaluation(scorers=None)` requests
+planning, while `scorers=[]` disables it; new `EvaluationPolicy` defaults to off.
+Without explicit context `settings` or `targets`, legacy calls retain their
+submission-time operator environment and ignore the unused registered-target
+registry. Unified calls freeze context configuration and validate any selected
+registry before discovery or admission. Both inherit an enclosing task-local
+operator scope without changing process environment values.
+Existing `EvalSurge.remote(url)` and `RemoteClient` retain dictionary behavior.
+Use `typed=True` for the unified remote return types. Do not mix the return shapes.
+Native local async compatibility remains `EvalSurge.local_async(...)`; the unified
+synchronous notebook examples do not require top-level event-loop management.
+
+### Three-minute example
+
+The retained [legacy Python sample](../examples/python_benchmark.py) runs a
+credential-free mock at concurrency five for at most 180 seconds/10,000 measured
+requests. It is a controlled transport tutorial, not real inference validation.
+The [framework examples](../examples/README.md#framework-agent-benchmarks) retain
+their existing explicit quality flow and disclosure requirements.

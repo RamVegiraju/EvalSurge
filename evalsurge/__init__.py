@@ -1,8 +1,31 @@
-"""Remote client by default; local execution lazily requires evalsurge[server]."""
+"""Unified request vocabulary; direct execution lazily requires evalsurge[server]."""
 
 from typing import TYPE_CHECKING, Any
 
 from benchmark_agents.models import Evaluation, Load, RunReport, Sample
+from benchmark_agents.v2_models import (
+    Acknowledgment,
+    AssessmentOutcome,
+    Case,
+    DecisionSummary,
+    EvaluationOutcome,
+    EvaluationPolicy,
+    Links,
+    Performance,
+    PhaseStates,
+    Report,
+    RequestCoverage,
+    Result,
+    RunCreate,
+    RunStatus,
+    SamplingCoverage,
+    SamplingStratum,
+    ScorerOutcome,
+    TargetReference,
+    Timing,
+    ValidationIssue,
+)
+from benchmark_agents.validation import RequestValidationError
 
 from .facade import EvalSurge, MissingServerDependenciesError, _local_module
 from .remote import (
@@ -16,6 +39,8 @@ from .remote import (
     RemoteTimeout,
     RemoteTransportError,
     RemoteUnauthorizedError,
+    TypedRemoteClient,
+    TypedRemoteRun,
 )
 
 if TYPE_CHECKING:
@@ -65,4 +90,27 @@ __all__ = [
     "RemoteTimeout",
     "RemoteRunFailed",
     "MissingServerDependenciesError",
+    "RunCreate",
+    "Case",
+    "TargetReference",
+    "EvaluationPolicy",
+    "RunStatus",
+    "Result",
+    "Report",
+    "Acknowledgment",
+    "Links",
+    "PhaseStates",
+    "DecisionSummary",
+    "Performance",
+    "Timing",
+    "ValidationIssue",
+    "RequestValidationError",
+    "TypedRemoteClient",
+    "TypedRemoteRun",
+    "EvaluationOutcome",
+    "ScorerOutcome",
+    "AssessmentOutcome",
+    "RequestCoverage",
+    "SamplingCoverage",
+    "SamplingStratum",
 ]

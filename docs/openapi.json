@@ -49,8 +49,29 @@
             "type": "number"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "anyOf": [
+              {
+                "enum": [
+                  "queued",
+                  "planning",
+                  "preflighting",
+                  "running",
+                  "profiling",
+                  "evaluating",
+                  "completed",
+                  "completed_with_gaps",
+                  "failed",
+                  "interrupted",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "cancellation_requested",
+                "type": "string"
+              }
+            ],
+            "title": "Status"
           }
         },
         "required": [
@@ -113,6 +134,92 @@
           "framework"
         ],
         "title": "AgentManifest",
+        "type": "object"
+      },
+      "AssessmentOutcome": {
+        "additionalProperties": false,
+        "description": "Protected native assessment; a false verdict is not an execution failure.",
+        "properties": {
+          "case_id": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "rationale_truncated": {
+            "default": false,
+            "title": "Rationale Truncated",
+            "type": "boolean"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "failed",
+              "scored",
+              "error",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "request_id",
+          "status"
+        ],
+        "title": "AssessmentOutcome",
         "type": "object"
       },
       "Capabilities": {
@@ -282,6 +389,13 @@
         "properties": {
           "evidence_gaps": {
             "items": {
+              "enum": [
+                "incomplete_measurements",
+                "evaluation_unavailable",
+                "planning_failed",
+                "internal_trace_coverage",
+                "profiling_failed"
+              ],
               "type": "string"
             },
             "title": "Evidence Gaps",
@@ -564,6 +678,113 @@
           "guidance"
         ],
         "title": "EvaluationError",
+        "type": "object"
+      },
+      "EvaluationOutcome": {
+        "additionalProperties": false,
+        "description": "Typed captured-answer evidence; absent fields remain unknown for legacy runs.\n\nModel execution completion is not a quality pass. Registered scores need an\nexplicit caller threshold; only boolean values have an intrinsic pass rate.\nRationales are protected content and can quote prompts or references.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Type"
+          },
+          "judge_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judge Model"
+          },
+          "needs_data": {
+            "items": {
+              "$ref": "#/components/schemas/Recommendation"
+            },
+            "title": "Needs Data",
+            "type": "array"
+          },
+          "request_coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "required": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required",
+            "type": "array"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ScorerOutcome"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pending",
+                  "running",
+                  "completed",
+                  "completed_with_errors",
+                  "completed_with_gaps",
+                  "no_ready_scorers",
+                  "needs_configuration",
+                  "configuration_changed",
+                  "failed",
+                  "interrupted",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "transport": {
+            "anyOf": [
+              {
+                "const": "databricks-sdk",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transport"
+          }
+        },
+        "title": "EvaluationOutcome",
         "type": "object"
       },
       "EvaluationPolicy": {
@@ -907,26 +1128,81 @@
         "description": "Independent planning, inference, load, profiling, and judging outcomes.",
         "properties": {
           "evaluation": {
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "completed_with_errors",
+              "completed_with_gaps",
+              "no_ready_scorers",
+              "needs_configuration",
+              "configuration_changed",
+              "failed",
+              "interrupted",
+              "skipped"
+            ],
             "title": "Evaluation",
             "type": "string"
           },
           "evaluation_readiness": {
+            "enum": [
+              "not_run",
+              "pending",
+              "running",
+              "skipped",
+              "passed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
             "title": "Evaluation Readiness",
             "type": "string"
           },
           "inference": {
+            "enum": [
+              "not_run",
+              "pending",
+              "running",
+              "passed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
             "title": "Inference",
             "type": "string"
           },
           "load": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "interrupted",
+              "cancelled",
+              "skipped"
+            ],
             "title": "Load",
             "type": "string"
           },
           "planning": {
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
             "title": "Planning",
             "type": "string"
           },
           "profiling": {
+            "enum": [
+              "pending",
+              "completed",
+              "failed",
+              "skipped"
+            ],
             "title": "Profiling",
             "type": "string"
           }
@@ -1450,6 +1726,34 @@
         "title": "Report",
         "type": "object"
       },
+      "RequestCoverage": {
+        "additionalProperties": false,
+        "description": "All measured attempts; only successful evidence-qualified outputs are judged.",
+        "properties": {
+          "failed": {
+            "minimum": 0.0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "successful": {
+            "minimum": 0.0,
+            "title": "Successful",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "successful",
+          "failed"
+        ],
+        "title": "RequestCoverage",
+        "type": "object"
+      },
       "RequestPage": {
         "additionalProperties": false,
         "description": "Bounded page of captured request records, including failures.",
@@ -1601,9 +1905,7 @@
         "description": "Typed result envelope; protected assessment data retains native variants.",
         "properties": {
           "evaluation": {
-            "additionalProperties": true,
-            "title": "Evaluation",
-            "type": "object"
+            "$ref": "#/components/schemas/EvaluationOutcome"
           },
           "evaluation_preflight": {
             "$ref": "#/components/schemas/EvaluationPreflight"
@@ -1668,6 +1970,19 @@
             "$ref": "#/components/schemas/PreflightResult"
           },
           "status": {
+            "enum": [
+              "queued",
+              "planning",
+              "preflighting",
+              "running",
+              "profiling",
+              "evaluating",
+              "completed",
+              "completed_with_gaps",
+              "failed",
+              "interrupted",
+              "cancelled"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -2029,6 +2344,19 @@
             "type": "number"
           },
           "status": {
+            "enum": [
+              "queued",
+              "planning",
+              "preflighting",
+              "running",
+              "profiling",
+              "evaluating",
+              "completed",
+              "completed_with_gaps",
+              "failed",
+              "interrupted",
+              "cancelled"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -2142,6 +2470,293 @@
           "inputs"
         ],
         "title": "Sample",
+        "type": "object"
+      },
+      "SamplingCoverage": {
+        "additionalProperties": false,
+        "description": "Evidence-qualified selection coverage with the frozen case/time policy.",
+        "properties": {
+          "eligible": {
+            "minimum": 0.0,
+            "title": "Eligible",
+            "type": "integer"
+          },
+          "eligible_strata": {
+            "minimum": 0.0,
+            "title": "Eligible Strata",
+            "type": "integer"
+          },
+          "fraction_of_eligible": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Fraction Of Eligible",
+            "type": "number"
+          },
+          "observed_dispatch_window_ms": {
+            "minimum": 0.0,
+            "title": "Observed Dispatch Window Ms",
+            "type": "number"
+          },
+          "policy": {
+            "title": "Policy",
+            "type": "string"
+          },
+          "seed": {
+            "minimum": 0.0,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "selected": {
+            "minimum": 0.0,
+            "title": "Selected",
+            "type": "integer"
+          },
+          "selected_strata": {
+            "minimum": 0.0,
+            "title": "Selected Strata",
+            "type": "integer"
+          },
+          "strata": {
+            "items": {
+              "$ref": "#/components/schemas/SamplingStratum"
+            },
+            "title": "Strata",
+            "type": "array"
+          },
+          "time_bins": {
+            "minimum": 1.0,
+            "title": "Time Bins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy",
+          "seed",
+          "time_bins",
+          "observed_dispatch_window_ms",
+          "eligible",
+          "selected",
+          "fraction_of_eligible",
+          "eligible_strata",
+          "selected_strata"
+        ],
+        "title": "SamplingCoverage",
+        "type": "object"
+      },
+      "SamplingStratum": {
+        "additionalProperties": false,
+        "description": "Selected captures in one zero-based case/time bucket, not a population weight.",
+        "properties": {
+          "case_id": {
+            "minimum": 0.0,
+            "title": "Case Id",
+            "type": "integer"
+          },
+          "selected": {
+            "minimum": 0.0,
+            "title": "Selected",
+            "type": "integer"
+          },
+          "time_bin": {
+            "minimum": 0.0,
+            "title": "Time Bin",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "case_id",
+          "time_bin",
+          "selected"
+        ],
+        "title": "SamplingStratum",
+        "type": "object"
+      },
+      "ScorerOutcome": {
+        "additionalProperties": false,
+        "description": "One judge's execution, coverage and optional boolean pass rate, independently.",
+        "properties": {
+          "assessments": {
+            "items": {
+              "$ref": "#/components/schemas/AssessmentOutcome"
+            },
+            "title": "Assessments",
+            "type": "array"
+          },
+          "attempted": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempted"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SamplingCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "eligible": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eligible"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "judge_errors": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judge Errors"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Metrics",
+            "type": "object"
+          },
+          "mlflow_experiment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mlflow Experiment Id"
+          },
+          "mlflow_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mlflow Run Id"
+          },
+          "pass_rate": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pass Rate"
+          },
+          "request_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Request Ids",
+            "type": "array"
+          },
+          "scored": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scored"
+          },
+          "scorer": {
+            "title": "Scorer",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "registered-mlflow",
+                  "catalog"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "enum": [
+              "completed",
+              "partial",
+              "failed",
+              "configuration_changed",
+              "needs_configuration",
+              "no_eligible_outputs"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "scorer",
+          "status"
+        ],
+        "title": "ScorerOutcome",
         "type": "object"
       },
       "SpanProfile": {

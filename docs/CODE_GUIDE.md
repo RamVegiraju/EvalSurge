@@ -19,6 +19,18 @@ local execution imports until explicitly requested. Package-level `Agent`,
 `Connection`, and `RunFailed` remain compatible lazy exports requiring the server
 extra; the public Pydantic models and HTTP client need only the base installation.
 
+`evalsurge/local.py` adds the v2 request vocabulary to direct execution. Its
+operator snapshot binds opaque request aliases to `Agent.http()` or lazy
+`Agent.databricks_app()` registrations. `EvalSurge(...)` and `.local()` use this
+context; `.local_async()` uses the native-async equivalent. Legacy keyword calls
+retain legacy reports. `.remote(..., typed=True)` wraps the existing transport
+with the same v2 models; default remote dictionary calls remain available.
+The factory inherits effective task-local configuration. Implicit target-registry
+validation is deferred until unified admission; legacy exact-Agent submissions
+retain submission-time configuration without validating that unused registry.
+`run_views.py` shares pure presentation with REST. `validation.py` shares bounded
+field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-unified-direct-and-remote-sdk.md).
+
 ## Request-to-report flow
 
 1. `api.create_app()` installs HTTP authentication/error handling/metadata over
@@ -59,6 +71,10 @@ extra; the public Pydantic models and HTTP client need only the base installatio
 | `coordinator.py` | `RunCoordinator.open()/close()` own storage and drain; `submit()` freezes and schedules; `_execute()` advances phases; reads, reports, wait, and cancellation share one lifecycle. |
 | `evalsurge/` | `Agent.http()` separates protocol and connection; `EvalSurge.local()/local_async()` expose run handles without starting a server or nesting event loops. |
 | `evalsurge/facade.py` | `EvalSurge.remote()` stays dependency-light; local factories and lazy exports verify the explicit server extra before loading the existing local implementation. |
+| `evalsurge/local.py` | Direct v2 admission, operator snapshot ownership and typed handles over the existing local runtime; legacy overloads remain. |
+| `run_views.py` | Shared status/result/report projections, including planless terminal failures; no target or judge execution. |
+| `validation.py` | `validate_request()` detaches schema inputs and emits safe bounded `RequestValidationError`; no raw submitted values. |
+| `v2_models.py` | Canonical request plus typed result/evaluation/coverage/evidence-gap variants; completion and quality remain independent. |
 | `adapters.py` | Supported response decoders bound input and validate completion/answer/usage/trace IDs; JSON never fabricates TTFT. |
 | `models.py` | Request and response contracts reject unknown model fields and bound load and assessment counts. Nested workload metadata remains flexible. |
 | `connections.py` | `resolve_connection()` validates exact operator-owned destinations; `authentication()` returns a refreshable header source. Connection records contain credential references, not copied secrets. |
@@ -85,6 +101,7 @@ extra; the public Pydantic models and HTTP client need only the base installatio
 | `openapi.py` | `install_schema()` installs a cached renderer that adds common header documentation and request examples. |
 | `scripts/export_openapi.py` | `main()` exports the public schema or verifies the committed snapshot with `--check`. |
 | `scripts/verify_remote_install.py` | Builds an isolated base-only dependency environment, installs the actual wheel, checks absent server distributions, and exercises remote SDK/CLI behavior plus missing-extra guidance without target traffic. |
+| `scripts/verify_wheel.py` | Checks required wheel/source assets, including unified SDK modules, and rejects local assistant metadata in the sdist by member name; never extracts or executes archive contents. |
 
 ## Contracts worth preserving
 
@@ -119,6 +136,17 @@ extra; the public Pydantic models and HTTP client need only the base installatio
   remains a deployment gate.
 
 ## Examples and retained history
+
+- `examples/journeys/` demonstrates direct HTTP/App execution and a consent-gated
+  classic notebook driver context; these samples are not live-validation evidence.
+- `examples/quality/` shows client-loaded datasets, explicit catalog/registered
+  judges, automatic planning priorities, and deliberately rejected/not-ready
+  edge cases. No uploaded scorer code or dataset-path request field is added.
+- `scripts/validation/unified_sdk_journeys.py` is dry-run by default. Live HTTP
+  mode reuses the actual framework demo with `live=True`; App mode requires an
+  existing deployed agent. It verifies typed retrieval, the HTTP pre-provider
+  fail-fast boundary, optional active-dispatch cancellation and context cleanup.
+  No fixture fallback exists. Notebook and optional REST validation are separate.
 
 - `examples/mock_agent.py` serves deterministic local SSE without model credentials.
 - `examples/python_benchmark.py` is a minimal public Python request: five concurrent

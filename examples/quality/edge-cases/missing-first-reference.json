@@ -1,0 +1,8 @@
+{
+  "target": {"connection_id": "agent"},
+  "cases": [
+    {"input": {"query": "Can I refund an opened item?"}},
+    {"input": {"query": "Can I refund an opened item?"}, "reference": {"expected_facts": ["Opened items cannot be refunded."]}}
+  ],
+  "evaluation": {"mode": "explicit", "scorers": ["correctness"]}
+}

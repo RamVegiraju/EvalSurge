@@ -1,11 +1,13 @@
-"""Verify the built wheel's public Python API, coordinator, report, and docs."""
+"""Verify release archives' required assets and exclude local assistant metadata."""
 
+import tarfile
 from pathlib import Path
 from zipfile import ZipFile
 
 REQUIRED_FILES = {
     "evalsurge/__init__.py",
     "evalsurge/client.py",
+    "evalsurge/local.py",
     "evalsurge/facade.py",
     "evalsurge/remote.py",
     "evalsurge/cli.py",
@@ -17,6 +19,8 @@ REQUIRED_FILES = {
     "benchmark_agents/diagnostics.py",
     "benchmark_agents/v2.py",
     "benchmark_agents/v2_models.py",
+    "benchmark_agents/run_views.py",
+    "benchmark_agents/validation.py",
     "benchmark_agents/target_resolver.py",
     "benchmark_agents/adapters.py",
     "benchmark_agents/limits.py",
@@ -57,7 +61,7 @@ def verify(wheel: Path) -> None:
 
 
 def main() -> None:
-    """Validate the repository's built wheel, failing on missing or ambiguous builds."""
+    """Validate built release archives, failing on missing assets or private metadata."""
     directory = Path(__file__).resolve().parents[1] / "dist"
     wheels = list(directory.glob("evalsurge-*.whl"))
     if len(wheels) != 1:
@@ -66,6 +70,34 @@ def main() -> None:
         )
     verify(wheels[0])
     print(f"Verified Python/REST API, report, and self-hosted docs assets in {wheels[0].name}")
+    sources = list(directory.glob("evalsurge-*.tar.gz"))
+    if len(sources) != 1:
+        raise SystemExit("Expected exactly one EvalSurge source distribution in dist")
+    verify_sdist(sources[0])
+    print(f"Verified source assets and excluded local assistant metadata in {sources[0].name}")
+
+
+def verify_sdist(source: Path) -> None:
+    """Inspect source members without extraction, importing code, or reading bodies.
+
+    Args:
+        source: Built source archive with one package/version root directory.
+
+    Raises:
+        ValueError: Required package assets are absent or local assistant metadata
+            is present. Rejected metadata contents are never read or displayed.
+        OSError: The archive cannot be read.
+        tarfile.TarError: The archive is malformed.
+    """
+    with tarfile.open(source, "r:gz") as archive:
+        names = {member.name.partition("/")[2] for member in archive.getmembers()}
+    if any(".isaac" in Path(name).parts for name in names):
+        raise ValueError("Source distribution contains local assistant metadata")
+    missing = REQUIRED_FILES - names
+    if missing:
+        raise ValueError(
+            f"Source distribution missing required files: {', '.join(sorted(missing))}"
+        )
 
 
 if __name__ == "__main__":

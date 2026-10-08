@@ -1,0 +1,13 @@
+{
+  "name": "explicit-refund-criteria",
+  "target": {"connection_id": "agent"},
+  "cases": [{"input": {"query": "Can I refund an opened item?"}, "reference": {"expected_facts": ["Opened items cannot be refunded."]}}],
+  "load": {"concurrency": 2, "duration_seconds": 10, "max_requests": 10, "timeout_seconds": 60},
+  "evaluation": {
+    "mode": "explicit",
+    "description": "Apply the authoritative refund policy faithfully; judge relevance and correctness, including negation and boundary conditions.",
+    "scorers": ["relevance", "correctness"],
+    "max_scored_requests": 5,
+    "sampling_seed": 42
+  }
+}

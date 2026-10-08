@@ -1,12 +1,14 @@
 """Ensure release validation rejects missing report assets without executing code."""
 
+import io
+import tarfile
 from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
 from hatchling.build import build_editable
 
-from scripts.verify_wheel import REQUIRED_FILES, verify
+from scripts.verify_wheel import REQUIRED_FILES, verify, verify_sdist
 
 
 @pytest.mark.parametrize(
@@ -15,8 +17,11 @@ from scripts.verify_wheel import REQUIRED_FILES, verify
         None,
         "evalsurge/__init__.py",
         "evalsurge/client.py",
+        "evalsurge/local.py",
         "evalsurge/facade.py",
         "benchmark_agents/coordinator.py",
+        "benchmark_agents/run_views.py",
+        "benchmark_agents/validation.py",
         "benchmark_agents/evaluation_errors.py",
         "benchmark_agents/evaluation_details.py",
         "benchmark_agents/evaluation_preflight.py",
@@ -49,3 +54,26 @@ def test_editable_build_exposes_both_namespaces_without_dynamic_build_dependenci
         paths = [name for name in archive.namelist() if name.endswith(".pth")]
         assert len(paths) == 1
         assert archive.read(paths[0]).decode().strip() == str(root)
+
+
+@pytest.mark.parametrize("problem", [None, "private_metadata", "missing_module"])
+def test_source_assets_exclude_local_metadata_without_reading_it(
+    tmp_path: Path, problem: str | None
+) -> None:
+    """Inspect archive names only; synthetic archive bytes are never executed."""
+    source = tmp_path / "evalsurge-test.tar.gz"
+    omitted = {"evalsurge/local.py"} if problem == "missing_module" else set()
+    names = REQUIRED_FILES - omitted
+    if problem == "private_metadata":
+        names = names | {".isaac/config.json"}
+    with tarfile.open(source, "w:gz") as archive:
+        for filename in names:
+            body = b"must-not-read-or-execute"
+            entry = tarfile.TarInfo(f"evalsurge-test/{filename}")
+            entry.size = len(body)
+            archive.addfile(entry, io.BytesIO(body))
+    if problem:
+        with pytest.raises(ValueError):
+            verify_sdist(source)
+    else:
+        verify_sdist(source)

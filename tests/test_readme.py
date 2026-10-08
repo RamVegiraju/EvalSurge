@@ -12,11 +12,11 @@ import pandas as pd
 import pytest
 
 from benchmark_agents.evaluation_details import assessment_details
-from benchmark_agents.models import Evaluation, RunReport, Target
+from benchmark_agents.models import RunReport, Target
 from benchmark_agents.runner import payload
 from benchmark_agents.settings import Settings
 from benchmark_agents.v2_models import RunCreate
-from evalsurge import EvalSurge, Sample
+from evalsurge import EvalSurge, EvaluationPolicy, Report, ScorerOutcome
 
 ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
@@ -25,23 +25,29 @@ README = ROOT / "README.md"
 async def test_readme_python_request_runs_without_judging(
     endpoint, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Run the documented request against a local SSE fixture, not a paid provider."""
+    """Preserve legacy transport regression; its SSE fixture is controlled, not live.
+
+    This test requires the explicit controlled-inference approval in AGENTS.md.
+    Static README checks below do not invoke this fixture or execute inference.
+    """
     base_url, server = endpoint
-    blocks = re.findall(r"```python\n(.*?)```", README.read_text(), re.DOTALL)
-    assert len(blocks) == 2
-    source = blocks[0].replace("http://127.0.0.1:9001/chat", base_url + "/normal")
-    source = source.replace('"artifacts/python"', repr(str(tmp_path / "python")))
+    example = ROOT / "examples/python_benchmark.py"
+    source = example.read_text().replace("http://127.0.0.1:9001/chat", base_url + "/normal")
+    source = source.replace('"artifacts/python-benchmark"', repr(str(tmp_path / "python")))
+    source = source.replace("duration_seconds=180", "duration_seconds=5")
+    source = source.replace("max_requests=10_000", "max_requests=20")
 
     def execute() -> dict[str, Any]:
         """Keep synchronous client waits off the fixture server's event loop."""
-        namespace: dict[str, Any] = {}
-        exec(compile(source, str(README), "exec"), namespace)
+        namespace: dict[str, Any] = {"__name__": "readme_legacy_regression"}
+        exec(compile(source, str(example), "exec"), namespace)
+        # The preserved sample prints, rather than returns, its report. Retain
+        # that behavior and parse its actual stdout after the thread returns.
+        namespace["main"]()
         return namespace
 
-    namespace = await asyncio.to_thread(execute)
-    report = namespace["report"]
-    printed = RunReport.model_validate_json(capsys.readouterr().out)
-    assert printed == report
+    await asyncio.to_thread(execute)
+    report = RunReport.model_validate_json(capsys.readouterr().out)
     assert report.run.status == "completed"
     assert report.run.preflight.status == "passed"
     assert report.run.metrics["requests"] == report.run.metrics["successful_requests"] == 20
@@ -64,42 +70,36 @@ async def test_readme_python_request_runs_without_judging(
     assert persisted.run.evaluation == report.run.evaluation
 
 
+def _readme_request() -> RunCreate:
+    """Execute only the golden-path imports/request construction, never its run."""
+    block = re.findall(r"```python\n(.*?)```", README.read_text(), re.DOTALL)[0]
+    source = block.split("with EvalSurge(", 1)[0]
+    namespace: dict[str, Any] = {}
+    exec(compile(source, str(README), "exec"), namespace)
+    return namespace["request"]
+
+
 def test_readme_quality_policy_and_output_match_current_contracts() -> None:
     """Validate optional policy and report projections without invoking judges."""
     readme = README.read_text()
-    install = re.search(r"^uv sync .+$", readme, re.MULTILINE)
+    install = re.search(r"^uv add .+$", readme, re.MULTILINE)
     assert install is not None
     arguments = shlex.split(install.group())
-    assert "--locked" in arguments
-    assert arguments[arguments.index("--default-index") + 1] == "https://pypi.org/simple"
+    assert arguments == ["uv", "add", "evalsurge[server]"]
     blocks = re.findall(r"```python\n(.*?)```", readme, re.DOTALL)
-    namespace: dict[str, Any] = {}
-    exec(compile(blocks[1], str(README), "exec"), namespace)
-    policy: Evaluation = namespace["evaluation"]
+    namespace: dict[str, Any] = {"request": _readme_request()}
+    from evalsurge import Case
+
+    namespace["Case"] = Case
+    exec(compile(blocks[2], str(README), "exec"), namespace)
+    judged: RunCreate = namespace["judged"]
+    policy: EvaluationPolicy = judged.evaluation
+    assert policy.mode == "explicit"
     assert policy.scorers == ["relevance", "correctness"]
-    assert policy.registered_scorers == []
-    assert policy.max_scored_requests == 20
-    sample = Sample(
-        inputs={"query": "Can I refund an opened item?"},
-        expectations={"expected_response": "Opened items are not refundable."},
-    )
-    assert sample.expectations["expected_response"]
-    blocks = re.findall(r"```json\n(.*?)```", readme, re.DOTALL)
-    documents = [json.loads(block) for block in blocks]
-    reports = [document for document in documents if "run" in document]
-    assert len(reports) == 1
-    excerpt = reports[0]
-    assert set(excerpt) <= RunReport.model_fields.keys()
-    run = excerpt["run"]
-    assert run["status"] == "completed"
-    assert run["metrics"]["requests"] == policy.max_scored_requests == 20
-    assert run["metrics"]["timing_successful_only"]["latency_ms"]["count"] == 20
-    assert run["metrics"]["timing_successful_only"]["ttft_ms"]["count"] == 20
-    criterion = run["evaluation"]["results"][0]
-    assert criterion["scored"] == criterion["attempted"] == policy.max_scored_requests
-    assert criterion["judge_errors"] == 0
-    assert criterion["pass_rate"] == 16 / 20
-    assessment = criterion["assessments"][0]
+    assert policy.max_scored_requests == 5
+    assert judged.cases[0].reference["expected_facts"]
+    assert "Report" in Report.model_json_schema()["title"]
+    assessment = {"request_id": "schema-only"}
     native = pd.DataFrame(
         [
             {
@@ -116,45 +116,37 @@ def test_readme_quality_policy_and_output_match_current_contracts() -> None:
         "correctness",
         catalog=True,
     )
-    assert criterion["assessments"] == normalized
+    criterion = ScorerOutcome(scorer="correctness", status="completed", assessments=normalized)
+    assert criterion.assessments[0].status == "failed"
+    assert criterion.assessments[0].value is False
+    assert criterion.status == "completed"
 
 
 def test_readme_automatic_request_matches_v2_contract() -> None:
     """Validate opt-in automatic judging and authoritative evidence without traffic."""
-    documents = [
-        json.loads(block)
-        for block in re.findall(r"```json\n(.*?)```", README.read_text(), re.DOTALL)
-    ]
-    requests = [
-        document
-        for document in documents
-        if document.get("evaluation", {}).get("mode") == "automatic"
-    ]
-    assert len(requests) == 1
-    request = RunCreate.model_validate(requests[0])
-    assert request.target.connection_id == "refund-agent"
+    assert "examples/quality/README.md" in README.read_text()
+    body = json.loads((ROOT / "examples/quality/automatic.json").read_text())
+    request = RunCreate.model_validate(body)
+    assert request.target.connection_id == "agent"
     assert request.evaluation.mode == "automatic"
     assert request.evaluation.scorers == []
-    assert request.evaluation.max_scored_requests == 20
-    assert request.cases[0].reference["expected_response"]
-    assert request.load.max_requests == 20
-    assert "url" not in requests[0]["target"]
-    assert "profile" not in requests[0]["target"]
+    assert request.evaluation.max_scored_requests == 5
+    assert request.cases[0].reference["expected_facts"]
+    assert request.load.max_requests == 10
+    assert "url" not in body["target"]
+    assert "profile" not in body["target"]
 
 
 def test_readme_recommended_request_defaults_to_performance_only() -> None:
     """Validate the first v2 example without resolving credentials or invoking targets."""
     readme = README.read_text()
-    documents = [json.loads(block) for block in re.findall(r"```json\n(.*?)```", readme, re.DOTALL)]
-    body = documents[0]
-    request = RunCreate.model_validate(body)
-    assert request.target.connection_id == "refund-agent"
-    assert "evaluation" not in body
+    request = _readme_request()
+    assert request.target.connection_id == "agent"
     assert request.evaluation.mode == "off"
-    assert set(body["target"]) == {"connection_id"}
-    assert request.load.concurrency == 3
-    assert request.load.max_requests == 20
-    assert readme.index("Recommended request") < readme.index("legacy v1")
+    assert set(request.target.model_dump()) == {"connection_id"}
+    assert request.load.concurrency == 2
+    assert request.load.max_requests == 10
+    assert readme.index("Start in Python") < readme.index("Optional server")
 
 
 def test_target_guide_examples_validate_without_discovery_or_traffic() -> None:

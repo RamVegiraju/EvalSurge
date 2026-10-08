@@ -5,6 +5,412 @@ Linux/Python 3.11–3.14. Observed main jobs failed during private-mirror instal
 there is no remote CI result for these local changes. Branch-protection
 settings have not been verified/enabled by this local work.
 
+## Hosted-agent onboarding documentation — October 8, 2026
+
+Clarified chosen concurrency versus known capacity, made the minimal `http-json`
+endpoint the README HTTP example, and kept DurableAgentServer as the recommended
+App path. Moved MLflow `/responses` to advanced compatibility; no public protocol,
+API enum, runtime or dependency was removed. Added
+[the integration recipe](docs/AGENT_INTEGRATION.md) and
+[proposed ADR 0012](docs/adr/0012-hosted-agent-integration-contract.md), separating
+hosting/authentication, invocation and optional trace evidence.
+
+Retrieved official Databricks Agent Server/query documentation and official
+LangGraph/OpenAI Agents/CrewAI execution documentation. Databricks labels MLflow
+AgentServer **legacy** and recommends DurableAgentServer; the Agent Server page
+does not specify a removal date. Cross-checked installed LangGraph `ainvoke`,
+LangChain message `text` and OpenAI Agents `final_output` source. CrewAI is not
+installed or a newly live-validated integration; its bridge is a docs-only recipe.
+
+Commands/results:
+
+```bash
+uv run --frozen --no-sync pytest -q tests/test_agent_integration_docs.py tests/test_readme.py tests/test_unified_journey_examples.py -k 'not runs_without_judging'
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync ruff format --check .
+uv run --frozen --no-sync python scripts/export_openapi.py --check
+uv run --frozen --no-sync openapi-spec-validator docs/openapi.json
+git diff --check
+```
+
+The selected **18 tests passed; one controlled-inference test was deselected**.
+New tests compile snippets and construct request/target schemas only; they do not
+import customer agents, start an endpoint, resolve an App, invoke a model, or run
+judges. Ruff lint passed. Formatting initially caught two Markdown Python blocks;
+they were corrected and the check passed (**161 files already formatted**).
+OpenAPI snapshot equality and independent schema validation passed; the exporter
+printed MLflow's informational tracing-skill hint. Whitespace checks passed.
+
+No fresh end-to-end inference, CrewAI/App/tracing parity, deployment, full
+regression suite, dependency sync/update, package build, commit, push or CI run is
+claimed. Documentation checks do not establish concurrency capacity. Material
+future serving/protocol/evidence changes remain subject to ADR/maintainer review
+and the explicit live/controlled-inference approvals in `AGENTS.md`.
+
+The framework-agnostic wording follow-up makes the endpoint contract, not a list
+of named frameworks, the integration boundary. Named bridge recipes are optional
+examples; compatible custom agents reuse the same request and captured-answer
+evaluation. Reran the selected schema/documentation command above: **18 passed,
+one controlled-inference test deselected**. README/integration-guide formatting
+and `git diff --check` passed. No runtime or live-validation claim was added.
+
+## Unified direct SDK milestone — October 8, 2026
+
+Implemented the proposed [ADR 0011](docs/adr/0011-unified-direct-and-remote-sdk.md)
+contract locally on branch `main`, based on HEAD
+`ce1f205c4153bb393aa6ec638cc1a88f67b90a71`. Direct Python is the onboarding
+default; optional typed remote execution uses the same v2 request and typed
+lifecycle/result/report models. Legacy local calls, dictionary remote calls and
+`/v1` remain compatibility interfaces. Added safe field-specific validation,
+typed quality/coverage/gaps, CLI summaries/JSON/static target discovery, dataset
+and judge examples, and consent-gated HTTP/App/classic-notebook journey samples.
+Evaluation remains off by default; lifecycle completion is not quality passing.
+
+Independent source review also reproduced and fixed request-encoding parity,
+Unicode byte-limit differences, ignored operator artifact-directory settings,
+typed nonfinite values normalizing to null, conflicting ambient SDK credentials
+in the HTTP live harness, and partially initialized framework-client cleanup.
+Harness shutdown now closes its socket and persists content-free failure evidence
+even if server shutdown raises. These fixes do not change the Locust engine or
+measured timing definitions. Duplicate App discovery, snapshot-read overhead,
+journal/generator measurements and capacity features remain deferred as described
+in [the milestone follow-up](docs/SDK_MILESTONE.md).
+
+Initial static checkpoint commands/results (superseded by the review below):
+
+```bash
+uv run --frozen --no-sync pytest -q \
+  tests/test_unified_sdk_contract.py tests/test_unified_usability_contract.py \
+  tests/test_unified_journey_examples.py tests/test_unified_journey_budget.py \
+  tests/test_framework_client_ownership.py tests/test_cli.py \
+  tests/test_remote_sdk.py tests/test_settings.py tests/test_diagnostics.py \
+  tests/test_framework_request_docs.py \
+  tests/test_v2.py::test_v2_validation_reports_safe_fields_and_bounds_without_submitted_values \
+  tests/test_v2.py::test_v2_validation_preserves_only_fixed_model_validator_guidance \
+  tests/test_v2.py::test_v2_validation_never_serializes_custom_exception_or_arbitrary_context \
+  tests/test_readme.py::test_readme_quality_policy_and_output_match_current_contracts \
+  tests/test_readme.py::test_readme_automatic_request_matches_v2_contract \
+  tests/test_readme.py::test_readme_recommended_request_defaults_to_performance_only \
+  tests/test_readme.py::test_target_guide_examples_validate_without_discovery_or_traffic \
+  tests/test_readme.py::test_readme_relative_documentation_links_and_anchors_resolve \
+  tests/test_simple_examples.py::test_example_index_links_resolve \
+  tests/test_simple_examples.py::test_every_user_example_has_an_explicit_integration_contract
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync ruff format --check .
+uv run --frozen --no-sync python scripts/export_openapi.py --check
+uv run --frozen --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --frozen --no-sync python scripts/verify_wheel.py
+uv run --frozen --no-sync python scripts/verify_remote_install.py --offline --wheel dist/evalsurge-0.2.0-py3-none-any.whl
+uv run --frozen --no-sync python scripts/check_ci_prerequisites.py
+git diff --check
+git diff --numstat -- uv.lock
+```
+
+The focused suite passed **219 tests in 1.25 seconds**, with no skips or warnings.
+It checks schemas, configuration, source ownership, lifecycle documents, transport
+policy and documentation, not agent inference. Simulated HTTP responses represent
+EvalSurge resource metadata only, never LLM/provider completions. Initial static
+checks caught two incorrect terminal-cancellation assertions and dataset NaN
+normalization; both were corrected and rerun. Later encoding regressions reproduced
+typed NaN normalization before its fix. No successful live run is inferred from
+these checks.
+
+Ruff passed (**153 files formatted**); OpenAPI snapshot equality and independent
+validation passed. A source comparison to HEAD verified all **7 `/v1` paths and
+28 reachable schemas unchanged**; this is schema compatibility, not a complete
+runtime compatibility sign-off. Fresh wheel/sdist build and packaged assets passed.
+An isolated installation passed with the wheel plus **11 locked base dependencies**,
+without the server/load/model SDK stack, including public v2 models, legacy/typed
+remote lifecycle, safe errors and missing-server guidance. Its intentional separate
+environment produced one `VIRTUAL_ENV` mismatch warning. The exporter printed
+MLflow's informational tracing-skill hint; no new tracing code or calls were added.
+
+No dependency update was requested. An earlier unfrozen `uv run` rewrote lock
+provenance under the ambient mirror; only those tool-generated edits were restored.
+Final checks use frozen execution. The final lock diff is empty, and provenance
+checks verified **189 public registry/artifact package sources**. No new vulnerability
+audit, supported-interpreter install matrix or dependency-upgrade approval is claimed.
+
+At the initial static checkpoint, live validation had not run. A sandboxed CLI
+authentication check reported an older credential-cache error. The fresh checks
+below supersede that diagnosis: secure-keyring access outside the sandbox works
+with the explicitly approved `e2-demo-field-eng` profile; no reauthentication,
+auth-storage downgrade, profile change or laptop-token copy was needed. Classic
+compute still requires explicit selection. Historical App records below are not
+verification of current deployments in the newly selected workspace.
+
+At that checkpoint, the full regression suite and inference-fixture CI were not run: they contain
+controlled provider completions and require the user's explicit exception approval
+under `AGENTS.md`. Framework startup cleanup currently has structural regression
+coverage, not a new live runtime result. Designated maintainer review, full approved
+regressions and fresh bounded real-agent journeys remain required. No commit, push,
+GitHub operation or CI trigger was performed; pre-existing `AGENTS.md` and `.isaac/`
+changes were preserved.
+
+### Fresh live evidence in the selected workspace
+
+User-approved workspace: `https://e2-demo-field-eng.cloud.databricks.com`, ID
+`1444828305810485`; explicit CLI/laptop profile: `e2-demo-field-eng`. The selected
+identity is active. Read-only discovery found no App with an `eval` name; other
+workspace Apps were not selected or invoked. Model discovery reported
+`databricks-gpt-oss-120b` and `databricks-gpt-5-4-mini` READY. Readiness is not
+inference evidence. No App/Lakebase deployment or classic cluster was created.
+
+One zero-inference, no-retry serverless prerequisite notebook completed: parent
+run `364550198059215`, task run `211631498695137`. It used environment version 5,
+Python 3.12.3 and Databricks SDK 0.146.0. Driver runtime auth can read the selected
+workspace; explicit runtime-OAuth can obtain a token with exact-host verification.
+The independent subprocess's runtime-OAuth initialization failed with `ValueError`.
+Loopback sockets, process launch and POSIX lock/fsync checks passed. No credential
+value was exported. This establishes a driver-to-worker auth gap, not notebook-to-App
+support. `scripts/validation/serverless_prerequisites.py` provides the reusable
+workspace-parameterized form of this diagnostic. Its task completion must not be
+mistaken for all prerequisites passing.
+
+Laptop real-inference commands:
+
+```bash
+uv run --frozen --no-sync python -m scripts.validation.unified_sdk_journeys \
+  --journey http --framework langgraph --profile e2-demo-field-eng \
+  --target-model databricks-gpt-oss-120b --exercise-cancel \
+  --live --accept-paid-traffic --artifact-dir /tmp/evalsurge-lg-20261008.Lbs8io
+uv run --frozen --no-sync python -m scripts.validation.unified_sdk_journeys \
+  --journey http --framework openai-agents --profile e2-demo-field-eng \
+  --target-model databricks-gpt-oss-120b \
+  --live --accept-paid-traffic --artifact-dir /tmp/evalsurge-openai-20261008.drofEP
+```
+
+Both used the actual native framework and model, concurrency five, at most five
+measured requests per run, 30-second dispatch/attempt limits, zero provider retries
+and evaluation off. Synthetic read-only tools/FAQ data are disclosed demo inputs;
+model responses were not stubbed. No planner/judge call occurred.
+
+LangGraph normal run `8f5db20a-9b0c-4ea5-9400-2c65e376b63e` passed five of five
+measured requests with zero errors, typed retrieval agreement and owned cleanup.
+Its successful-only observed p95 latency was 943.44 ms and answer-text TTFT
+871.50 ms. These are small-run client observations, not sustainable capacity.
+The unknown-route probe failed and skipped measured load. Cancellation returned
+`cancellation_requested` and terminated as cancelled, but had **zero measured
+attempts**: cancellation before user dispatch is not in-flight cancellation
+coverage. The earlier harness receipt's `dispatch_cancellation_exercised=true`
+overstates this evidence; the harness is being tightened to observe actual HTTP
+dispatch. Preserve that original receipt and this correction.
+
+LangGraph also emitted upstream Pydantic serialization warnings around structured
+reasoning content. Independent installed-source/artifact review found five
+nonempty captured answer strings and positive provider usage values; across seven
+traces, concatenated string model fragments matched the corresponding hosted
+answers. MLflow stored raw `LLMResult` rather than normalized chat output. That is
+degraded chat-trace rendering, not clean tracing/judging parity. Usage can include
+reasoning tokens; future text-object chunks are not established support.
+OpenAI Agents run `965459df-81da-454e-9624-889d23aede1c`
+**failed** its real model-bearing preflight: the Chat Completions stream handler
+passed structured reasoning blocks to `ResponseTextDeltaEvent.delta`, whose type
+is string. Measured load was skipped and no additional run was attempted by that
+harness. The failed result remains failed. It does not contradict older native
+Responses-protocol App evidence, which exercises a different transport.
+
+Remaining notebook journey tests explicitly select `databricks-gpt-5-4-mini` under
+the user's smaller-model approval. This is a separate configured test, never an
+automatic fallback, provider retry or replacement of failed evidence. Serverless
+notebook-to-App, current deployed source, classic notebook, judge calibration,
+designated maintainer review and approved full regression/CI remain open gates.
+
+### Serverless live outcome and pre-push review — October 8, 2026
+
+Read-only CLI inspection confirmed parent run `584248337638691` and task
+`1003312814916440` terminated with `INTERNAL_ERROR` / `FAILED`, after five seconds
+of setup and 214 seconds of execution. The selected profile was
+`e2-demo-field-eng`; the selected model was `databricks-gpt-5-4-mini`, evaluation
+off, concurrency five, with the previously recorded maximum of 26 top-level
+attempts per framework (52 across both). These are approved bounds, not observed
+attempt counts. The task had no retries; no new paid run was submitted.
+
+`get-run-output` returned no `notebook_output.result`. It reported an unresponsive
+Python kernel / exit code 3 and a framework-server startup exception:
+`MlflowException: No Experiment with id=1 exists`. Without a final receipt,
+successful inference, framework-by-framework counts, cancellation, report
+retrieval and cleanup cannot be claimed. The startup exception does not establish
+the cause of the kernel exit. No fresh App/Lakebase/classic resource was deployed.
+
+Installed native MLflow source (`tracking/fluent.py`, `set_experiment`) sets
+`MLFLOW_EXPERIMENT_ID` in the environment. The dedicated notebook harness restored
+only its originally supplied keys, allowing that ID to leak into another fresh
+SQLite store. A new subprocess-isolated test using two actual MLflow stores failed
+before the fix and passed afterward (**1 passed in 1.94 seconds**). The harness now
+clears and restores this ID inside its existing owned configuration scope, including
+the exceptional path, after owned resources drain. No framework, provider, agent
+or completion is mocked by this regression; it makes no inference calls. The fix
+has not been uploaded or rerun live, and the original failed run remains failed.
+
+README, Python/notebook guidance, milestone status, ADR 0011 and harness guidance
+now surface this failure and retain the worker-OAuth/deployed-App validation gaps.
+GitHub authentication outside the sandbox confirmed the correct personal
+`RamVegiraju` identity; `git fetch origin` found no branch divergence (`0 0`).
+The repository workflow runs the full controlled-inference suite on every push.
+At this checkpoint its exception approval was still required; no workflow was
+disabled or skipped. The subsequent user-approved release checks are recorded below.
+
+Further installed-source inspection found native Uvicorn calls
+`sys.exit(STARTUP_FAILURE)` after lifespan startup failure. An isolated regression
+using real Uvicorn/FastAPI, with an intentionally failed ASGI lifespan and no agent
+route or provider fixture, reproduced **process exit code 3** before the fix.
+Both harnesses now catch SystemExit inside the server task and propagate a fixed
+RuntimeError through existing cleanup/receipt paths. The same regression then
+passed (**1 passed in 0.40 seconds**) and returned control to its host coroutine.
+This establishes the local termination path matching the remote symptom, not a
+definitive remote root cause or successful live rerun. Invocation/measurement
+semantics, target retries, profile/auth boundaries and paid bounds are unchanged.
+
+Source-archive inspection also found `.isaac/config.json` in the first local
+sdist. It was not uploaded and its contents were not read. The directory remains
+untouched; `.gitignore` and the Hatch sdist exclusion now keep it out of commits
+and packaging. The package verifier now requires the new `local`, `run_views`
+and `validation` modules and checks source member names without extraction.
+The strengthened verifier rejected the old archive as expected; three no-inference
+archive regressions cover clean, missing-module and private-metadata cases.
+`pyproject.toml` changed only its build exclusion; dependency declarations and
+`uv.lock` did not change. `uv lock --check --offline --default-index
+https://pypi.org/simple` accepted the locked metadata. Cached locked sync aligned
+Ruff from the previously installed 0.16.9 to locked 0.16.10, not a lock upgrade.
+
+Final consolidated pre-push checks on macOS/Python 3.12.13:
+
+```bash
+uv sync --locked --offline --default-index https://pypi.org/simple --extra agents --group dev
+uv run --frozen --no-sync pytest -q \
+  tests/test_unified_sdk_contract.py tests/test_unified_usability_contract.py \
+  tests/test_unified_journey_examples.py tests/test_unified_journey_budget.py \
+  tests/test_framework_client_ownership.py tests/test_dispatch_observer.py \
+  tests/test_serverless_journey_contract.py tests/test_wheel.py \
+  tests/test_cli.py tests/test_remote_sdk.py tests/test_settings.py \
+  tests/test_diagnostics.py tests/test_framework_request_docs.py \
+  tests/test_v2.py::test_v2_validation_reports_safe_fields_and_bounds_without_submitted_values \
+  tests/test_v2.py::test_v2_validation_preserves_only_fixed_model_validator_guidance \
+  tests/test_v2.py::test_v2_validation_never_serializes_custom_exception_or_arbitrary_context \
+  tests/test_readme.py::test_readme_quality_policy_and_output_match_current_contracts \
+  tests/test_readme.py::test_readme_automatic_request_matches_v2_contract \
+  tests/test_readme.py::test_readme_recommended_request_defaults_to_performance_only \
+  tests/test_readme.py::test_target_guide_examples_validate_without_discovery_or_traffic \
+  tests/test_readme.py::test_readme_relative_documentation_links_and_anchors_resolve \
+  tests/test_simple_examples.py::test_example_index_links_resolve \
+  tests/test_simple_examples.py::test_every_user_example_has_an_explicit_integration_contract
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync ruff format --check .
+uv run --frozen --no-sync python scripts/export_openapi.py --check
+uv run --frozen --no-sync openapi-spec-validator docs/openapi.json
+uv run --frozen --no-sync python scripts/check_ci_prerequisites.py
+uv lock --check --offline --default-index https://pypi.org/simple
+uv build --no-build-isolation
+uv run --frozen --no-sync python scripts/verify_wheel.py
+uv run --frozen --no-sync python scripts/verify_remote_install.py --offline --wheel dist/evalsurge-0.2.0-py3-none-any.whl
+git diff --check
+git diff --numstat -- pyproject.toml uv.lock
+```
+
+The consolidated suite passed **262 tests in 3.49 seconds**, with no warnings or
+skips. Checks exercised only schema/resource metadata, operator configuration,
+source/docs contracts, archives and native local storage/failed ASGI startup.
+No agent/model completion was stubbed or called. Ruff lint/format passed (158
+files); OpenAPI snapshot equality and independent schema validation passed.
+Recursive comparison against baseline `ce1f205` found all **7 v1 paths and 28
+reachable schemas unchanged**, not a runtime compatibility sign-off. Public
+registry/artifact provenance passed for **189 locked packages**. Rebuilt wheel
+and sdist passed required-asset/private-metadata checks. Isolated installation of
+the actual wheel plus **11 locked base dependencies** passed legacy/typed remote,
+CLI and missing-server checks without the server/load/model stack. It emitted the
+expected separate-environment `VIRTUAL_ENV` warning. Secret-pattern scanning found
+no matches in the reviewed source/docs directories; this is not a security audit.
+
+At this static checkpoint, full regression, push-triggered controlled-inference CI,
+designated maintainer review and the remaining live journeys were still open. The offline full suite
+uses deterministic SSE/JSON target responses (`tests/conftest.py`), controlled
+preflight/readiness/load boundaries, real LangGraph/OpenAI frameworks with fixture
+provider completions (`tests/test_frameworks.py` and App-boundary integrations),
+and native MLflow with controlled planner/judge responses (evaluation/preflight
+suites, including `tests/test_mlflow_backend.py`). These check reproducible failure,
+wire, lifecycle and evaluation regressions without paid traffic; they do not
+establish real inference. Approval for that explicit exception was required before
+the full suite or a push triggering it. No commit or push had been performed at
+that checkpoint; the approved full checks below supersede its regression status.
+
+### Approved full release checks — October 8, 2026
+
+After disclosure of the controlled target/provider/planner/judge boundaries above,
+the user explicitly approved the offline full suite and push-triggered CI exception.
+That approval does not convert fixtures into live-model evidence or authorize new
+paid calls. No workflow or regression was disabled to obtain passing results.
+
+The first `uv run --frozen --no-sync pytest -q` completed with **7 failed,
+811 passed, 30 warnings in 218.19 seconds**. Five App-quality regressions exposed
+direct factory configuration bypassing the effective task-local scope and legacy
+submission losing an experiment selected after context entry. A legacy sync test
+also reproduced eager validation of an unused invalid target registry; the last
+failure was a README assertion still looking for the removed v1 curl quickstart.
+
+Factories now inherit the effective private scope. Unified requests freeze and
+validate their registry before discovery/admission. Legacy exact-Agent calls without
+explicit context bindings/settings retain submission-time configuration and ignore
+that unused registry. Both preserve the actual artifact owner without global
+environment mutation. Seven new no-inference regressions cover scoped construction,
+frozen valid registries, fail-closed invalid registries and native async/sync legacy
+submission. The new sync guard caught a missing artifact-directory propagation in
+the first focused rerun; it was corrected before the final full run. The README
+regression now validates the direct v2 golden-path request. ADR 0011 and the Python
+and code guides document these compatibility boundaries.
+
+Final focused/full and release-gate commands:
+
+```bash
+uv sync --locked --offline --no-build-isolation --default-index https://pypi.org/simple --extra agents --group dev
+uv run --frozen --no-sync pytest -q --tb=short tests/test_unified_sdk_contract.py tests/test_databricks_app_quality.py tests/test_foundations.py::test_should_accept_readme_sample_as_performance_only_request tests/test_python_api.py::test_sync_client_does_not_nest_event_loop
+uv run --frozen --no-sync pytest -q
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync ruff format --check .
+uv run --frozen --no-sync python scripts/export_openapi.py --check
+uv run --frozen --no-sync openapi-spec-validator docs/openapi.json
+uv run --frozen --no-sync python scripts/check_ci_prerequisites.py
+uv lock --check --offline --default-index https://pypi.org/simple
+uv build --no-build-isolation
+uv run --frozen --no-sync python scripts/verify_wheel.py
+uv run --frozen --no-sync python scripts/verify_remote_install.py --offline --wheel dist/evalsurge-0.2.0-py3-none-any.whl
+git diff --check
+git diff --numstat -- uv.lock
+```
+
+The focused rerun passed **71 tests, 13 warnings in 15.47 seconds**. The full
+rerun passed **828 tests, 42 warnings in 232.58 seconds**, with no skips. Warnings
+come from native MLflow's SQLAlchemy deprecated `noload` loader and positional
+Pandas `all(0)` calls. These are controlled integration/regression results, including
+real frameworks, Locust and native MLflow at the disclosed fixture boundaries;
+they are not actual LLM inference, App deployment or notebook journey validation.
+The new framework bridge documentation has syntax/schema coverage only, not CrewAI
+runtime or hosting parity.
+
+The initial offline isolated build could not resolve uncached Hatch metadata.
+The explicit public-PyPI sync then failed with connection refused after three
+retries. Offline locked sync with already-installed compatible **Hatchling 1.32.4**
+and `--no-build-isolation` passed. The dependency lock remains unchanged; no registry
+URLs, artifact hashes or dependency versions were rewritten. This is not a fresh
+public-index clean installation or a latest-compatible dependency upgrade.
+
+Lint/format passed (**161 files**); OpenAPI equality/independent schema validation
+and public provenance checks passed (**189 locked registry packages**). Final
+wheel/sdist checks verify required assets and private-metadata exclusion; isolated
+installation verifies the client with **11 locked base dependencies**, without
+the server/load/model stack. The isolated environment emits the expected
+`VIRTUAL_ENV` mismatch warning. The
+earlier 7-path/28-component v1 schema comparison remains separate from the full
+runtime regressions and from any supported-interpreter CI result.
+
+This record is prepared before commit/push. Remote CI must be inspected after
+the actual push; configured jobs alone are not a pass. The user-owned `AGENTS.md`
+edit and local `.isaac/` directory remain outside the commit. Designated maintainer
+review, current deployed-App/notebook-to-App/classic-notebook evidence and the
+failed serverless live journey remain open. No new paid traffic or deployment
+was performed for these release checks.
+
 ## Publication verification — October 8, 2026
 
 Reviewed the pending four framework/hosting request examples, controlled real

@@ -1,6 +1,7 @@
 """Single-owner run lifecycle shared by Python and REST; no HTTP dependencies."""
 
 import asyncio
+import copy
 import fcntl
 import json
 import math
@@ -249,6 +250,23 @@ class RunCoordinator:
             raise CoordinatorError(422, "Workload must contain JSON-serializable values") from None
         if size > MAX_REQUEST_BYTES:
             raise CoordinatorError(413, "Request body exceeds the eight-megabyte limit")
+
+    def read_run(self, run_id: UUID) -> dict[str, Any]:
+        """Read detached state for shared presentation without exposing mutable ownership.
+
+        Args:
+            run_id: Existing local resource identifier.
+
+        Returns:
+            Independent protected state; callers must not publish operator fields.
+
+        Raises:
+            CoordinatorError: No run exists.
+            RuntimeError: Storage is not owned or is closing.
+
+        Recovery follows existing behavior and never reinvokes a target.
+        """
+        return copy.deepcopy(self._read_run(run_id))
 
     def _read_run(self, run_id: UUID) -> dict[str, Any]:
         """Read owned state or recover an abandoned snapshot without replaying actions.

@@ -4,12 +4,36 @@ Start here for the public Python API. These scripts call an existing agent;
 they do not start an EvalSurge server, implement polling, or manage credentials.
 Only benchmark endpoints and agent actions you are authorized to exercise.
 
-These examples use runner-local HTTP agents. Databricks Apps are also supported
-through registered targets in `/v2`; see [the target guide](../docs/TARGETS.md).
-The local Python interface has no App-specific convenience factory.
-For REST, CLI, and remote SDK examples of each framework under both hosting
-options, use [the four-target guide](../docs/FRAMEWORK_TARGET_EXAMPLES.md) and its
-[JSON request files](requests/local-langgraph.json) / [operator TOML](requests/operator.toml).
+New integrations use one `RunCreate` request and direct execution by default:
+
+| Example | Purpose |
+| --- | --- |
+| [Direct HTTP](journeys/direct_http.py) | Existing real HTTP agent; no EvalSurge server |
+| [Direct App](journeys/direct_app.py) | Existing deployed App and explicitly selected OAuth profile |
+| [Classic notebook](journeys/classic_notebook.py) | Same App request on a driver, consent gate and context cleanup |
+| [Dataset and judges](quality/README.md) | Explicit catalog, reviewed custom alias, automatic, and readiness edges |
+
+Install `evalsurge[server]`, then run a selected real target only after reviewing
+the bound of ten measured agent invocations plus one excluded probe (not a
+model/tool-call or spend quota):
+
+```bash
+uv run python -m examples.journeys.direct_http \
+  http://127.0.0.1:9001/chat --allow-paid-inference
+uv run python -m examples.journeys.direct_app \
+  your-deployed-app --profile YOUR_SELECTED_OAUTH_PROFILE --allow-paid-inference
+```
+
+These scripts do not deploy targets, select a default profile, or substitute
+fixture completions when a live target is unavailable. New samples have static
+schema checks, not a claim of end-to-end notebook/live coverage. Serverless must
+be validated separately. See [the target guide](../docs/TARGETS.md) and
+[actual validation](../VALIDATION.md).
+
+For optional REST, CLI, and remote SDK examples of each framework under both
+hosting options, use [the four-target guide](../docs/FRAMEWORK_TARGET_EXAMPLES.md),
+[JSON request files](requests/local-langgraph.json), and [operator TOML](requests/operator.toml).
+The following older scripts remain compatibility examples:
 
 | Example | Purpose |
 | --- | --- |
@@ -19,7 +43,10 @@ options, use [the four-target guide](../docs/FRAMEWORK_TARGET_EXAMPLES.md) and i
 
 ## Credential-free mock quickstart
 
-From the checkout, after [installation](../README.md#credential-free-quickstart-legacy-v1), start the
+This mock is a controlled transport tutorial, not actual agent/LLM validation.
+Before running controlled tests or CI, disclose the provider boundary and obtain
+approval under [the engineering policy](../AGENTS.md). From the checkout, after
+[installation](../README.md#start-in-python), start the
 deterministic sample agent in one terminal:
 
 ```bash
@@ -60,7 +87,8 @@ EVALSURGE_DEMO_LIVE=false MLFLOW_MODEL_CATALOG_URI='' \
   uv run --no-sync python -m examples.framework_agent
 ```
 
-This serves real LangGraph and OpenAI Agents with synthetic tools, isolated
+The command above explicitly selects controlled model responses. It serves real
+LangGraph and OpenAI Agents with synthetic tools, isolated
 memory, and MLflow instrumentation. Its model responses are fixtures by default;
 the command does not opt in to live model inference.
 
@@ -95,7 +123,10 @@ Protect reports and artifacts: they can contain prompts, answers, and rationales
 
 Local tests exercise actual framework runners, Locust, and native MLflow with
 controlled provider boundaries. That is not paid/live validation, model-quality
-calibration, or sustainable-capacity evidence.
+calibration, or sustainable-capacity evidence. Existing controlled inference
+tests/CI need explicit disclosure and approval before execution. For live
+validation select an exact authorized profile and bounded traffic; missing auth
+or deployment is a blocker, not permission to substitute fixtures.
 
 ## Supporting agents and advanced tooling
 

@@ -25,6 +25,36 @@ Missing token usage remains null with a coverage fraction, not zero.
 
 ## Verified demo preset
 
+### Fresh direct HTTP checks — October 8
+
+In the explicitly selected `e2-demo-field-eng` workspace, `databricks-gpt-oss-120b`
+passed five bounded LangGraph HTTP requests, but emitted list-valued reasoning
+content on Chat Completions. The captured answer-text fragments were intact;
+MLflow retained raw `LLMResult` rather than normalized chat output. Pydantic
+serialization warnings are a real tracing limitation, not a clean compatibility
+pass. Provider completion-token usage can include reasoning, not just displayed
+answer text. Trace-aware judging was not exercised.
+
+The same endpoint **failed** the OpenAI Agents streamed Chat Completions
+preflight: its handler forwards `delta.content` to the string-typed
+`ResponseTextDeltaEvent.delta`, which rejects the provider's structured reasoning
+list. EvalSurge skipped measured load. This is distinct from the earlier native
+Responses-API App checks below; no converter patch, retry or fallback was added.
+Later journey tests explicitly select the previously tested mini endpoint before
+running. The October 8 serverless HTTP/API job failed without a final receipt;
+fresh compatibility for that topology is not established. Its output included an
+MLflow experiment/store startup error and an unexpected kernel exit. Local native
+MLflow/Uvicorn regressions cover configuration and startup-exit containment, not
+model compatibility. Keep these failures visible when selecting transports.
+
+Source review covered MLflow 3.16.1, LangChain Core 1.6.6, LangChain OpenAI 1.6.7,
+OpenAI 3.22.1, OpenAI Agents 0.22.3 and Pydantic 2.13.5. LangGraph's demo currently
+emits only string chunks. General handling of future text-object blocks requires
+its own regression/live check; do not assume every structured-content variant
+will be emitted correctly. Exact outcomes are in [validation](../VALIDATION.md).
+
+### Earlier native App transport
+
 The current native App sample has a different contract from the framework demos
 below. Its October 7 check used `system.ai.gpt-oss-120b` via the MLflow Responses
 route and the actual `OpenAIResponsesModel`/`Runner.run`. The first MLflow Chat

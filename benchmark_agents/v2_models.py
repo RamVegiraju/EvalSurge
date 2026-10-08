@@ -3,21 +3,46 @@
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_serializer, model_validator
 
 from .models import (
     Evaluation,
+    EvaluationError,
     EvaluationPreflight,
+    EvaluationStatus,
     Load,
     LoadError,
+    LoadStatus,
     Model,
     PreflightResult,
     ProfilingSummary,
+    Recommendation,
     RequestProfile,
     RunRequest,
     Sample,
     Target,
 )
+
+LifecycleStatus = Literal[
+    "queued",
+    "planning",
+    "preflighting",
+    "running",
+    "profiling",
+    "evaluating",
+    "completed",
+    "completed_with_gaps",
+    "failed",
+    "interrupted",
+    "cancelled",
+]
+EvidenceGap = Literal[
+    "incomplete_measurements",
+    "evaluation_unavailable",
+    "planning_failed",
+    "internal_trace_coverage",
+    "profiling_failed",
+]
 
 
 class TargetReference(Model):
@@ -130,7 +155,7 @@ class Acknowledgment(Model):
     """Admission receipt; completion and quality are separate outcomes."""
 
     id: UUID
-    status: str
+    status: LifecycleStatus | Literal["cancellation_requested"]
     links: Links
     poll_after_seconds: float = Field(default=1, ge=0, le=60)
 
@@ -138,19 +163,23 @@ class Acknowledgment(Model):
 class PhaseStates(Model):
     """Independent planning, inference, load, profiling, and judging outcomes."""
 
-    planning: str
-    inference: str
-    evaluation_readiness: str
-    load: str
-    profiling: str
-    evaluation: str
+    planning: Literal["pending", "running", "completed", "failed", "cancelled", "interrupted"]
+    inference: Literal[
+        "not_run", "pending", "running", "passed", "failed", "cancelled", "interrupted"
+    ]
+    evaluation_readiness: Literal[
+        "not_run", "pending", "running", "skipped", "passed", "failed", "cancelled", "interrupted"
+    ]
+    load: LoadStatus
+    profiling: Literal["pending", "completed", "failed", "skipped"]
+    evaluation: EvaluationStatus
 
 
 class RunStatus(Model):
     """Lightweight polling response with no prompts, answers, or destinations."""
 
     id: UUID
-    status: str
+    status: LifecycleStatus
     name: str | None = None
     phases: PhaseStates
     links: Links
@@ -162,7 +191,7 @@ class DecisionSummary(Model):
 
     performance: Literal["pending", "complete", "incomplete", "not_run"]
     quality: Literal["pending", "off", "available", "unavailable"]
-    evidence_gaps: list[str] = Field(default_factory=list)
+    evidence_gaps: list[EvidenceGap] = Field(default_factory=list)
     sustainable_capacity_established: Literal[False] = False
 
 
@@ -194,11 +223,101 @@ class Performance(Model):
     observed_peak_in_flight: int | None = None
 
 
+class SamplingStratum(Model):
+    """Selected captures in one zero-based case/time bucket, not a population weight."""
+
+    case_id: int = Field(ge=0)
+    time_bin: int = Field(ge=0)
+    selected: int = Field(ge=0)
+
+
+class SamplingCoverage(Model):
+    """Evidence-qualified selection coverage with the frozen case/time policy."""
+
+    policy: str
+    seed: int = Field(ge=0)
+    time_bins: int = Field(ge=1)
+    observed_dispatch_window_ms: float = Field(ge=0)
+    eligible: int = Field(ge=0)
+    selected: int = Field(ge=0)
+    fraction_of_eligible: float = Field(ge=0, le=1)
+    eligible_strata: int = Field(ge=0)
+    selected_strata: int = Field(ge=0)
+    strata: list[SamplingStratum] = Field(default_factory=list)
+
+
+class RequestCoverage(Model):
+    """All measured attempts; only successful evidence-qualified outputs are judged."""
+
+    total: int = Field(ge=0)
+    successful: int = Field(ge=0)
+    failed: int = Field(ge=0)
+
+
+class AssessmentOutcome(Model):
+    """Protected native assessment; a false verdict is not an execution failure."""
+
+    request_id: str
+    case_id: int | None = Field(default=None, ge=0)
+    status: Literal["passed", "failed", "scored", "error", "unavailable"]
+    value: bool | int | float | str | None = None
+    rationale: str | None = Field(default=None, max_length=2000)
+    rationale_truncated: bool = False
+    error: EvaluationError | None = None
+
+
+class ScorerOutcome(Model):
+    """One judge's execution, coverage and optional boolean pass rate, independently."""
+
+    scorer: str
+    status: Literal[
+        "completed",
+        "partial",
+        "failed",
+        "configuration_changed",
+        "needs_configuration",
+        "no_eligible_outputs",
+    ]
+    eligible: int | None = Field(default=None, ge=0)
+    attempted: int | None = Field(default=None, ge=0)
+    scored: int | None = Field(default=None, ge=0)
+    judge_errors: int | None = Field(default=None, ge=0)
+    coverage: SamplingCoverage | None = None
+    request_ids: list[str] = Field(default_factory=list)
+    assessments: list[AssessmentOutcome] = Field(default_factory=list)
+    mlflow_run_id: str | None = None
+    mlflow_experiment_id: str | None = None
+    metrics: dict[str, float | None] = Field(default_factory=dict)
+    pass_rate: float | None = Field(default=None, ge=0, le=1)
+    source: Literal["registered-mlflow", "catalog"] | None = None
+    version: str | int | None = None
+    error: EvaluationError | None = None
+
+
+class EvaluationOutcome(Model):
+    """Typed captured-answer evidence; absent fields remain unknown for legacy runs.
+
+    Model execution completion is not a quality pass. Registered scores need an
+    explicit caller threshold; only boolean values have an intrinsic pass rate.
+    Rationales are protected content and can quote prompts or references.
+    """
+
+    status: EvaluationStatus | None = None
+    results: list[ScorerOutcome] = Field(default_factory=list)
+    needs_data: list[Recommendation] = Field(default_factory=list)
+    request_coverage: RequestCoverage | None = None
+    judge_model: str | None = None
+    transport: Literal["databricks-sdk"] | None = None
+    required: list[str] = Field(default_factory=list)
+    error: EvaluationError | None = None
+    error_type: str | None = None
+
+
 class Result(Model):
     """Typed result envelope; protected assessment data retains native variants."""
 
     id: UUID
-    status: str
+    status: LifecycleStatus
     name: str | None = None
     phases: PhaseStates
     links: Links
@@ -206,9 +325,23 @@ class Result(Model):
     metrics: Performance | None = None
     preflight: PreflightResult
     evaluation_preflight: EvaluationPreflight
-    evaluation: dict[str, Any] = Field(default_factory=dict)
+    evaluation: EvaluationOutcome = Field(default_factory=EvaluationOutcome)
     load_error: LoadError | None = None
     planning_error: dict[str, str] | None = None
+
+    @field_serializer("evaluation")
+    def serialize_evaluation(self, outcome: EvaluationOutcome):
+        """Preserve partial wire payloads and the declared typed OpenAPI schema.
+
+        Args:
+            outcome: Native typed evaluation, including only observed fields.
+
+        Returns:
+            JSON-compatible observed fields. A return annotation is deliberately
+            omitted because Pydantic uses it to replace the field's output schema;
+            the public contract must remain EvaluationOutcome, not an untyped dict.
+        """
+        return outcome.model_dump(exclude_unset=True)
 
 
 class Report(Model):

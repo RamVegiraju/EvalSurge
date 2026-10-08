@@ -29,6 +29,16 @@ client temporarily mutates global connection configuration or serializes tokens;
 workers receive detached credential references. JSON response decoding is capped
 at two million decoded bytes and does not infer tool timings or TTFT.
 
+The unified direct SDK binds target aliases in the operator context, not in
+`RunCreate`. App target construction is non-networked; resolution still uses the
+existing explicit-profile/exact-origin OAuth boundary. Private snapshots propagate
+to owned tasks/workers without global environment changes. The optional API server
+owns its own registered aliases; a remote client cannot upload a local binding.
+CLI target discovery is static and secret-free. Ordinary summaries omit protected
+assessment content; explicit `--json` output can contain rationales and must be
+treated as a protected export. Direct context cleanup drains work and releases
+exclusive artifacts, but cannot roll back agent tools or kill trusted scorer code.
+
 These controls do not make a general public load-testing service safe. Multi-tenant deployment additionally requires connection ACLs, network egress enforcement (including DNS rebinding controls), quotas, audit logging, request-body limits at the gateway, secret management, and durable job ownership. Only benchmark endpoints and agent actions you are authorized to exercise; load retries are intentionally disabled.
 
 The API limits decoded request bodies to 8 MB, including chunked bodies. Admission
@@ -92,5 +102,10 @@ span/tool names can still be sensitive. Full source traces and captured request 
 remain protected evidence, not sanitized public telemetry.
 
 Artifacts contain input prompts, responses, reference data, model/profile identifiers, and request metadata. Protect the artifact directory and MLflow store with filesystem permissions and a retention policy. Do not commit live artifacts. Deleting artifacts also deletes local idempotency history. Journal flushing protects against worker-process interruption, not disk failure or filesystem loss.
+
+Local assistant configuration under `.isaac/` is not project source. Keep it out
+of commits and source distributions; release verification checks archive member
+names without reading or exposing its contents. This check is not a comprehensive
+secret scanner.
 
 Send vulnerability details privately to the repository owner or through private vulnerability reporting when enabled. Do not post credentials or private prompts in issues. Security claims apply only to this documented deployment boundary; this repository has not undergone an independent security audit.

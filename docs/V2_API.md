@@ -3,7 +3,10 @@
 `/v2` provides admission, lightweight status, typed results, paginated reports,
 cancellation, and static capabilities over the existing coordinator and Locust
 engine. The runner remains a local single-owner service. `/v1` and the local
-Python API remain available.
+Python API remain available. New [direct Python usage](PYTHON_API.md) accepts the
+same `RunCreate` shape without an API server. The direct caller binds targets
+through `Agent.http()`/`Agent.databricks_app()` outside requests; this guide covers
+the [optional server](OPTIONAL_SERVER.md) registry and HTTP surface.
 
 End users can select either a locally hosted HTTP agent or a Databricks App from
 the operator registry. Both use the same request and execution pipeline; see
@@ -11,6 +14,9 @@ the operator registry. Both use the same request and execution pipeline; see
 host, not a remote submitter's laptop.
 For complete local and Databricks App requests for LangGraph and OpenAI Agents,
 see [the four framework-target examples](FRAMEWORK_TARGET_EXAMPLES.md).
+For your own dataset, reviewed judge aliases, automatic selection, and readiness
+edges, see [quality examples](../examples/quality/README.md) and
+[report structure](REPORTS_AND_JUDGES.md).
 
 Plain `evalsurge` installs only the remote SDK/CLI and their HTTPX/Pydantic
 dependencies. Install `evalsurge[server]` to run local
@@ -245,6 +251,22 @@ envelope remains unchanged.
 EVALSURGE_URL=http://127.0.0.1:8000 uv run --no-sync evalsurge doctor
 uv run --no-sync evalsurge run benchmark.json --wait --timeout 120 --open-report
 ```
+
+The default waiting output includes metric/coverage summaries, not full protected
+report contents. Use `--json` explicitly for scripting/export. `evalsurge targets`
+lists public registration aliases/protocols without App lookup or inference:
+
+```bash
+uv run --no-sync evalsurge targets --url http://127.0.0.1:8000
+uv run --no-sync evalsurge run benchmark.json --wait --json
+uv run --no-sync evalsurge targets --local --settings operator.toml
+uv run --no-sync evalsurge run benchmark.json --local --settings operator.toml --wait
+```
+
+Local CLI mode uses the same v2 request and private settings without an API server.
+It needs the `server` extra. Static target discovery proves registration, not
+credentials, deployment health, or actual inference. Invalid request guidance
+names sanitized public fields; it does not echo inputs or credentials.
 
 For remote access, set `EVALSURGE_API_KEY` without putting the key in arguments or
 URLs. `doctor` retrieves static capabilities; it reports configuration, not live

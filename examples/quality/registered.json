@@ -1,0 +1,13 @@
+{
+  "name": "reviewed-policy-judge",
+  "target": {"connection_id": "agent"},
+  "cases": [{"input": {"query": "Can I refund an opened item?"}, "reference": {"expected_facts": ["Opened items cannot be refunded."]}}],
+  "load": {"concurrency": 2, "duration_seconds": 10, "max_requests": 10, "timeout_seconds": 60},
+  "evaluation": {
+    "mode": "explicit",
+    "description": "Evaluate the captured answers with the operator-reviewed policy judge.",
+    "scorers": ["registered:policy"],
+    "max_scored_requests": 5,
+    "sampling_seed": 42
+  }
+}

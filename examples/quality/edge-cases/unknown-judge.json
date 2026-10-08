@@ -1,0 +1,5 @@
+{
+  "target": {"connection_id": "agent"},
+  "cases": [{"input": {"query": "Can I refund an opened item?"}}],
+  "evaluation": {"mode": "explicit", "scorers": ["registered:not_approved"]}
+}

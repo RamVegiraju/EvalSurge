@@ -1,0 +1,5 @@
+{
+  "target": {"connection_id": "agent"},
+  "cases": [{"input": {"query": "Can I refund an opened item?"}}],
+  "evaluation": {"mode": "automatic", "scorers": ["correctness"]}
+}

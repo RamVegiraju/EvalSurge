@@ -1,5 +1,30 @@
 # API and implementation review — 0.2.0
 
+## Unified direct SDK milestone — October 8, 2026
+
+[ADR 0011](adr/0011-unified-direct-and-remote-sdk.md) was recorded before
+implementation and requires designated maintainer review. Direct execution now
+accepts the existing v2 `RunCreate` and external operator target bindings. Optional
+typed remote access shares the same result/status/report models and lifecycle
+methods. Legacy local keyword calls, remote dictionary returns and `/v1` remain.
+The change does not introduce a second engine, target replay or a new hosting
+authorization mechanism.
+
+V2 responses now declare evaluation/assessment variants, sampling coverage and
+existing lifecycle/evidence-gap enums in OpenAPI. Partial historic evaluation
+payloads retain their serialized field presence; unknown metrics/coverage do not
+become fabricated observations. Response-schema narrowing can affect generated
+clients even when runtime JSON is unchanged: regenerate those clients and review
+exhaustive enums. No new endpoints or caller credential/model selectors are added.
+Shared value-free validation distinguishes bad fields from nonfinite JSON.
+
+CLI local mode, static target discovery, safe metric summaries and protected
+opt-in JSON are additive. Completion remains separate from quality passing;
+threshold exit gates are deferred. Current-run verification belongs in
+`VALIDATION.md`; historical full-suite or App results do not validate this new SDK.
+Do not claim maintainer approval, remote CI, live notebook auth, sustainable
+capacity or judge calibration from the static checks.
+
 ## Registered-target v2 façade — October 7, 2026
 
 The additive `/v2` API uses registered targets, defaults evaluation to off, admits
@@ -30,7 +55,8 @@ clients to update. V1 retrieval of a v2 run without a frozen plan returns safe
 409; v2 JSON reports handle failed/interrupted planning. The browser report shell
 now renders those planless runs through a same-origin v2 fallback. Results describe one
 closed-loop load level, not sustainable capacity; assessment dictionaries remain
-an explicit schema-maturity limitation.
+an explicit schema-maturity limitation at this October 7 checkpoint. ADR 0011's
+October 8 change types v2 evaluation outcomes; v1 retains its compatibility shape.
 
 ## Client/input/failure follow-up — October 7, 2026
 

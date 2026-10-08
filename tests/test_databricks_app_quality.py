@@ -250,7 +250,7 @@ async def test_real_quality_assesses_captures_without_target_reinvocation(
         )
     )
     code, record = await asyncio.to_thread(quality.execute, options)
-    assert code == (0 if mode == "yes" else 1)
+    assert code == (0 if mode == "yes" else 1), record
     assert record["quality_outcome"] == ("passed" if mode == "yes" else "failed")
     assert record["evaluation_execution_complete"] is True
     assert record["evaluation_readiness"]["status"] == "passed"

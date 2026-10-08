@@ -1,0 +1,22 @@
+# Placeholder-only trusted configuration; never commit actual profiles/secrets.
+artifact_dir = "artifacts/quality"
+
+[connections.agent]
+kind = "http"
+url = "http://127.0.0.1:9001/chat"
+protocols = ["openai-chat"]
+
+[provider]
+name = "databricks"
+profile = "YOUR_SELECTED_OAUTH_PROFILE"
+planner_model = "YOUR_PLANNER_ENDPOINT"
+judge_model = "databricks:/YOUR_CATALOG_JUDGE_ENDPOINT"
+
+# This selects an EXISTING reviewed native MLflow scorer. It does not register,
+# upload or execute newly supplied judge code. Tracking auth is operator-owned.
+[scorers.policy]
+name = "your_reviewed_policy_judge"
+experiment_id = "YOUR_AUTHORIZED_EXPERIMENT_ID"
+version = 1
+required_fields = ["inputs", "outputs", "expectations"]
+description = "Reviewed refund-policy judge with an operator-approved definition."

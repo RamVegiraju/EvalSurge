@@ -5,6 +5,11 @@ and sole Locust engine. The framework is an implementation detail of your agent;
 hosting and the public invocation protocol are separate choices. The operator
 registers each target, and callers select only its `connection_id`.
 
+For the simpler direct Python path and a minimal JSON wrapper around your own
+LangGraph, OpenAI agent, or CrewAI crew, start with
+[the hosted-agent recipe](AGENT_INTEGRATION.md). The four registered requests
+below remain optional server examples; they do not imply native CrewAI validation.
+
 | Agent | Registered alias / request file | Operator-selected public contract |
 | --- | --- | --- |
 | Local LangGraph | `local-langgraph` — [JSON](../examples/requests/local-langgraph.json) | `openai-chat`, `/langgraph/chat` in the repository demo |
@@ -17,6 +22,17 @@ LangGraph Platform API or an automatically discovered OpenAI API. Your own hoste
 agent must expose one of EvalSurge's [supported wire contracts](TARGETS.md#supported-wire-contracts).
 Using OpenAI Agents does not require an OpenAI-hosted model: its internal model
 provider/API is independent of the App's public `/api/invocations` contract.
+
+## Direct Python alternative
+
+You do not need an EvalSurge server to use either hosting option. Use
+`EvalSurge(targets={"agent": Agent.http(url)})` or
+`Agent.databricks_app(name, profile="YOUR_SELECTED_OAUTH_PROFILE")`, then
+`start(RunCreate(...))` with `target.connection_id="agent"`. The same cases/load/
+evaluation vocabulary works remotely with `EvalSurge.remote(url, typed=True)`.
+See [direct Python](PYTHON_API.md), [journey scripts and notebook](../examples/README.md),
+and [your dataset/judges](../examples/quality/README.md). The four JSON files below
+remain optional server-registration examples, not a requirement to host EvalSurge.
 
 ## Operator setup
 
@@ -160,7 +176,9 @@ Requires the deployed App and a completed private operator registration. Save as
 Evaluation is omitted in all four, so it is **off**: no planner or judge calls.
 Your real App can still incur model/tool/resource costs. Review its internal limits
 and side effects, then explicitly authorize bounded live traffic before submitting
-an App request. The local fixture demo needs no Databricks profile or model consent.
+an App request. The local fixture demo needs no Databricks profile, but controlled
+inference tests/CI still require disclosure and explicit approval; they are not
+live agent/LLM validation.
 
 Fixed message adapters accept exactly one `query` or `messages` input field.
 Nested messages are preserved, but extra top-level fields such as `custom_inputs`,
