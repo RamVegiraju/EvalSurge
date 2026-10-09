@@ -137,6 +137,7 @@ class AgentUser(HttpUser):
                 headers = {
                     "X-Benchmark-Run-ID": run_id,
                     "X-Benchmark-Request-ID": row["request_id"],
+                    "X-Benchmark-Case-ID": str(row["case_id"]),
                 }
                 if config.target.adapter in {"mlflow-agent-server", "databricks-agent-runtime"}:
                     headers["X-MLflow-Return-Trace-ID"] = "true"

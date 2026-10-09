@@ -542,6 +542,7 @@ def test_every_user_example_has_an_explicit_integration_contract() -> None:
         "openai_agents_benchmark.py",
         "mock_agent.py",
         "framework_agent.py",
+        "real_framework_agent.py",
     }
     examples = {path.name for path in (ROOT / "examples").glob("*.py")}
     assert examples == covered, "Add end-to-end coverage and update the example index."

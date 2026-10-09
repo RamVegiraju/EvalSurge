@@ -53,6 +53,18 @@ def preflight_result(rows: list[dict[str, Any]], summary: dict[str, Any]) -> Pre
         code, guidance = "worker_failed", "The inference-check worker did not finish."
     elif row.get("error_phase") == "authentication":
         code, guidance = "authentication_failed", "Check the server-owned target credentials."
+    elif row.get("http_status") in {401, 403}:
+        code, guidance = (
+            "authentication_failed",
+            "The target rejected authentication or authorization. Check the operator-owned "
+            "credentials and the selected identity's endpoint permissions.",
+        )
+    elif row.get("http_status") in {400, 422}:
+        code, guidance = (
+            "target_http_error",
+            "The target rejected the first case input. Check its schema and the selected "
+            "invocation protocol; unsupported fields must be explicitly mapped by your endpoint.",
+        )
     elif row.get("http_status") is not None and not 200 <= row["http_status"] < 300:
         code, guidance = "target_http_error", "Check target access and endpoint configuration."
     elif row.get("deadline_exceeded") or error_type in {
@@ -67,7 +79,15 @@ def preflight_result(rows: list[dict[str, Any]], summary: dict[str, Any]) -> Pre
     elif row.get("error_phase") == "response":
         code, guidance = (
             "invalid_response",
-            "The agent did not return a valid, nonempty JSON answer. Check the endpoint contract.",
+            "The agent did not return a valid, completed nonempty JSON answer. Check the selected "
+            "endpoint contract, completion status, and returned trace/token evidence.",
+        )
+    elif error_type == "InvalidInput":
+        code, guidance = (
+            "invalid_stream",
+            "The selected invocation protocol could not encode the first case input. "
+            "Check its query/messages contract; use http-json or an explicit endpoint mapping "
+            "for custom input fields. No target invocation was dispatched.",
         )
     elif row.get("error_phase") in {"request", "stream"}:
         code, guidance = (

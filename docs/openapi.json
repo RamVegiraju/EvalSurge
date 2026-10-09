@@ -575,6 +575,18 @@
         "additionalProperties": false,
         "description": "Static planning/judging readiness and reviewed executable scorer identifiers.",
         "properties": {
+          "answer_evaluation_requires_traces": {
+            "const": false,
+            "default": false,
+            "title": "Answer Evaluation Requires Traces",
+            "type": "boolean"
+          },
+          "captured_answers_only": {
+            "const": true,
+            "default": true,
+            "title": "Captured Answers Only",
+            "type": "boolean"
+          },
           "catalog_judges": {
             "enum": [
               "configured",
@@ -618,6 +630,12 @@
             },
             "title": "Registered Scorers",
             "type": "array"
+          },
+          "trace_required_judges_require_correlated_probe": {
+            "const": true,
+            "default": true,
+            "title": "Trace Required Judges Require Correlated Probe",
+            "type": "boolean"
           }
         },
         "required": [
@@ -872,6 +890,94 @@
           }
         },
         "title": "EvaluationPreflight",
+        "type": "object"
+      },
+      "EvidenceCapabilities": {
+        "additionalProperties": false,
+        "description": "Independent client, answer, internal-span and trace-aware evidence.\n\nDefault entries preserve old response compatibility without asserting that\nconfiguration, authentication, model execution or evidence was verified.",
+        "properties": {
+          "answer_evaluation": {
+            "$ref": "#/components/schemas/EvidenceCapability"
+          },
+          "internal_profiling": {
+            "$ref": "#/components/schemas/EvidenceCapability"
+          },
+          "load_measurements": {
+            "$ref": "#/components/schemas/EvidenceCapability"
+          },
+          "trace_aware_evaluation": {
+            "$ref": "#/components/schemas/EvidenceCapability"
+          }
+        },
+        "title": "EvidenceCapabilities",
+        "type": "object"
+      },
+      "EvidenceCapability": {
+        "additionalProperties": false,
+        "description": "Feature selection and observed evidence, not proof of quality or capacity.\n\nConfiguration comes only from the frozen run policy and stays unknown for\nhistorical payloads that do not record it. Counts exclude inference probes\nand judge-readiness assessments. Load counts cover all recorded measured\nattempts, including failures, not successful latency or completeness. Profile\ncounts cover validated traces; assessment counts cover scorer/attempt pairs.",
+        "properties": {
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Frozen feature selection; null means historical configuration is unknown, not false.",
+            "title": "Configured"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "guidance": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Guidance",
+            "type": "string"
+          },
+          "observed_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Observed Count",
+            "type": "integer"
+          },
+          "state": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "observed",
+              "unavailable",
+              "off"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          }
+        },
+        "title": "EvidenceCapability",
         "type": "object"
       },
       "Links": {
@@ -1909,6 +2015,9 @@
           },
           "evaluation_preflight": {
             "$ref": "#/components/schemas/EvaluationPreflight"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvidenceCapabilities"
           },
           "id": {
             "format": "uuid",
@@ -3037,6 +3146,12 @@
           "max_traces": {
             "title": "Max Traces",
             "type": "integer"
+          },
+          "optional_for_load_and_answer_evaluation": {
+            "const": true,
+            "default": true,
+            "title": "Optional For Load And Answer Evaluation",
+            "type": "boolean"
           },
           "readiness": {
             "enum": [

@@ -1,4 +1,4 @@
-"""Bounded notebook-driver HTTP/direct/API validation with actual model inference.
+"""Historical diagnostic for notebook-driver-local HTTP/helper execution.
 
 Use from a dedicated serverless notebook with the installed wheel and the source
 ``examples``/``scripts`` packages available. No job is submitted by this module.
@@ -10,17 +10,21 @@ This topology is notebook -> HTTP framework server on the notebook driver, or
 notebook -> authenticated loopback EvalSurge API -> that HTTP framework server.
 Neither is notebook -> deployed Databricks App. The profile-only App resolver is
 unchanged; notebook/App identity and deployment validation remain separate gates.
+This module is not the intended hosted-agent journey. Use the separate
+``serverless_runner_app_target`` readiness gate and runner-only notebook sample
+for that topology; never substitute this diagnostic for deployed-App coverage.
 """
 
 import argparse
 import asyncio
+import hashlib
 import math
 import os
 import secrets
 import socket
 import sys
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager, suppress
+from collections.abc import AsyncIterator, Iterator, Sequence
+from contextlib import asynccontextmanager, contextmanager, suppress
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -31,6 +35,7 @@ from .dispatch_observer import (
     wait_for_active_dispatch,
     wait_for_active_dispatch_sync,
 )
+from .hosted_journeys import retrieval_evidence
 from .unified_sdk_journeys import (
     _content_free_report,
     _report_after_wait,
@@ -53,7 +58,13 @@ def parse_options(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--target-model", required=True)
-    parser.add_argument("--framework", required=True, choices=("langgraph", "openai-agents"))
+    parser.add_argument(
+        "--framework", required=True, choices=("langgraph", "openai-agents", "crewai")
+    )
+    parser.add_argument(
+        "--model-api", required=True, choices=("mlflow-responses", "openai-responses")
+    )
+    parser.add_argument("--max-output-tokens", type=int, default=512)
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--concurrency", type=int, default=5)
     parser.add_argument("--max-requests", type=int, default=5)
@@ -84,7 +95,9 @@ def parse_options(arguments: Sequence[str] | None = None) -> argparse.Namespace:
         parser.error("--target-model must name the explicitly approved serving endpoint")
     if not 1 <= options.concurrency <= 5 or not 1 <= options.max_requests <= 20:
         parser.error("--concurrency must be 1..5 and --max-requests 1..20")
-    for name, maximum in (("duration", 180), ("timeout", 60)):
+    if not 1 <= options.max_output_tokens <= 512:
+        parser.error("--max-output-tokens must be 1..512")
+    for name, maximum in (("duration", 180), ("timeout", 30)):
         value = getattr(options, name)
         if not math.isfinite(value) or not 0.1 <= value <= maximum:
             parser.error(f"--{name} must be finite and between 0.1 and {maximum} seconds")
@@ -97,8 +110,10 @@ def budget_record(options: argparse.Namespace) -> dict[str, Any]:
     """Return aggregate direct/API invocation bounds, never a monetary quota.
 
     Each mode has one model-bearing preflight per run. A failed normal run stops
-    further runs. Unknown-route probes make no inference calls. Actual agents can
-    make multiple model/tool calls within one invocation; that spend is not capped.
+    further runs. Unknown-route probes make no inference calls. These reviewed
+    no-tool examples make one call per LangGraph/OpenAI Agents invocation and at
+    most two per CrewAI invocation; provider retries are disabled. Output-token
+    settings are requests to the provider, not an enforced monetary quota.
     """
     modes = 2
     runs = modes * (2 if options.exercise_cancel else 1)
@@ -106,6 +121,8 @@ def budget_record(options: argparse.Namespace) -> dict[str, Any]:
         "live": options.live,
         "topology": "notebook-driver-http-and-authenticated-loopback-api",
         "framework": options.framework,
+        "model_api": options.model_api,
+        "max_output_tokens_per_model_call": options.max_output_tokens,
         "concurrency": options.concurrency,
         "dispatch_seconds_per_run": options.duration,
         "per_attempt_timeout_seconds": options.timeout,
@@ -117,7 +134,12 @@ def budget_record(options: argparse.Namespace) -> dict[str, Any]:
         "evaluation_mode": "off",
         "inference_stubbed": False,
         "deployed_app_tested": False,
-        "model_calls_per_agent_invocation_bounded": False,
+        "model_calls_per_agent_invocation_bounded": True,
+        "max_model_calls_per_agent_invocation": 2 if options.framework == "crewai" else 1,
+        "max_model_calls": runs
+        * (options.max_requests + 1)
+        * (2 if options.framework == "crewai" else 1),
+        "metadata_retry_window_seconds": 1,
         "monetary_quota_enforced": False,
         "sustainable_capacity_established": False,
     }
@@ -153,7 +175,7 @@ def driver_workspace(expected_origin: str) -> Any:
                 auth_type="runtime-oauth",
                 scopes=["all-apis"],
                 http_timeout_seconds=20,
-                retry_timeout_seconds=0,
+                retry_timeout_seconds=1,
             )
         )
         if workspace.config.host.rstrip("/") != expected_origin:
@@ -162,6 +184,101 @@ def driver_workspace(expected_origin: str) -> Any:
         return workspace
     except Exception:  # noqa: BLE001 - SDK messages may include private auth configuration
         raise RuntimeError("Notebook OAuth or exact workspace verification failed") from None
+
+
+def _create_driver_helper(options: argparse.Namespace, workspace: Any) -> Any:
+    """Own the latest generic helper's actual guarded Responses/framework clients.
+
+    Args:
+        options: Explicit framework, model, API route and bounded model settings.
+        workspace: Caller-owned native runtime-OAuth client for the exact notebook
+            workspace. It stays in this driver process; no profile/token is copied.
+
+    Returns:
+        Real FastAPI /invoke helper with request-local framework state and clients
+        closed after owned server shutdown. Startup does not call any model.
+
+    Raises:
+        ValueError: Configured host is different, framework/configuration invalid.
+        ImportError: A selected framework is unavailable; never installs/falls back.
+
+    Side Effects:
+        Native SDK refresh is requested by model dispatch inside the agent process.
+        Each request makes bounded actual Responses calls; no tools, judging,
+        profiling or tracing are silently added. Locust uses loopback HTTP only.
+        The model-selection profile label below is descriptive metadata, not a
+        named-profile lookup: only the supplied runtime workspace authenticates.
+    """
+    from evalsurge.serving import AgentAnswer, InvocationContext, create_app
+    from examples.real_framework_agent import (
+        ModelSelection,
+        build_handler,
+        response_completion_guard,
+    )
+
+    if workspace.config.host.rstrip("/") != options.workspace:
+        raise ValueError("Runtime identity does not resolve to the approved workspace")
+    selection = ModelSelection(
+        profile="notebook-driver-runtime-oauth",
+        model=options.target_model,
+        api=options.model_api,
+        expected_host=options.workspace,
+        max_output_tokens=options.max_output_tokens,
+        timeout_seconds=options.timeout,
+    )
+    resources: dict[str, Any] = {}
+
+    async def handler(inputs: dict[str, Any], context: InvocationContext) -> AgentAnswer:
+        return await resources["handler"](inputs, context)
+
+    app = create_app(handler, isolation="request")
+    app.state.inference_evidence = {"outbound_attempts": 0, "completed_responses": 0}
+
+    async def record_dispatch(request: Any) -> None:
+        """Count actual outbound attempts, never retaining request/credential data."""
+        app.state.inference_evidence["outbound_attempts"] += 1
+
+    async def record_completion(response: Any) -> None:
+        """Count only HTTP successes accepted by the preceding raw completion guard."""
+        if 200 <= response.status_code < 300:
+            app.state.inference_evidence["completed_responses"] += 1
+
+    @asynccontextmanager
+    async def lifespan(app: Any) -> AsyncIterator[None]:
+        import httpx
+        from openai import AsyncOpenAI
+
+        from benchmark_agents.providers import DatabricksAuth
+
+        async with (
+            httpx.AsyncClient(
+                auth=DatabricksAuth(workspace),
+                trust_env=False,
+                follow_redirects=False,
+                timeout=selection.timeout_seconds,
+                event_hooks={
+                    "request": [record_dispatch],
+                    "response": [response_completion_guard, record_completion],
+                },
+            ) as http,
+            AsyncOpenAI(
+                base_url=selection.base_url,
+                api_key="sdk-auth",
+                http_client=http,
+                max_retries=0,
+                timeout=selection.timeout_seconds,
+            ) as client,
+        ):
+            resources["handler"] = build_handler(
+                options.framework, client, selection, http_client=http
+            )
+            try:
+                yield
+            finally:
+                resources.clear()
+
+    app.router.lifespan_context = lifespan
+    return app
 
 
 async def prerequisite_probe(expected_origin: str) -> dict[str, Any]:
@@ -338,20 +455,34 @@ async def _exercise_direct(
         run = await client.start(request)
         report = await _report_after_wait(run, bound)
         status, result, retrieved = await run.status(), await run.result(), await run.report()
-        passed = _successful(report) and status.id == result.id == retrieved.run.id == run.id
-        checks.append({"check": "direct_normal", "passed": passed, **_content_free_report(report)})
+        parity = retrieval_evidence(run.id, status, result, report, retrieved, remote=False)
+        passed = _successful(report) and parity["retrieval_agrees"]
+        checks.append(
+            {"check": "direct_normal", "passed": passed, **_content_free_report(report), **parity}
+        )
         if not passed:
             return checks
         bad = request.model_copy(update={"target": TargetReference(connection_id="negative")})
-        report = await _report_after_wait(await client.start(bad), bound)
+        failed_run = await client.start(bad)
+        report = await _report_after_wait(failed_run, bound)
+        parity = retrieval_evidence(
+            failed_run.id,
+            await failed_run.status(),
+            await failed_run.result(),
+            report,
+            await failed_run.report(),
+            remote=False,
+        )
+        failed_fast = _failed_fast(report) and parity["retrieval_agrees"]
         checks.append(
             {
                 "check": "direct_pre_provider_fail_fast",
-                "passed": _failed_fast(report),
+                "passed": failed_fast,
                 **_content_free_report(report),
+                **parity,
             }
         )
-        if not _failed_fast(report) or not options.exercise_cancel:
+        if not failed_fast or not options.exercise_cancel:
             return checks
         run = await client.start(request)
         status, counts = await wait_for_active_dispatch(run, observer, bound)
@@ -359,10 +490,15 @@ async def _exercise_direct(
         measured_observed = active and counts["measured_inflight"] > 0
         acknowledgment = await run.cancel() if active else None
         report = await _report_after_wait(run, bound)
+        parity = retrieval_evidence(
+            run.id, await run.status(), await run.result(), report, await run.report(), remote=False
+        )
         checks.append(
             {
                 "check": "direct_active_cancel",
-                "passed": measured_observed and report.run.status == "cancelled",
+                "passed": measured_observed
+                and report.run.status == "cancelled"
+                and parity["retrieval_agrees"],
                 "acknowledgment": acknowledgment.status if acknowledgment else None,
                 "measured_dispatch_observed_at_cancel": measured_observed,
                 "measured_inflight_at_cancel": counts["measured_inflight"],
@@ -370,6 +506,7 @@ async def _exercise_direct(
                 "naturally_completed_before_cancel": status.status
                 in {"completed", "completed_with_gaps"},
                 **_content_free_report(report),
+                **parity,
             }
         )
     return checks
@@ -422,20 +559,34 @@ def _exercise_api(
         run = client.start(request)
         report = wait(run)
         status, result, retrieved = run.status(), run.result(), run.report()
-        passed = _successful(report) and status.id == result.id == retrieved.run.id == run.id
-        checks.append({"check": "api_normal", "passed": passed, **_content_free_report(report)})
+        parity = retrieval_evidence(run.id, status, result, report, retrieved, remote=True)
+        passed = _successful(report) and parity["retrieval_agrees"]
+        checks.append(
+            {"check": "api_normal", "passed": passed, **_content_free_report(report), **parity}
+        )
         if not passed:
             return checks
         bad = request.model_copy(update={"target": TargetReference(connection_id="negative")})
-        report = wait(client.start(bad))
+        failed_run = client.start(bad)
+        report = wait(failed_run)
+        parity = retrieval_evidence(
+            failed_run.id,
+            failed_run.status(),
+            failed_run.result(),
+            report,
+            failed_run.report(),
+            remote=True,
+        )
+        failed_fast = _failed_fast(report) and parity["retrieval_agrees"]
         checks.append(
             {
                 "check": "api_pre_provider_fail_fast",
-                "passed": _failed_fast(report),
+                "passed": failed_fast,
                 **_content_free_report(report),
+                **parity,
             }
         )
-        if not _failed_fast(report) or not options.exercise_cancel:
+        if not failed_fast or not options.exercise_cancel:
             return checks
         run = client.start(request)
         status, counts = wait_for_active_dispatch_sync(run, observer, bound)
@@ -443,10 +594,15 @@ def _exercise_api(
         measured_observed = active and counts["measured_inflight"] > 0
         acknowledgment = run.cancel() if active else None
         report = wait(run)
+        parity = retrieval_evidence(
+            run.id, run.status(), run.result(), report, run.report(), remote=True
+        )
         checks.append(
             {
                 "check": "api_active_cancel",
-                "passed": measured_observed and report.run.status == "cancelled",
+                "passed": measured_observed
+                and report.run.status == "cancelled"
+                and parity["retrieval_agrees"],
                 "acknowledgment": acknowledgment.status if acknowledgment else None,
                 "measured_dispatch_observed_at_cancel": measured_observed,
                 "measured_inflight_at_cancel": counts["measured_inflight"],
@@ -454,6 +610,7 @@ def _exercise_api(
                 "naturally_completed_before_cancel": status.status
                 in {"completed", "completed_with_gaps"},
                 **_content_free_report(report),
+                **parity,
             }
         )
     return checks
@@ -501,11 +658,37 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
         "app_journey": "not_exercised_profile_auth_contract_and_deployment_unavailable",
     }
     servers: list[tuple[Any, asyncio.Task[Any], socket.socket, str]] = []
+    helper: Any | None = None
     path = directory / "serverless-journey-validation.json"
     atomic_json(path, record)
     try:
         from benchmark_agents.api import create_app as api_app
-        from examples.framework_agent import create_app as framework_app
+        from examples import real_framework_agent
+
+        selected_distribution = {
+            "langgraph": "langgraph",
+            "openai-agents": "openai-agents",
+            "crewai": "crewai",
+        }[options.framework]
+        record["versions"] = {
+            name: version(name)
+            for name in (
+                "evalsurge",
+                "databricks-sdk",
+                "locust",
+                "httpx",
+                "openai",
+                "uvicorn",
+                selected_distribution,
+            )
+        }
+        record["source_sha256"] = {
+            "serverless_sdk_journeys.py": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "real_framework_agent.py": hashlib.sha256(
+                Path(real_framework_agent.__file__).read_bytes()
+            ).hexdigest(),
+        }
+        record["agent_handler_deadline_seconds"] = options.timeout + 5
 
         key = secrets.token_urlsafe(32)
         values = {
@@ -513,17 +696,17 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
             "MLFLOW_TRACKING_URI": f"sqlite:///{directory}/agent-traces.db",
             "BENCHMARK_API_KEY": key,
             "BENCHMARK_TRACE_ENABLED": "false",
+            "CREWAI_DISABLE_TELEMETRY": "true",
         }
         with _owned_demo_environment(values):
             try:
-                observer = DispatchObserver(
-                    framework_app(live=True, workspace=workspace), f"/{options.framework}/chat"
-                )
+                helper = _create_driver_helper(options, workspace)
+                observer = DispatchObserver(helper, "/invoke")
                 serving = await _serve(observer)
                 servers.append(serving)
                 agent_origin = serving[3]
                 bindings = {
-                    "agent": Agent.http(f"{agent_origin}/{options.framework}/chat"),
+                    "agent": Agent.http(f"{agent_origin}/invoke", protocol="http-json"),
                     "negative": Agent.http(f"{agent_origin}/not-an-agent"),
                 }
                 checks = await _exercise_direct(options, bindings, observer)
@@ -561,5 +744,7 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
             if servers:
                 await _close_servers(servers, record)
         finally:
+            if helper is not None:
+                record["model_transport_evidence"] = dict(helper.state.inference_evidence)
             atomic_json(path, record)
     return record

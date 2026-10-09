@@ -1,5 +1,40 @@
 # API and implementation review — 0.2.0
 
+## Hosted endpoint and evidence additions — October 8, 2026
+
+[ADR 0012](adr/0012-hosted-agent-integration-contract.md) records the additive
+helper/readiness contract before behavior changes. Designated maintainer review
+and real-model journey verification remain separate gates.
+
+V2 `Result.evidence` adds defaulted typed states for load measurements,
+captured-answer evaluation, optional internal profiling and trace-required
+evaluation. Configuration is nullable for historical documents; observed counts
+exclude probes/readiness. Record/assessment coverage is not a quality pass,
+complete timing coverage or sustainable capacity. Static capabilities add fixed
+explanations but still declare `runtime_verified=false`. No new endpoint or
+caller credential/provider/evidence-store selector is added.
+
+Compatibility is directional: the updated models accept historical documents
+without these defaulted fields. Older typed SDKs use strict `extra="forbid"`
+models and can reject the new evidence/capability fields from an updated server.
+Update the typed client with the server for this proposed 0.x contract; defaulting
+new fields does not establish old-client/new-server compatibility. `/v1` response
+schemas remain unchanged. Version negotiation or tolerant response models need a
+separate reviewed contract, not a silent relaxation of request validation.
+
+The optional `evalsurge.serving` module runs only in the customer's agent process.
+It does not change the runner's invocation contracts. One additive
+`X-Benchmark-Case-ID` header supplies run-scoped case keys alongside existing
+correlation. Consumers validating an exact HTTP header set should review this
+addition. Authentication and state stores remain customer-owned.
+
+Preflight keeps existing code enums: HTTP 401/403 now uses
+`authentication_failed` rather than generic `target_http_error`; HTTP 400/422
+guidance identifies the input contract. Required probe trace-collection exceptions
+now become `evaluation_trace_collection_failed` readiness errors and skip load;
+raw exception messages are not exported. No protocol removal, target replay,
+automatic instrumentation or measurement-window change is introduced.
+
 ## Unified direct SDK milestone — October 8, 2026
 
 [ADR 0011](adr/0011-unified-direct-and-remote-sdk.md) was recorded before

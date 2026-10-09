@@ -6,29 +6,61 @@ Only benchmark endpoints and agent actions you are authorized to exercise.
 
 New integrations use one `RunCreate` request and direct execution by default:
 
-| Example | Purpose |
-| --- | --- |
-| [Direct HTTP](journeys/direct_http.py) | Existing real HTTP agent; no EvalSurge server |
-| [Direct App](journeys/direct_app.py) | Existing deployed App and explicitly selected OAuth profile |
-| [Classic notebook](journeys/classic_notebook.py) | Same App request on a driver, consent gate and context cleanup |
-| [Dataset and judges](quality/README.md) | Explicit catalog, reviewed custom alias, automatic, and readiness edges |
+| Example | Load-generator location | Agent target |
+| --- | --- | --- |
+| [local_runner_http_target.py](journeys/local_runner_http_target.py) | Local Python/laptop | Separately hosted real HTTP agent |
+| [local_runner_databricks_app_target.py](journeys/local_runner_databricks_app_target.py) | Local Python/laptop | Already deployed Databricks App |
+| [serverless_runner_databricks_app_target.py](journeys/serverless_runner_databricks_app_target.py) | Serverless notebook; prepared/authentication-blocked | Already deployed App; not yet live-validated from a notebook |
+| [Classic notebook](journeys/classic_notebook.py) | Retained classic driver; deferred | Deployed App; not evidence of serverless support |
+| [Dataset and judges](quality/README.md) | Caller selects the runner | Explicit catalog, reviewed custom alias, automatic, and readiness edges |
 
 Install `evalsurge[server]`, then run a selected real target only after reviewing
-the bound of ten measured agent invocations plus one excluded probe (not a
+the bound of five measured agent invocations plus one excluded probe (not a
 model/tool-call or spend quota):
 
 ```bash
-uv run python -m examples.journeys.direct_http \
-  http://127.0.0.1:9001/chat --allow-paid-inference
-uv run python -m examples.journeys.direct_app \
+uv run python -m examples.journeys.local_runner_http_target \
+  http://127.0.0.1:9001/invoke --allow-paid-inference
+uv run python -m examples.journeys.local_runner_databricks_app_target \
   your-deployed-app --profile YOUR_SELECTED_OAUTH_PROFILE --allow-paid-inference
 ```
 
 These scripts do not deploy targets, select a default profile, or substitute
-fixture completions when a live target is unavailable. New samples have static
-schema checks, not a claim of end-to-end notebook/live coverage. Serverless must
-be validated separately. See [the target guide](../docs/TARGETS.md) and
+fixture completions when a live target is unavailable. Static schema checks are
+not a claim of end-to-end notebook/live coverage. The new serverless sample is
+**prepared, authentication-blocked—not live-validated**. It runs only the load
+generator, never an agent/helper in the notebook. Its initial budget is one
+excluded probe plus one measured App invocation at concurrency one, evaluation
+off; a reviewed no-tool App must enforce the declared <=512 output-token limit.
+Driver/profile, independent-worker OAuth and deployed-App readiness must pass
+before separately approved model traffic. See
+[the notebook checklist](../scripts/validation/README.md#serverless-notebook-validation),
+[the target guide](../docs/TARGETS.md) and
 [actual validation](../VALIDATION.md).
+
+## Sample classifications
+
+Examples are customer implementations, not an EvalSurge framework allowlist.
+Keep hosting and inference claims separate:
+
+| Sample or harness | Hosting / execution | Inference and evidence boundary |
+| --- | --- | --- |
+| [real_framework_agent.py](real_framework_agent.py) | Real customer-process LangGraph, OpenAI Agents or CrewAI behind the optional JSON helper | Explicit real Responses model; no fixture fallback. Stateless/nonstreaming; no memory, traces or TTFT. CrewAI uses a separate reviewed environment |
+| [local_runner_http_target.py](journeys/local_runner_http_target.py) | Laptop → already hosted HTTP endpoint | Calls the supplied endpoint; does not deploy or establish its framework/model by itself |
+| [local_runner_databricks_app_target.py](journeys/local_runner_databricks_app_target.py) | Laptop → already deployed Databricks App | Exact App/profile selection; not a local stand-in for App hosting |
+| [serverless_runner_databricks_app_target.py](journeys/serverless_runner_databricks_app_target.py) / [serverless_runner_app_target.py](../scripts/validation/serverless_runner_app_target.py) | Serverless EvalSurge/Locust runner → existing deployed App | Prepared/authentication-blocked. Zero-inference guards pass; no live notebook-to-App success, API execution, cancellation or fail-fast claim |
+| [serverless_sdk_journeys.py](../scripts/validation/serverless_sdk_journeys.py) | Retained notebook-local helper diagnostic | Not the intended notebook-runner → deployed-App sample; it does not validate that journey and is not an additional agent-hosting option |
+| [quality examples](quality/README.md) | Explicit/automatic evaluation over supplied cases and captured answers | Separate opt-in planner/judge budget; not exercised by the current load-only smokes |
+| [framework_agent.py](framework_agent.py) / [mock_agent.py](mock_agent.py) | Retained instrumented demo / deterministic transport tutorial | Controlled inference paths are explicitly labeled; require disclosure/approval and never count as real-model validation |
+
+Notebook validation is **serverless-only**; local-Python real-agent checks are a
+separate runner journey. Use short functional smokes before any larger tests.
+The notebook-to-App authentication blocker, approved App names and exact pass/failure
+records are in [hosted journey validation](../docs/HOSTED_JOURNEY_VALIDATION.md).
+An approved name or a successful local run is not evidence that an App was deployed.
+The older [direct_http.py](journeys/direct_http.py) and
+[direct_app.py](journeys/direct_app.py) names remain compatibility examples;
+their original ten-request bounds differ from the new five-request smokes.
 
 For optional REST, CLI, and remote SDK examples of each framework under both
 hosting options, use [the four-target guide](../docs/FRAMEWORK_TARGET_EXAMPLES.md),
@@ -132,5 +164,6 @@ or deployment is a blocker, not permission to substitute fixtures.
 
 - [mock_agent.py](mock_agent.py): small deterministic SSE target, no model credentials.
 - [framework_agent.py](framework_agent.py): instrumented LangGraph/OpenAI Agents demo with tools and memory; its implementation is intentionally more involved.
+- [real_framework_agent.py](real_framework_agent.py): native LangGraph/OpenAI Agents/CrewAI handlers for the generic JSON helper, with explicit real Responses API selection and no fixture path. See the exact live receipts rather than inferring successful inference from configuration checks; CrewAI requires a separately reviewed installation. This stateless sample emits no trace evidence or TTFT.
 - [Python guide](../docs/PYTHON_API.md): authentication, async usage, protocols, and opening the report UI.
 - [Validation tools](../scripts/validation/README.md): advanced CLI flags, remote REST polling, and opt-in framework/provider integration checks.

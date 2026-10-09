@@ -195,6 +195,40 @@ class DecisionSummary(Model):
     sustainable_capacity_established: Literal[False] = False
 
 
+class EvidenceCapability(Model):
+    """Feature selection and observed evidence, not proof of quality or capacity.
+
+    Configuration comes only from the frozen run policy and stays unknown for
+    historical payloads that do not record it. Counts exclude inference probes
+    and judge-readiness assessments. Load counts cover all recorded measured
+    attempts, including failures, not successful latency or completeness. Profile
+    counts cover validated traces; assessment counts cover scorer/attempt pairs.
+    """
+
+    configured: bool | None = Field(
+        default=None,
+        description="Frozen feature selection; null means historical configuration is unknown, not false.",
+    )
+    state: Literal["pending", "observed", "unavailable", "off"] = "pending"
+    observed_count: int = Field(default=0, ge=0)
+    total_count: int | None = Field(default=None, ge=0)
+    coverage: float | None = Field(default=None, ge=0, le=1)
+    guidance: str = Field(default="", max_length=500)
+
+
+class EvidenceCapabilities(Model):
+    """Independent client, answer, internal-span and trace-aware evidence.
+
+    Default entries preserve old response compatibility without asserting that
+    configuration, authentication, model execution or evidence was verified.
+    """
+
+    load_measurements: EvidenceCapability = Field(default_factory=EvidenceCapability)
+    answer_evaluation: EvidenceCapability = Field(default_factory=EvidenceCapability)
+    internal_profiling: EvidenceCapability = Field(default_factory=EvidenceCapability)
+    trace_aware_evaluation: EvidenceCapability = Field(default_factory=EvidenceCapability)
+
+
 class Timing(Model):
     """Successful client observations in milliseconds; absent values stay unknown."""
 
@@ -322,6 +356,7 @@ class Result(Model):
     phases: PhaseStates
     links: Links
     summary: DecisionSummary
+    evidence: EvidenceCapabilities = Field(default_factory=EvidenceCapabilities)
     metrics: Performance | None = None
     preflight: PreflightResult
     evaluation_preflight: EvaluationPreflight

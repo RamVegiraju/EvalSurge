@@ -33,9 +33,9 @@ Keep the localhost MVP simple; shared hosting requires the gates in
 
 ## Verification and dependencies
 
-Reproduce behavioral failures and add regression coverage. Prefer actual framework
-and native MLflow integration tests with controlled provider boundaries, not mocks
-of the framework itself. Run focused tests during implementation, then:
+Reproduce behavioral failures and add regression coverage. Use actual frameworks
+and native MLflow integration APIs; follow the real-inference and disclosure policy
+below before running tests. Run focused tests during implementation, then:
 
 ```bash
 uv sync --locked --extra agents --group dev
@@ -46,6 +46,33 @@ uv run python scripts/export_openapi.py --check
 uv run openapi-spec-validator docs/openapi.json
 uv build --no-build-isolation
 ```
+
+### Real inference and disclosure
+
+- Default every test that validates agent behavior or LLM inference to an actual
+  agent executing actual model calls. Local agents must also use a real LLM;
+  deployment is required only when validating Databricks App hosting.
+- Do not silently substitute mocked provider transports, fixture completions,
+  canned answers, fake agents, or local stand-ins for deployed Apps. A real framework
+  executing against stubbed model responses is still controlled inference, not a
+  live agent/LLM test.
+- Before running any test or suite, or triggering CI, that uses stubbed inference,
+  notify the user which tests are controlled, exactly what is stubbed, and why.
+  Obtain explicit approval for that exception; do not infer permission from the
+  presence of existing fixtures or a generic request to test everything.
+- Existing offline regression/CI tests include controlled provider responses.
+  Preserve them, but disclose their boundary before running or triggering them.
+  Never report their passes as evidence of actual model inference.
+- Pure schema, storage, formatting and other non-inference checks need no model
+  call. Intentional pre-provider failure tests also make no inference call: disclose
+  this and report them separately from successful real-inference coverage.
+- Report live and controlled results separately, including the actual agent,
+  hosting, model, traffic bounds, and remaining gaps. If credentials, deployment,
+  permissions or approved traffic/spend bounds are missing, report the blocker
+  instead of replacing real inference with a stub.
+- This preference does not authorize unbounded paid traffic, deployments, or
+  automatic profile selection. The explicit consent/profile/budget rules below
+  still apply.
 
 Use the newest compatible stable dependencies after checking official release
 metadata and running these checks. Keep `pyproject.toml` and `uv.lock` consistent;

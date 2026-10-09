@@ -10,12 +10,12 @@ required. Exact check results are recorded in [validation](../VALIDATION.md).
 
 | Journey | Harness/example | Required evidence before claiming it passed |
 | --- | --- | --- |
-| Laptop → local HTTP | `scripts/validation/unified_sdk_journeys.py --journey http --framework langgraph` or `openai-agents` | Actual compiled/native framework and actual selected model; typed status/result/report, failed pre-provider probe, active cancellation and cleanup |
-| Laptop → deployed App | Same harness with `--journey app`; `examples/journeys/direct_app.py` | Existing authorized App, verified deployed framework/source and actual model; refreshed OAuth, correct native protocol, fail-fast, cancellation and reports |
-| Classic notebook → App | `examples/journeys/classic_notebook.py` | User-selected classic cluster, selected usable OAuth profile on its driver, outbound App network/auth, subprocess execution, private persistent POSIX artifacts, and lock/loop cleanup |
+| Local runner → local HTTP agent | `examples/journeys/local_runner_http_target.py`; `scripts/validation/local_runner_http_target_journeys.py` | Actual compiled/native framework and actual selected model; typed status/result/report, failed pre-provider probe, active cancellation and cleanup |
+| Local runner → deployed App | `examples/journeys/local_runner_databricks_app_target.py`; explicit native App harness | Existing authorized App, verified deployed framework/source and actual model; refreshed OAuth, correct native protocol, fail-fast, cancellation and reports |
+| Classic notebook runner → App (deferred) | Retained `examples/journeys/classic_notebook.py` | Out of the current serverless-only scope; no cluster created/started or classic fallback |
 | Optional REST/server → registered target | Existing live REST/framework harness plus new typed remote SDK | Service auth, operator-only aliases, same frozen request and measured/judged semantics, inspectable failure report |
-| Serverless notebook → App | Separate follow-up, not inferred from classic or loopback HTTP | Driver prerequisites checked; independent worker runtime-OAuth failed. Current profile-only App contract is not established on serverless |
-| Serverless notebook → loopback API → real HTTP agent | `scripts/validation/serverless_sdk_journeys.py` | Dedicated driver, native driver OAuth, authenticated private loopback API, actual framework/model calls and sole Locust subprocess; does not establish deployed-App support |
+| Serverless notebook runner → App | `examples/journeys/serverless_runner_databricks_app_target.py`; `scripts/validation/serverless_runner_app_target.py` | Prepared/authentication-blocked. Agent remains in its deployed App; notebook hosts EvalSurge/Locust only. Driver prerequisites checked; independent worker runtime-OAuth failed. Current profile-only App contract is not established on serverless |
+| Retained notebook-local helper diagnostic | `scripts/validation/serverless_sdk_journeys.py` | Not an advertised agent-hosting option or a deployed-App substitute; any retained receipts are classified separately |
 
 Dry-run prints only bounds, for example:
 
@@ -37,8 +37,10 @@ The user confirmed `e2-demo-field-eng` for the new workspace. Secure CLI-keyring
 access works outside the sandbox; no profile change or auth-storage downgrade was
 needed. Serverless driver runtime-OAuth works, but an independent worker cannot
 obtain that notebook context. Do not copy laptop tokens or weaken App profile
-isolation to work around it. Previous Apps/benchmarks remain historical evidence;
-no fresh App deployment is implied. Classic compute still requires selection.
+isolation to work around it. Current native App creation/readiness and latest
+local checks are tracked separately in
+[hosted journey validation](HOSTED_JOURNEY_VALIDATION.md). Classic compute is
+explicitly deferred, not a fallback for the serverless authentication gap.
 Live GPT-OSS Chat Completions validation exposed an OpenAI Agents structured-content
 preflight failure; the separately selected mini-model journey does not erase it.
 The mini-model serverless job `584248337638691` also failed: the Python kernel

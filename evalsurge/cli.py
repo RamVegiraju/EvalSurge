@@ -190,6 +190,29 @@ def _summary(report: dict[str, Any]) -> None:
         ):
             if isinstance(decisions.get(key), str) and decisions[key] in allowed:
                 print(f"{label}: {decisions[key]}.")
+    evidence = run.get("evidence", {})
+    if isinstance(evidence, dict) and evidence:
+        print("Evidence capability             configured      observed state")
+        for key, label in (
+            ("load_measurements", "Load measurements"),
+            ("answer_evaluation", "Captured-answer judging"),
+            ("internal_profiling", "Internal profiling"),
+            ("trace_aware_evaluation", "Trace-aware judging"),
+        ):
+            entry = evidence.get(key, {})
+            entry = entry if isinstance(entry, dict) else {}
+            configured = entry.get("configured")
+            selection = "yes" if configured is True else "no" if configured is False else "unknown"
+            state = entry.get("state")
+            if not isinstance(state, str) or state not in {
+                "pending",
+                "observed",
+                "unavailable",
+                "off",
+            }:
+                state = "unknown"
+            print(f"{label:<28} {selection:>12} {state:>19}")
+        print("Configured is not verified; observed evidence is not a quality pass.")
     if not isinstance(metrics, dict):
         print("Performance metrics: unavailable.")
     else:

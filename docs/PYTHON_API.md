@@ -118,25 +118,56 @@ required traces, or provider configuration remain explicit failures/gaps.
 
 ## Databricks notebook
 
-Import [the classic notebook source](../examples/journeys/classic_notebook.py),
-install the package on an explicitly selected classic cluster, and configure an
-explicit OAuth profile on that driver. The notebook defaults to no traffic until
-consent is set. Its request uses the same public model and context cleanup as a
-laptop run. A laptop profile is not notebook authentication, and driver-only
-credential success is not evidence the spawned worker can authenticate.
+**Prepared, authentication-blocked—not live-validated.** Review
+[the serverless runner-only source notebook](../examples/journeys/serverless_runner_databricks_app_target.py)
+and its [readiness harness](../scripts/validation/serverless_runner_app_target.py).
+Their availability does not establish supported live notebook-to-App execution.
+
+The notebook is the EvalSurge/Locust **load generator**; the target agent remains
+in its deployed Databricks App. This is a runner-location choice, not an additional
+agent-hosting option. Use the same public `RunCreate` request and context cleanup
+as a laptop run. The current scope is serverless only; the retained
+[classic notebook source](../examples/journeys/classic_notebook.py) is deferred.
+A laptop profile is not notebook authentication, and driver-only credential
+success is not evidence the spawned worker can authenticate.
+The [serverless runner status](SERVERLESS_RUNNER_STATUS.md) explains why hosting
+FastAPI in the notebook does not repair worker OAuth, and why calling an external
+API instead changes the load-generator location.
+
+`Agent.databricks_app` currently requires a selected profile; it does not accept
+an injected native notebook SDK client. The operator resolver rejects ambient
+destination/identity overrides before App discovery. Independently, native
+driver `runtime-oauth` relies on notebook context unavailable to the Locust
+subprocess in the retained prerequisite check. Do not copy notebook tokens or
+laptop OAuth-cache/profile files, bypass the guard or silently select a new
+principal. A supported operator-auth change requires an ADR and maintainer review.
+
+The initial sample performs at most one excluded inference preflight and one
+measured App invocation at concurrency one, evaluation off. Before authorizing
+traffic, verify the driver/profile binding, independent worker OAuth, exact
+deployed-App readiness and reviewed no-tool source with a <=512 output-token
+limit. This is an App-invocation bound, not a generic model/tool-turn or dollar
+quota. The native async context uses notebook top-level `await` and closes its
+runner lifecycle; it does not delete Apps or Lakebase. Optional remote/API
+execution, fail-fast and cancellation are separate notebook validation gates.
+See [the validation checklist](../scripts/validation/README.md#serverless-notebook-validation).
 
 Serverless notebook execution is a separate validation gate: subprocess execution,
 credential availability, local storage locking, egress, and notebook shutdown all
 need real checks. Neither sample code nor classic success proves serverless support.
-No notebook runtime, App, or model was provisioned by these samples.
+Samples do not provision compute, Apps or models. The notebook-local helper
+diagnostic is not a substitute for the intended deployed-App target.
 
 The October 8 serverless HTTP/API job failed: its Python kernel exited and its
 output included an MLflow experiment/store startup mismatch. It returned no final
 receipt, so request counts, active cancellation and cleanup are not established.
 The harness's experiment-ID leak and native Uvicorn startup-exit path are covered
 by local storage/lifespan regressions, but have not been revalidated live.
-Independent-worker OAuth and
-notebook-to-deployed-App validation remain open. See [validation](../VALIDATION.md).
+The corrected zero-inference prerequisite confirmed driver OAuth, loopback and
+POSIX lock/fsync; independent worker runtime-OAuth still failed. Notebook-to-App
+validation therefore remains authentication-blocked. Neither Job success nor
+the historical notebook-hosted helper establishes a deployed-App pass. See
+[validation](../VALIDATION.md).
 
 ## Optional remote execution
 
@@ -184,8 +215,9 @@ registry before discovery or admission. Both inherit an enclosing task-local
 operator scope without changing process environment values.
 Existing `EvalSurge.remote(url)` and `RemoteClient` retain dictionary behavior.
 Use `typed=True` for the unified remote return types. Do not mix the return shapes.
-Native local async compatibility remains `EvalSurge.local_async(...)`; the unified
-synchronous notebook examples do not require top-level event-loop management.
+Native local async execution remains `EvalSurge.local_async(...)`. The prepared
+serverless runner-only notebook uses this context with top-level `await`; the
+retained synchronous examples do not establish notebook authentication support.
 
 ### Three-minute example
 

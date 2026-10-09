@@ -23,6 +23,7 @@ from importlib.metadata import version
 from urllib.parse import urlsplit
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import Config
 
 dbutils.widgets.text("workspace", "")  # noqa: F821 - Databricks source notebook
 expected_host = dbutils.widgets.get("workspace").rstrip("/")  # noqa: F821
@@ -49,7 +50,15 @@ checks = {
 for auth_type in ("runtime", "runtime-oauth"):
     result = {}
     try:
-        workspace = WorkspaceClient(host=expected_host, auth_type=auth_type, scopes=["all-apis"])
+        workspace = WorkspaceClient(
+            config=Config(
+                host=expected_host,
+                auth_type=auth_type,
+                scopes=["all-apis"],
+                http_timeout_seconds=20,
+                retry_timeout_seconds=1,
+            )
+        )
         result["workspace_matches"] = workspace.config.host.rstrip("/") == expected_host
         if not result["workspace_matches"]:
             raise ValueError
@@ -88,8 +97,10 @@ try:
             "-c",
             "import json\n"
             "from databricks.sdk import WorkspaceClient\n"
+            "from databricks.sdk.core import Config\n"
             "try:\n"
-            f" w=WorkspaceClient(host={expected_host!r},auth_type='runtime-oauth',scopes=['all-apis'])\n"
+            f" w=WorkspaceClient(config=Config(host={expected_host!r},auth_type='runtime-oauth',"
+            "scopes=['all-apis'],http_timeout_seconds=20,retry_timeout_seconds=1))\n"
             f" assert w.config.host.rstrip('/') == {expected_host!r}\n"
             " print(json.dumps({'auth_type':w.config.auth_type,"
             "'oauth_available':bool(w.config.oauth_token().access_token)}))\n"

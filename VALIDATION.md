@@ -1,9 +1,454 @@
 # Validation — 0.2.0
 
-Validated locally on macOS/Python 3.12 on October 4–8, 2026. CI is configured for
-Linux/Python 3.11–3.14. Observed main jobs failed during private-mirror installation;
-there is no remote CI result for these local changes. Branch-protection
-settings have not been verified/enabled by this local work.
+Validated locally on macOS/Python 3.12 on October 4–8, 2026. Baseline commit
+`2276c3b4d6fa9943544f988df4e5ed658ad79365` passed GitHub run `37840928318` on
+October 8: every test and security job succeeded on Linux/Python 3.11–3.14.
+That approved controlled-inference CI does not validate the follow-up checkpoint
+or establish live model/deployment success. Earlier mirror-install failures remain
+historical evidence. Repository review enforcement remains a maintainer gate.
+
+## Endpoint-first helper and evidence follow-up — October 8, 2026
+
+Implemented against pushed baseline `2276c3b4d6fa9943544f988df4e5ed658ad79365`;
+this is an implementation checkpoint, not a fully live-validated release. Proposed ADR 0012 records the contract
+before behavior changes; designated maintainer approval remains outstanding.
+The unified SDK, `/v1`, existing protocol choices and sole Locust engine remain.
+
+### Paused publication checkpoint — October 8, 2026
+
+The user requested that App load tests stop and that the implementation and its
+documentation be preserved for resumption on October 9, 2026. The App workstream
+confirmed **zero of its 52 additional physical model calls were used**, no new
+scenario started and no invocation/subprocess remained in flight. No App or
+Runtime Store was stopped or deleted; retained resources can continue incurring
+hosting/storage charges. This checkpoint does not authorize a scheduled resume.
+
+The LangGraph and OpenAI Agents Apps reached RUNNING with authenticated `/status`
+200 and exact workspace/principal checks. Their ready deployment IDs are
+`01f1c38db3f5165b98332e7c16cb1108` and
+`01f1c38db4281b698aaac4c5aa8e6761`. Handler/model counters were zero at that
+readiness read; they were not refreshed after the pause. Resources-only model
+permission updates, failed startup revisions and corrected source hashes are
+recorded in [the hosted-journey record](docs/HOSTED_JOURNEY_VALIDATION.md#corrected-native-app-readiness--october-8-2026-edt).
+Readiness is not a successful inference/load test. CrewAI remains dependency-
+blocked and undeployed; no downgrade or stand-in was used.
+
+The corrected environment-5 serverless prerequisite run was
+`526298221857181`, task `972949342784427`: Python 3.12.3, Databricks SDK 0.146.0.
+Notebook-driver runtime OAuth, exact selected workspace/active identity,
+loopback sockets and POSIX locking/fsync passed. Independent subprocess runtime
+OAuth failed with `ValueError`; **zero inference calls** occurred and no deployed
+App was tested. Jobs `SUCCESS` does not override the failed worker-auth check.
+The earlier failed/prerequisite receipts below remain historical evidence.
+
+[The serverless runner status](docs/SERVERLESS_RUNNER_STATUS.md) distinguishes
+calling an externally hosted API from hosting the API/Locust in the notebook.
+The latter still needs reviewed independently refreshable worker authentication;
+starting FastAPI does not fix that boundary. No token copying, trust-guard bypass,
+new credential identity or classic-compute fallback was implemented.
+
+Read-only helper/evidence/serverless reviews found no blocker for preserving this
+checkpoint. They do not replace designated maintainer review. Two dormant harness
+follow-ups remain before future execution: save a safe local canary receipt when
+an optional framework is missing, and check the notebook profile's exact workspace
+before App discovery while separating safe auth/discovery diagnostics.
+
+Publication checks use the installed environment with `--frozen --no-sync`.
+`pyproject.toml` and `uv.lock` are unchanged; no dependency sync/update or new
+upstream-latest claim is made. An incidental mirror-URL rewrite with unchanged
+package versions was separately preserved and reversed before building. The
+full controlled-provider suite and new remote CI were not authorized here;
+the checkpoint commit uses `[skip ci]` for its push-triggered workflow. No
+remote repository/workflow settings were changed. The scheduled CI definition
+remains present and was not changed by this pause.
+
+See [the session handoff](docs/SESSION_HANDOFF.md) for scope, retained evidence,
+safe resumption order and publication verification. The following historical
+subsections retain their original traffic and verification boundaries.
+
+Final no-inference publication checks:
+
+```bash
+uv run --frozen --no-sync pytest -q tests/test_runner_target_examples.py tests/test_local_runner_http_journey_contract.py tests/test_real_framework_contract.py tests/test_serverless_journey_contract.py tests/test_serverless_app_target_contract.py tests/test_hosted_journey_harness.py tests/test_agent_integration_docs.py tests/test_simple_examples.py::test_every_user_example_has_an_explicit_integration_contract
+uv run --frozen --no-sync pytest -q tests/test_hosted_evidence_contract.py tests/test_evidence_cli.py tests/test_probe_evidence_failure.py
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync ruff format --check .
+uv run --frozen --no-sync python scripts/export_openapi.py --check
+uv run --frozen --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --frozen --no-sync python scripts/verify_wheel.py
+uv run --frozen --no-sync python scripts/verify_remote_install.py --offline
+git diff --check
+```
+
+- Focused source/schema/native-construction/storage and deliberate pre-provider
+  rejection checks: **130 passed in 3.30 seconds**. Independent presentation/schema
+  and deliberate pre-judge evidence-failure checks: **22 passed in 0.07 seconds**.
+  No model completion, target traffic or judge call was substituted or executed.
+- Ruff lint passed; format check reported **184 files already formatted**.
+- OpenAPI equality and independent schema validation passed. A read-only Python
+  comparison against `git show 2276c3b:docs/openapi.json` confirmed **all seven
+  `/v1` paths and 28 reachable schemas unchanged**. Additive v2 strict-client
+  compatibility limits remain documented in `docs/API_REVIEW.md`.
+- Wheel/source builds and archive assets/private-metadata checks passed. Offline
+  isolated base-wheel installation checked its 11 dependency packages, compatible
+  installation, public evidence DTOs, lazy server imports, CLI and remote lifecycle
+  metadata. That lifecycle metadata is simulated; it is not model inference or
+  a real hosted service. The expected `VIRTUAL_ENV` mismatch warning describes the
+  deliberate isolated environment. No main lockfile/dependency changes occurred.
+- Whitespace checks passed. No new full-suite/remote-CI result, fresh upstream
+  dependency audit, live calls or successful serverless/App inference is claimed.
+  Build/asset checks were repeated after these documentation edits so the source
+  distribution includes the final record.
+
+### Fresh local HTTP helper matrix — October 8, 2026
+
+The latest real helper and public HTTP request were exercised in **12 new local
+scenarios**: LangGraph/OpenAI Agents × native-async direct SDK/authenticated local
+REST × normal load/active cancellation/intentional fail-fast. Local machine was
+the load-generator location and the real agent's HTTP hosting location. A
+serverless notebook was not used to host an agent, and these local results do
+not establish deployed-App or notebook-runner coverage. The exact public
+`examples/journeys/local_runner_http_target.py:request()` object was imported for
+both SDK modes; that first matrix did not execute its synchronous CLI/`main()`
+wrapper. The separate entrypoint checks below now establish that path.
+
+The eight positive runs used the explicitly approved `e2-demo-field-eng` profile,
+`https://e2-demo-field-eng.cloud.databricks.com`, `system.ai.gpt-oss-120b`, the
+explicit `/ai-gateway/mlflow/v1/responses` route, low reasoning and `store=False`.
+Each used five closed-loop users, five measured attempts plus one excluded probe,
+a ten-second dispatch ceiling, 512 maximum output tokens per model call, a
+30-second model transport timeout, 35-second handler deadline and 40-second
+benchmark attempt timeout. Model retries were zero; the actual native compiled
+LangGraph or OpenAI Responses Agent/Runner executed, without canned responses,
+tools, fallback, planner or judge calls. Evaluation was off. Each positive run
+made exactly six outbound model requests and retained six guarded completed
+Responses: **48 model attempts / 48 completed Responses** in this new batch,
+separately from the earlier four local canary calls. Paid traffic was serialized,
+the allotted 48-call ceiling was reached exactly, and the lease was released.
+
+Normal load completed before the ten-second ceiling because the five-attempt cap
+was reached. All normal runs had observed peak concurrency five, five successes,
+zero errors and token-usage coverage 1.0. These are functional smokes, not
+continuous ten-second loads, stable tail-latency comparisons or sustainable
+capacity. Nonstreaming JSON supplied no TTFT/first-event timing; none was invented.
+
+| Framework / execution | Run ID | Successful measured / errors | p50 / p95 latency (ms) | Protected JSON report |
+| --- | --- | --- | --- | --- |
+| LangGraph / native-async direct | `f1dc050b-ce10-4cf5-8695-d1ed2ed7dcf3` | 5 / 0 | 670.85 / 816.57 | [Report](/private/tmp/evalsurge-local-http-lg-load-direct-20261008.Afigzl/typed-report.json) |
+| OpenAI Agents / native-async direct | `e28ebff0-b27c-4529-8962-635d31be8a4b` | 5 / 0 | 547.65 / 746.56 | [Report](/private/tmp/evalsurge-local-http-oai-load-direct-20261008.ilClNi/typed-report.json) |
+| LangGraph / typed remote → local API | `cded6670-af5d-455b-ba69-4fe0c62c3a72` | 5 / 0 | 559.45 / 584.19 | [Report](/private/tmp/evalsurge-local-http-lg-load-api-20261008.gDQhQg/typed-report.json) |
+| OpenAI Agents / typed remote → local API | `86e7d920-6b5f-4d66-bf21-b6cf69f8a6f8` | 5 / 0 | 593.41 / 690.98 | [Report](/private/tmp/evalsurge-local-http-oai-load-api-20261008.8c4Mmv/typed-report.json) |
+
+Each of the four separately bounded cancellation checks observed `running` plus
+five active measured ASGI handlers before receiving `cancellation_requested`.
+All five measured calls subsequently completed and drained with zero errors,
+while lifecycle/report status remained `cancelled`. All five had already been
+dispatched at the small attempt cap. This is verified active lifecycle
+cancellation/drain, **not** evidence of suppressing an unissued backlog or aborting
+upstream model work/costs. Cancellation cannot roll back tools; these samples
+had no tools. No call was replayed or budget increased to improve that claim.
+
+| Framework / execution | Active-cancel/drain run ID | Terminal status | p50 / p95 measured latency (ms) | Protected JSON report |
+| --- | --- | --- | --- | --- |
+| LangGraph / native-async direct | `8204f883-cf83-45f5-ae6b-594351e75e69` | `cancelled` | 561.22 / 627.09 | [Report](/private/tmp/evalsurge-local-http-lg-cancel-direct-20261008.pVfQe8/typed-report.json) |
+| OpenAI Agents / native-async direct | `41cd0727-d52a-454b-ae63-f611e968a0f7` | `cancelled` | 588.71 / 616.33 | [Report](/private/tmp/evalsurge-local-http-oai-cancel-direct-20261008.JzDwYk/typed-report.json) |
+| LangGraph / typed remote → local API | `461c9bb3-8b11-4a06-907d-11b0ac95d339` | `cancelled` | 588.22 / 694.73 | [Report](/private/tmp/evalsurge-local-http-lg-cancel-api-20261008.leY60l/typed-report.json) |
+| OpenAI Agents / typed remote → local API | `99e2bea1-9d47-4294-879d-f8b91d8ec1dd` | `cancelled` | 569.14 / 576.49 | [Report](/private/tmp/evalsurge-local-http-oai-cancel-api-20261008.rAbn7G/typed-report.json) |
+
+Four negative checks deliberately added an unsupported input field to the real
+handler. Its native input validation rejected before any provider request.
+Each retained one failed probe with `target_http_error`, terminal `failed`, load
+`skipped`, zero measured rows and **zero outbound/completed model calls**. These
+are separately reported no-inference fail-fast checks, not model success.
+
+| Framework / execution | Intentional fail-fast run ID | Protected typed failure report |
+| --- | --- | --- |
+| LangGraph / native-async direct | `1d8df9c7-4adf-4d10-afd9-c42fe98ca4e2` | [Report](/private/tmp/evalsurge-local-http-lg-failfast-direct-20261008.HkuEmE/typed-report.json) |
+| LangGraph / typed remote → local API | `faf73da9-b3e6-4e73-880f-5e5c36252526` | [Report](/private/tmp/evalsurge-local-http-lg-failfast-api-20261008.Fk5CSt/typed-report.json) |
+| OpenAI Agents / native-async direct | `6950bf7e-e59a-4ebf-b839-4a4f0fa4caf9` | [Report](/private/tmp/evalsurge-local-http-oai-failfast-direct-20261008.CPI66G/typed-report.json) |
+| OpenAI Agents / typed remote → local API | `b03ad02e-3c64-4c99-869b-46bf6517ef98` | [Report](/private/tmp/evalsurge-local-http-oai-failfast-api-20261008.P8tykh/typed-report.json) |
+
+All 12 scenarios verified terminal identifiers, independent phases and full typed
+status/result/waited-report/retrieved-report parity. Five-row normal/cancellation
+report pages excluded the preflight; failure pages had zero measured rows. Every
+SDK context, native agent lifespan and listener closed. API modes additionally
+verified missing-key HTTP 401, authenticated typed retrieval, HTTP 200 for the
+static report shell, and API lifespan/listener cleanup. The shell fetch is not
+browser-rendering evidence. Full typed reports and content-free receipts remain
+mode 0600 in private validation-machine directories, not committed artifacts;
+the loopback servers have closed, so no dead loopback report URL is advertised.
+
+[The protected matrix summary](/private/tmp/evalsurge-local-http-matrix-summary-20261008.ueOqkq/summary.json)
+lists all 12 receipt/report paths, counters, source identities and file modes.
+The current metadata classifier confirmed all 12 retained passes without
+further inference or rewriting original receipts. The original failed LangGraph
+cleanup canary and zero-inference startup failure remain unchanged. New local
+success does not relabel either old failure or establish current App readiness.
+
+Exact tested source SHA256:
+
+- `examples/real_framework_agent.py`:
+  `300f9771e145156f3ba36385f31878a26e9fa34b3a43e2c897fa16fa2d236dc0`.
+- `examples/journeys/local_runner_http_target.py`:
+  `806adbf0fb9d4959202ba596308bd5c30374c8090770fef63520dd22d7569a85`.
+
+Installed environment: Python 3.12.13, LangGraph 1.2.12, OpenAI Agents 0.22.3,
+OpenAI 3.22.1, Databricks SDK 0.146.0, MLflow 3.16.1 and Locust 2.46.6.
+No new dependency, deployment, notebook upload, credential/profile change,
+commit or push occurred in this local workstream. CrewAI's exact dependency
+blocker and App/serverless gates remain separate. Evaluation, trace correlation,
+memory, streaming and synchronous CLI wrapper coverage are not claimed here.
+
+Actual live commands used the module
+`scripts.validation.local_runner_http_target_journeys` with the framework,
+execution, scenario and fresh `--artifact-dir` corresponding to each row above.
+All selected `--profile e2-demo-field-eng --workspace-host
+https://e2-demo-field-eng.cloud.databricks.com --model system.ai.gpt-oss-120b
+--api mlflow-responses --live`; only `load`/`cancel` commands added
+`--accept-paid-traffic`. They were executed individually with
+`uv run --frozen --no-sync python -m`, not as an unbounded/retrying matrix script.
+The exact per-run selections and safe outcomes are retained in each `receipt.json`.
+
+Focused no-inference verification (configuration/status metadata, native
+constructors and intentional pre-provider rejection; no provider completions):
+
+```bash
+uv run --frozen --no-sync pytest -q tests/test_local_runner_http_journey_contract.py tests/test_real_framework_contract.py
+uv run --frozen --no-sync ruff check scripts/validation/local_runner_http_target_journeys.py tests/test_local_runner_http_journey_contract.py examples/real_framework_agent.py tests/test_real_framework_contract.py
+uv run --frozen --no-sync ruff format scripts/validation/local_runner_http_target_journeys.py tests/test_local_runner_http_journey_contract.py
+```
+
+Result: **59 passed in 0.95 seconds**; Ruff lint/format passed. No controlled
+provider-completion full suite or new CI ran as part of this fresh local matrix.
+See [the hosted-journey record](docs/HOSTED_JOURNEY_VALIDATION.md#completed-local-runner--http-target-matrix--october-8-2026)
+for the same hosting/runner and evidence boundaries.
+
+### Public synchronous HTTP entrypoints — October 8, 2026
+
+Executed the unchanged public `examples/journeys/local_runner_http_target.py`
+child script against the actual latest LangGraph and OpenAI Agents helper,
+using private working directories for its fixed relative artifact path. Both
+exited zero, printed native typed `Report` JSON, completed one excluded probe
+and five measured successes with zero errors, reached peak concurrency five,
+and closed agent lifespans/listeners, SDK storage locks and worker processes.
+The same approved profile/workspace, GPT-OSS model, MLflow Responses route,
+512-output-token ceiling and zero retry controls remained in force. Evaluation
+was off: no planner, judges, tools, memory, fixtures or fallback.
+
+- LangGraph run `bea314c3-fc3f-4830-8ce6-29e6b2a3381c`: p50/p95 588.81/597.09 ms;
+  [protected report](/private/tmp/evalsurge-local-http-main-20261008.1EGljR/langgraph/typed-report.json).
+- OpenAI Agents run `699fb8bc-b737-4339-a2d5-b32fad798ef8`: p50/p95 556.50/602.17 ms;
+  [protected report](/private/tmp/evalsurge-local-http-main-20261008.1EGljR/openai-agents/typed-report.json).
+
+Each made exactly six outbound/completed Responses, **12 / 12** in this new
+batch, **60 / 60** with the preceding local matrix, separately from four earlier
+canary calls. Source identities stayed unchanged. These five-attempt smokes are
+not sustained capacity, robust tail-latency, App or notebook validation. No
+failed paid preflight was replayed and no source code was changed to obtain a pass.
+
+### Fresh journey preparation checkpoint — October 8, 2026
+
+This section retains the pre-execution preparation state. The user subsequently
+approved the three proposed App names and explicitly narrowed notebook execution
+to **serverless only**, deferring classic compute. New local receipts are recorded
+in [the short-smoke checkpoint](docs/HOSTED_JOURNEY_VALIDATION.md#current-short-smoke-scope-and-fresh-evidence):
+OpenAI Responses canary passed with two real completed calls and cleanup;
+LangGraph's two real calls/retrieval passed but its initial agent cleanup failed.
+No claim of new App or notebook inference follows from those local passes.
+The first new zero-inference serverless prerequisite retained a constructor
+`TypeError` (run `166927894022579` / task `585536860269`); corrected source uses
+native `Config` and a positive metadata retry window. No planner/judge calls
+are authorized in this short load-only pass.
+
+Three parallel workstreams prepared local real-framework handlers, native App
+resources and notebook checks. This checkpoint includes **zero new target/model,
+planner or judge calls**. No App/Runtime Store/cluster/Job was created, started,
+deployed or deleted; no notebook was uploaded. No profile, credential-storage
+policy, dependency lockfile or Git publication was changed.
+
+Secure elevated metadata reads with the existing `e2-demo-field-eng` profile
+succeeded after sandboxed reads reported a credential-cache error. Reauthentication
+and plaintext auth storage were not needed. The refreshed workspace had 233 Apps;
+none matched EvalSurge/test-eval-ram or the three proposed new native names:
+`agent-bricks-es-lg-1008`, `agent-bricks-es-oai-1008`,
+`agent-bricks-es-crew-1008`. No eligible current-user-owned or EvalSurge-named
+classic compute was found. These are resource-discovery observations, not live
+deployment evidence or authorization to select unrelated resources.
+
+Added `examples/real_framework_agent.py` with actual LangGraph, native OpenAI
+Responses/Runner and prepared native CrewAI handlers. The failed GPT-OSS Chat
+Completions receipt remains failed. A customer-owned HTTPX response hook checks
+raw `completed` status before Agents discards it; native framework converters
+are unchanged. Missing native usage remains absent. Target retries are zero,
+request state is isolated, and the example supplies no traces, memory or TTFT.
+Model transport is 30 seconds; total handler deadline is 35 seconds, so a
+30-second runner timeout does not prove upstream abortion. The local profile
+factory is not a native App deployment entrypoint.
+
+CrewAI is uninstalled and unexecuted. Stable 1.15.25 with OpenAI 3.22.1 in a
+separate Python 3.12 environment is a proposed dependency combination, not a
+resolved/tested lock. Real model canaries, new App/store creation, exact overall
+traffic budgets, classic compute and portable notebook-worker OAuth still need
+concrete confirmation. See [the retained matrix](docs/HOSTED_JOURNEY_VALIDATION.md).
+
+Fresh read-only task output for run `584248337638691` / task `1003312814916440`
+shows `No Experiment with id=1 exists` during ASGI startup, then startup failure
+and kernel exit 3. Installed Uvicorn source uses exit 3 for startup failure; this
+explains the retained failure sequence, not a successful live notebook fix.
+The notebook harness now checks terminal phases and full result/report parity
+for six direct/remote scenarios, with bounded prerequisite HTTP/retry settings.
+It still does not establish the latest helper, CrewAI or notebook→App coverage;
+driver runtime OAuth is not worker-portable merely by inheriting environment.
+
+Final focused command:
+
+```bash
+uv run --frozen --no-sync pytest -q tests/test_real_framework_contract.py tests/test_serverless_journey_contract.py tests/test_hosted_journey_harness.py tests/test_agent_integration_docs.py tests/test_simple_examples.py::test_every_user_example_has_an_explicit_integration_contract
+```
+
+**87 passed in 3.66 seconds.** These are pure configuration/status metadata,
+native client/framework construction, deliberate pre-provider rejection,
+local storage/startup and documentation checks. The guard checks use status-only
+HTTPX objects and headers, not fabricated model answers/provider completions.
+They are not successful inference. Earlier isolated notebook/harness checks
+also passed: **44 in 2.52 seconds**. Repository-wide Ruff lint/format and
+`git diff --check` passed (172 formatted Python files).
+
+No new full-suite run, OpenAPI regeneration or package rebuild is claimed for
+this subsequent preparation checkpoint; the earlier 921-test/full release-gate
+results below predate the new example and these notebook checks. Working-tree
+changes remain uncommitted and unpushed, with unrelated user changes preserved.
+
+### Earlier milestone implementation and verification
+
+- Added the optional customer-process `evalsurge.serving.create_app` helper:
+  unchanged bounded JSON input, completed `AgentAnswer`, immutable correlation
+  context and explicit request/case/run-shared state keys. No built-in auth,
+  tracing, memory, retry, streaming or TTFT is implied.
+- Added defaulted typed evidence capabilities to v2 results/reports and safe CLI
+  summaries. Configuration, measured observations, coverage and quality verdicts
+  stay distinct. Omitted/duplicate selected-scorer outcomes leave aggregate
+  denominators unknown; false verdicts remain observed assessments, not passes.
+- Required probe trace-collection failures now produce a safe readiness error
+  and prevent measured load. Answer-only readiness does not collect optional
+  probe traces. Fixed guidance distinguishes auth/input/completion failures.
+- Added a dry-run-first hosted-journey harness, integration/evidence guides and a
+  bounded validation matrix. Terminal lifecycle/phase/result/report agreement is
+  required for retrieval parity. Inconsistent remote evidence preserves an
+  active-work warning. Intentional fail-fast tests require an expected safe code;
+  they cannot turn an unrelated failure into successful inference.
+
+Before the readiness correction, the smallest no-inference regression produced
+one failure and one pass: a trace collector exception escaped instead of returning
+an evaluation-readiness failure. Retained coverage tests exercise that exception,
+missing required traces and answer-only readiness with pre-provider sentinels.
+No synthetic model completion was used for these checks.
+
+Final focused command (pure schemas, presentation, packaging, helper routing and
+intentional pre-provider failures; no target or judge inference):
+
+```bash
+uv run --frozen --no-sync pytest -q tests/test_probe_evidence_failure.py tests/test_serving.py tests/test_hosted_evidence_contract.py tests/test_evidence_cli.py tests/test_hosted_journey_harness.py tests/test_wheel.py tests/test_diagnostics.py tests/test_unified_usability_contract.py tests/test_unified_journey_examples.py tests/test_agent_integration_docs.py tests/test_readme.py -k 'not runs_without_judging'
+```
+
+Final result: **173 passed, one controlled-inference test deselected** in 0.31 seconds.
+The existing controlled-inference README case was deliberately deselected.
+The helper tests do not execute a real agent; routing/validation checks and
+deliberate handler failures are separate from successful real-model integration.
+The journey harness's pure DTO tests make no inference/deployment calls either.
+
+Other local commands:
+
+```bash
+uv sync --locked --offline --no-build-isolation --default-index https://pypi.org/simple --extra agents --group dev
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync ruff format --check .
+uv run --frozen --no-sync python scripts/export_openapi.py --check
+uv run --frozen --no-sync openapi-spec-validator docs/openapi.json
+uv build --no-build-isolation
+uv run --frozen --no-sync python scripts/verify_wheel.py
+uv run --frozen --no-sync python scripts/verify_remote_install.py --offline
+git diff --check
+```
+
+Local gates: locked offline sync against the public index (190 resolved,
+182 installed checked), Ruff lint/format, regenerated OpenAPI equality and
+independent schema validation, wheel/source build and archive verification.
+Comparison against the pushed snapshot preserved all seven `/v1` paths and 28
+reachable schemas. Isolated base-client installation checked 11 locked dependencies
+and public evidence-model imports without the server/load/model stack; its simulated
+API metadata is not simulated inference. No dependency or lockfile update occurred.
+Older typed SDKs forbid unknown fields and may reject the additive v2 evidence or
+capability responses; historical-document defaults are not bidirectional SDK/server
+compatibility. This release caveat is recorded in ADR 0012 and the API review.
+
+The hosted-journey guide records primary-source checks and selected-profile
+read-only resource findings. No new live inference, judging, App/store/Job/compute
+creation, notebook upload or cleanup is claimed. The recorded OpenAI Agents/GPT-OSS
+preflight and serverless Job failure remain unresolved; CrewAI and new deployed-App
+journeys remain unverified. The user approved the local controlled-inference
+regression suite on October 8; the results are recorded below. No new CI was
+triggered. Live validation needs exact model/route/source/App and
+compute selections with bounded consent. The proposed 72-attempt matrix is not
+preapproved traffic or a capacity result. See
+[the retained findings and matrix](docs/HOSTED_JOURNEY_VALIDATION.md).
+
+### Approved full-regression follow-up — October 8, 2026
+
+The user explicitly approved the existing canned provider-response exception
+before execution. Full-suite framework/native MLflow tests use controlled model
+transports and deterministic localhost endpoints; real SDK/Locust execution is
+not actual LLM inference or proof of a deployed App. Pure/no-inference checks and
+intentional pre-provider failures are included in the aggregate count.
+
+Environment: macOS, Python 3.12.13, pytest 9.1.1, MLflow 3.16.1, Locust 2.46.6,
+LangGraph 1.2.12, OpenAI Agents 0.22.3, OpenAI 3.22.1, Databricks SDK 0.146.0 and
+Pydantic 2.13.5. Locked public-index offline agents/dev sync checked 182 installed
+packages after resolving 190; dependency metadata and lockfile were unchanged.
+
+Initial `uv run --frozen --no-sync pytest -q`: **919 passed, two failed,
+42 warnings in 221.69 seconds**. Both failures reproduced together in isolation
+in 3.87 seconds. The assertions were stale against this milestone's documented
+behavior, not replaced with skips:
+
+- The denied HTTP 401 CLI probe expected generic `target_http_error`; it now
+  asserts exact `authentication_failed` in the persisted preflight and CLI. The
+  zero-measurement, skipped-load/judging and single-probe assertions remain.
+- The default-off v2 journey expected missing internal-trace coverage despite
+  disabled optional profiling. It now asserts no such gap and typed profiling
+  configuration `false`, state `off` and zero observed profiles. All request,
+  idempotency, measurement, secrecy and phase assertions remain.
+
+Focused rerun command:
+
+```bash
+uv run --frozen --no-sync pytest -q 'tests/test_requests_example.py::test_requests_cli_real_api_locust_and_safe_preflight[denied-1]' tests/test_v2.py::test_sdk_v2_runs_actual_locust_without_planner_or_judge
+```
+
+Focused rerun: **two passed in 3.92 seconds**. Final
+`uv run --frozen --no-sync pytest -q`: **921 passed, 42 warnings in 243.46 seconds**
+(exit 0). No tests were skipped to remove the failures. Initial failures remain
+recorded above. Independent review confirmed the updated assertions preserve the
+existing fail-fast, request-count, idempotency, secrecy and measurement checks.
+Warnings originate from MLflow: one SQLAlchemy `SADeprecationWarning` for `noload`
+and 41 `Pandas4Warning` instances for positional `.all(0)`. Installed upstream
+packages were not patched and these warnings were not suppressed.
+
+Ruff lint and format checks passed again after the assertion updates (170 files
+formatted), as did whitespace checks. OpenAPI equality/validation and read-only
+comparison with the pushed baseline passed: all seven `/v1` paths and 28 reachable
+request/response schemas remain equal. Wheel/source builds, archive verification
+and isolated base-client installation also passed; the expected `VIRTUAL_ENV`
+mismatch warning identifies the deliberate independent 11-dependency environment.
+Its service lifecycle metadata is simulated, not model/provider inference.
+The updated validation record is included in the rebuilt source distribution;
+wheel and source package assets were verified separately.
+
+No live LLM traffic, deployments, notebook/resource changes, new CI, commits or
+pushes were performed in this follow-up. User-owned working-tree edits remain
+preserved. Maintainer review, old strict-client/new-server compatibility decisions
+and the separately authorized real-model journey matrix remain release gates.
 
 ## Hosted-agent onboarding documentation — October 8, 2026
 

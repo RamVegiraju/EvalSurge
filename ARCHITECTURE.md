@@ -25,9 +25,12 @@ capacity campaigns in that ADR remain deferred.
 The minimal hosted-agent onboarding contract is documented in
 [the framework-neutral integration recipe](docs/AGENT_INTEGRATION.md).
 [Proposed ADR 0012](docs/adr/0012-hosted-agent-integration-contract.md) separates
-hosting/authentication, invocation and trace evidence for future serving options.
-It changes documentation only: no new runtime backend, capacity discovery,
-automatic instrumentation or legacy protocol removal is implemented.
+hosting/authentication, invocation and trace evidence. Its optional agent-side
+`evalsurge.serving` helper adapts a customer-owned async handler to `http-json`
+with explicit request/case/run-shared state keys. V2 results distinguish configured
+from observed evidence without new collection calls. No new load backend,
+capacity discovery, automatic instrumentation or legacy protocol removal is
+implemented. Maintainer review and live journey validation remain separate gates.
 
 ```mermaid
 flowchart LR
@@ -60,6 +63,7 @@ flowchart LR
 - `coordinator.py`: single-owner storage, admission, idempotency/recovery, frozen plans, task/phase transitions, paginated results, cancellation, and drain.
 - `evalsurge/`: default sync/native-async direct v2 facade and optional typed remote adapter; legacy interfaces remain, with one coordinator/Locust engine and explicit operator target bindings.
 - `run_views.py`: FastAPI-independent typed status/result/report presentation shared by direct execution and v2 routes; no new evaluator or worker.
+- `evalsurge/serving.py`: optional agent-process HTTP endpoint over a customer-owned handler; input/completion validation and untrusted correlation/state keys, not agent auth, memory or automatic tracing.
 - `validation.py`: bounded value-free request diagnostics shared by REST, SDK and CLI; schema errors remain distinct from JSON-encoding errors.
 - `connections.py`: operator-owned credential references bound to exact target URLs. API callers cannot select arbitrary environment secrets.
 - `planner.py`: bounded optional LLM selection from catalog IDs and operator-allowlisted aliases, using opt-in manifests. Deterministic validation decides readiness. The model cannot change load limits, destinations, credentials, rubric implementations, or evidence requirements.

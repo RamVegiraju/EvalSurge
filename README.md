@@ -39,6 +39,12 @@ not a framework allowlist; another framework needs no new EvalSurge adapter if
 its endpoint already satisfies the same contract.
 EvalSurge does not import a graph, deploy your agent, or automatically instrument
 its internals. Keep endpoint/provider credentials outside the benchmark request.
+If you do not already have a compatible endpoint, the optional
+[`evalsurge.serving` helper](docs/AGENT_INTEGRATION.md) calls your own async handler
+inside the agent process. It preserves JSON inputs, validates completed answers,
+and passes correlation/state keys. Choose isolation explicitly; authentication,
+agent memory and trace instrumentation remain yours. Existing compatible
+endpoints need no wrapper.
 
 ## Start in Python
 
@@ -80,7 +86,13 @@ The HTTP example sends `{"query": "Give a short greeting."}` unchanged and expec
 `application/json` with a nonempty `outputs` string. It does not provide TTFT.
 If your existing endpoint speaks streaming Chat Completions, explicitly use
 `protocol="openai-chat"` instead. See [supported target protocols](docs/TARGETS.md#supported-wire-contracts)
-and [the streaming HTTP script](examples/journeys/direct_http.py).
+and [the local-runner HTTP-target script](examples/journeys/local_runner_http_target.py).
+
+Inspect `report.run.evidence` for separate load, captured-answer evaluation,
+internal profiling and trace-aware evaluation states. Configured is not observed;
+missing optional traces do not prevent ordinary answer judging. A completed
+assessment can still have a false verdict. See
+[evidence and readiness](docs/EVIDENCE_CAPABILITIES.md).
 
 ## Target a Databricks App
 
@@ -102,24 +114,52 @@ The default is DurableAgentServer's synchronous `/api/invocations` contract.
 EvalSurge resolves the App through the selected Databricks SDK
 profile and refreshes OAuth; it does not deploy the agent, provision Lakebase,
 negotiate protocols, or retry model requests. Native invocation JSON does not
-provide answer-text TTFT or token usage. See [the App script](examples/journeys/direct_app.py)
+provide answer-text TTFT or token usage. See [the local-runner App-target script](examples/journeys/local_runner_databricks_app_target.py)
 and [framework/hosting examples](docs/FRAMEWORK_TARGET_EXAMPLES.md).
 
 ## From a Databricks notebook
 
-Use the same Python request and App binding on the notebook driver. Start with
-classic compute; serverless validation is separate. The [notebook source
-example](examples/journeys/classic_notebook.py) is consent-gated and includes
-context-managed cleanup. Configure an explicitly selected OAuth profile on the
-driver first; a profile on your laptop is not automatically present in a notebook.
-App access and the spawned worker's authentication must both be verified.
+**Prepared, authentication-blocked—not live-validated.** The
+[runner-only serverless notebook sample](examples/journeys/serverless_runner_databricks_app_target.py)
+is available for review and dry-run planning. Do not submit its model-bearing Job
+until the supported operator-owned authentication design and deployed-App
+readiness have been reviewed.
 
-These new journey samples have static contract coverage; their presence is not
-evidence that all notebook/hosting combinations passed live validation. Consult
+Notebook compute is a **load-generator location**, not another agent-hosting
+option. The intended serverless journey runs EvalSurge/Locust on the notebook
+driver and sends traffic to an already deployed App; it does not host an agent
+inside that notebook. The same v2 cases/load/evaluation vocabulary applies.
+Classic compute is deferred from the current validation. The retained
+[classic source](examples/journeys/classic_notebook.py) is not a serverless pass.
+
+Authentication must work both for App discovery and in the spawned load worker.
+A profile on your laptop is not automatically present in a notebook, and notebook
+driver OAuth alone does not establish worker authentication. The current public
+App binding requires an explicit profile and rejects contradictory ambient
+identity/destination settings. Native notebook OAuth is unavailable to the
+independent worker in the retained serverless prerequisite check. No token is
+copied into sample source, workload JSON or Job parameters to bypass either gate.
+See [the serverless/API topology diagnosis](docs/SERVERLESS_RUNNER_STATUS.md)
+for what failed and the reviewed authentication work still needed.
+
+The initial notebook sample is bounded to **one excluded probe plus one measured
+App invocation**, concurrency one, with evaluation off. Select an already deployed,
+ready no-tool agent whose reviewed source enforces at most 512 output tokens per
+model response. App invocations are not a generic model/tool-call or spending cap.
+Driver/profile readiness, independent worker OAuth, deployed App readiness and
+explicit traffic approval are all required; optional API execution, fail-fast and
+cancellation need separate validation. See [the notebook validation checklist](scripts/validation/README.md#serverless-notebook-validation).
+
+The samples' static contract coverage is not evidence that all notebook/hosting
+combinations passed live validation. Consult
 [the validation record](VALIDATION.md) for actual model, hosting, and traffic bounds.
-The October 8 serverless HTTP/API validation failed without a final receipt;
-notebook-to-App worker authentication and current deployed-App journeys remain
-unverified. The notebook example is not a supported-serverless claim.
+The [hosted-journey matrix](docs/HOSTED_JOURNEY_VALIDATION.md) lists current
+resources, retained failures and the bounded next live-validation plan.
+The retained October 8 notebook-local HTTP/API run failed without a final receipt;
+later zero-inference prerequisites confirmed driver OAuth but failed independent
+worker OAuth. These are distinct from notebook-to-App validation. Current journey
+results and blockers are kept in the hosted-journey record, not inferred from an
+example's presence.
 
 ## Where requests originate
 

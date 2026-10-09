@@ -29,7 +29,90 @@ contract/readiness, not all cases, thread safety or concurrency capacity.
 
 If your service already has a [supported endpoint](TARGETS.md#supported-wire-contracts),
 skip this step. Otherwise use a thin adapter in **your agent project**, not in the
-load generator. Install FastAPI/Uvicorn alongside your existing framework:
+load generator. The optional helper below and the manual recipe both call your
+existing handler inside its own process; neither makes EvalSurge import your agent.
+
+### Optional framework-neutral serving helper
+
+Install the optional server dependencies alongside your existing framework:
+
+```bash
+uv add 'evalsurge[server]'
+```
+
+Save this as `agent_server.py`. Implement `answer_case` with one of the framework
+bridges below, or your own real handler. This helper does not choose/change its
+provider or substitute a model completion:
+
+```python
+from typing import Any
+
+from evalsurge.serving import AgentAnswer, InvocationContext, create_app
+
+from your_agent_bridge import answer_case
+
+
+async def answer(inputs: dict[str, Any], context: InvocationContext) -> AgentAnswer:
+    """Execute this project's real agent and select its completed text answer."""
+    completed = await answer_case(inputs["query"], request_id=context.session_id)
+    return AgentAnswer(outputs=completed)
+
+
+app = create_app(answer, isolation="request")
+```
+
+Start it locally with `uv run uvicorn agent_server:app --host 127.0.0.1 --port 9001`,
+then bind `Agent.http("http://127.0.0.1:9001/invoke", protocol="http-json")` in
+the Python example below. **The helper has no built-in authentication.** Loopback
+is the tutorial default; add customer-owned authentication middleware or an
+authenticated gateway before exposing it on a network. Correlation headers are
+untrusted labels and never authorize access or identify a tenant.
+
+The helper preserves the complete nonempty input object: it does not strip
+`custom_inputs`, nested routing fields or your framework's state. Your handler
+still owns its input schema and explicit mapping. Request bodies are limited to
+eight megabytes, including chunked bodies; malformed/nonfinite JSON, duplicate
+keys and invalid UTF-8 are rejected before customer execution. Handler exceptions
+and invalid/empty final answers produce fixed, safe failed HTTP responses—not
+success-shaped error text. Exactly one handler call is made; no retries occur.
+
+Choose state keys deliberately:
+
+| `isolation` | `context.session_id` semantics | Required context |
+| --- | --- | --- |
+| `request` | Fresh attempt/request key | Standalone calls permitted; absent benchmark headers generate a fresh opaque key |
+| `case` | One key per run and case | Valid benchmark run, request and case headers |
+| `shared` | One shared key per run | Valid benchmark run and request headers |
+
+The runner sends `X-Benchmark-Run-ID`, `X-Benchmark-Request-ID` and
+`X-Benchmark-Case-ID`. Malformed, duplicated or incomplete benchmark headers are
+rejected with a safe 400. `context.run_id`, `request_id` and `case_id` are available
+for customer instrumentation separately from the state key. Generated standalone
+keys are not traces. Keys do not isolate shared tools, caches, stores or mutable
+globals, and this helper does not create session persistence or agent memory.
+The excluded readiness probe uses the run's first case and can modify case/shared
+state before measured load. Use `request` isolation for independent benchmark
+attempts unless your intended production behavior requires a shared session.
+
+If your handler already obtains actual evidence, supply it explicitly:
+`AgentAnswer(outputs=completed, trace_id=root_trace_id,
+usage={"output_tokens": actual_output_token_count})`. The complete JSON response
+is limited to two megabytes. Trace IDs are bounded printable ASCII strings and
+are returned consistently in JSON and `X-MLflow-Trace-ID`; counts must be
+nonnegative integers. Omit evidence you do not have. The helper does not instrument
+or export traces, estimate token counts, implement deadlines for customer code,
+or manufacture streaming/TTFT. HTTP latency includes the completed handler and
+response serialization. Customer code owns timeouts and cancellation cleanup.
+
+These helper checks cover schemas, correlation, routing and intentional
+pre-provider failures without model inference. They do not establish successful
+live framework execution or a deployed App. See [validation](../VALIDATION.md)
+for separately retained real-model evidence and current gaps.
+
+### Manual HTTP wrapper
+
+If you prefer to keep a separate serving implementation in your project, install
+FastAPI/Uvicorn alongside your existing framework:
 
 ```bash
 uv add fastapi uvicorn
@@ -293,8 +376,9 @@ Future serving options should add hosting/authentication resolution independentl
 of wire encoding and trace collection, reusing the same `RunCreate`, Locust and
 captured-answer evaluator. The proposed
 [integration design](adr/0012-hosted-agent-integration-contract.md) records the
-compatibility, measurement and verification gates; no new serving/trace backend
-is implemented by this guide.
+compatibility, measurement and verification gates. The optional serving helper is
+an additive bridge to the existing `http-json` contract, not a new load engine,
+hosting resolver, trace backend or framework allowlist.
 
 Official framework APIs checked October 8, 2026:
 [LangGraph graph API](https://docs.langchain.com/oss/python/langgraph/graph-api),

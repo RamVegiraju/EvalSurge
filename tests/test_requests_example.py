@@ -174,7 +174,8 @@ async def test_requests_cli_real_api_locust_and_safe_preflight(
         assert run["load_status"] == run["evaluation_status"] == "skipped"
         assert report["total"] == 0 and run["metrics"] == {}
         assert target["received"] == 1
-        assert "target_http_error" in stderr
+        assert run["preflight"]["error"]["code"] == "authentication_failed"
+        assert "authentication_failed" in stderr
         assert run["preflight"]["error"]["message"] in stderr
         assert run["preflight"]["request_id"] in stderr
 

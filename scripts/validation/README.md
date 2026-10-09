@@ -14,8 +14,12 @@ benchmarks. Run these modules from the repository root.
 | [databricks_app_smoke.py](databricks_app_smoke.py) | Dry-run-by-default, consent-gated check of an existing authorized App; one probe plus at most 500 measured calls, up to five users/180 seconds, no judging. |
 | [databricks_app_quality.py](databricks_app_quality.py) | Separate consent-gated native App quality integration; one synthetic policy/reference, up to two captured responses per relevance/correctness scorer, local native MLflow evidence. |
 | [unified_sdk_journeys.py](unified_sdk_journeys.py) | Consent-gated direct SDK checks against a real local framework/model or an existing authorized App. |
+| [local_runner_http_target_journeys.py](local_runner_http_target_journeys.py) | Local runner → real HTTP agent: current five-attempt public request, direct/optional API, intentional pre-provider fail-fast, active cancellation and typed report parity. |
 | [serverless_prerequisites.py](serverless_prerequisites.py) | Importable source notebook: zero-inference driver/worker OAuth, socket, process and POSIX-storage checks; requires an explicit workspace widget. |
-| [serverless_sdk_journeys.py](serverless_sdk_journeys.py) | Real model/framework HTTP checks on a notebook driver, using direct execution and an authenticated loopback API; not a deployed-App stand-in. |
+| [serverless_runner_app_target.py](serverless_runner_app_target.py) | Prepared/authentication-blocked readiness harness for the serverless runner → deployed App; one probe plus one measured invocation only after auth/deployment/traffic review. Not a live validation pass. |
+| [serverless runner-only notebook](../../examples/journeys/serverless_runner_databricks_app_target.py) | Source notebook for that harness; paid traffic off by default, generator only, no agent-hosting substitute. |
+| [serverless_sdk_journeys.py](serverless_sdk_journeys.py) | Retained notebook-local HTTP helper diagnostic; not the intended serverless-runner → App sample or an additional hosting option. |
+| [serverless_helper_notebook.py](serverless_helper_notebook.py) | Historical notebook-hosted helper launcher; diagnostic only, not deployed-App coverage. |
 
 For configurable local load against an already running authorized agent:
 
@@ -44,15 +48,28 @@ These helpers invoke an existing App through the local facade; they do not
 deploy EvalSurge or establish live `/v2` HTTP or sustainable-capacity evidence.
 
 The previous `examples.*` CLI and integration-runner module paths have moved to
-`scripts.validation.*`. `examples.python_benchmark` is now the minimal tutorial,
-without command-line flags. The obsolete smoke script and its `run.json` were
+`scripts.validation.*`. `examples.python_benchmark` is a retained controlled
+mock tutorial without command-line flags, not the primary real-agent journey.
+The obsolete smoke script and its `run.json` were
 removed: their missing correctness reference conflicts with fail-fast readiness.
 Actual REST/Locust regression coverage and the framework harness remain.
 
 ## Serverless notebook validation
 
+**Prepared, authentication-blocked—not live-validated.** The
+[runner-only notebook](../../examples/journeys/serverless_runner_databricks_app_target.py)
+and [App-target harness](serverless_runner_app_target.py) now exist. Keep the
+paid-traffic widget false for review/dry-run planning. No model-bearing Job is
+authorized by preparing the sample or obtaining a successful prerequisite task.
+
+In the intended user journey, **only the load generator** runs on serverless
+compute. The real agent stays in its deployed Databricks App. Authentication,
+egress and subprocess prerequisites must pass before model-bearing load; do not
+substitute a notebook-hosted agent for a failed App/authentication gate.
+
 Use a dedicated, explicitly authorized serverless notebook/task. Install the built
-`evalsurge[agents]` wheel with the reviewed frozen requirements. The wheel does not
+current `evalsurge[server]` wheel and reviewed frozen execution requirements;
+agent-framework dependencies are not needed in this runner-only notebook. The wheel does not
 package `examples` or `scripts`: upload those selected source packages to a private
 Workspace directory and add that directory to the notebook import path. Select a
 supported environment version through the Jobs environment spec; disable task
@@ -63,10 +80,45 @@ EvalSurge deployment. Never upload a laptop token or OAuth-cache/profile file.
 First run the prerequisites notebook with the approved workspace origin in its
 `workspace` widget. Examine individual booleans, not just Jobs `SUCCESS`. The fresh
 check found driver runtime-OAuth available but independent-worker OAuth unavailable.
-That is a notebook-to-App authentication gap; do not strip auth-routing overrides
-or fall back to classic without user selection.
+That is a notebook-to-App authentication gap. The current public App binding is
+also profile-only and rejects ambient destination/identity overrides before SDK
+discovery; a laptop profile name is not a native notebook auth configuration.
+Do not strip auth-routing overrides, copy notebook tokens/cache/profile files,
+add a new principal, introduce a forwarding proxy or fall back to classic to
+hide these blockers. A supported operator-auth change needs ADR/maintainer review.
 
-For the separately scoped notebook-driver HTTP/API journey:
+Before any model-bearing submission, all of the following must be reviewed:
+
+1. Exact user-selected workspace and supported operator-owned driver/profile
+   identity, without bypassing ambient-override controls.
+2. The independent Locust subprocess can acquire and refresh App OAuth itself;
+   native driver-only success is insufficient.
+3. One explicitly selected deployed App is ready, has the reviewed current source,
+   and is a no-tool agent enforcing at most 512 output tokens per model response.
+4. Current wheel/source and frozen requirements, environment version 5, zero Job
+   retries, finite timeout, and an explicit initial traffic lease: **one excluded
+   probe plus one measured App invocation**, concurrency one, evaluation off.
+
+The harness returns fixed safe blockers before inference if profile/worker
+readiness fails. The sample creates no deployment or model and exports no auth
+messages, tokens or raw child output. Model/tool turns and dollars are not capped
+by a generic App-invocation count; verify deployed behavior separately. A completed
+run is not a quality verdict or capacity claim. Status/result/report agreement and
+runner context cleanup belong in the final receipt; Apps/Lakebase are not deleted
+by closing the runner. Optional notebook API execution, intentional fail-fast and
+active cancellation remain separate, unvalidated gates.
+
+The selected environment-5 prerequisite receipt records driver OAuth, loopback
+and POSIX lock/fsync success but worker OAuth failure, with zero inference calls.
+The runner-only sample has no fresh live notebook-to-App receipt. Keep the retained
+historical helper failure separate; its local storage/lifespan regressions do not
+establish successful deployed-App hosting. See
+[the hosted-journey record](../../docs/HOSTED_JOURNEY_VALIDATION.md) and
+[VALIDATION.md](../../VALIDATION.md) for actual resources and pass/failure evidence.
+
+### Retained notebook-local helper diagnostic (not the advertised App journey)
+
+This is retained for investigation/history, not the primary end-user sample:
 
 ```python
 from scripts.validation.serverless_sdk_journeys import (
@@ -84,6 +136,8 @@ options = parse_options(
         "YOUR_VERIFIED_COMPATIBLE_ENDPOINT",
         "--framework",
         "langgraph",  # or openai-agents
+        "--model-api",
+        "mlflow-responses",  # Explicit advertised route; never automatic fallback.
         "--artifact-dir",
         "/tmp/NEW_EMPTY_PRIVATE_DIRECTORY",
         "--exercise-cancel",

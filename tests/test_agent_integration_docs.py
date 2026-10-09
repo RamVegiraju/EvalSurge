@@ -13,21 +13,44 @@ GUIDE = ROOT / "docs" / "AGENT_INTEGRATION.md"
 def test_agent_integration_python_snippets_compile_without_execution() -> None:
     """Compile recipes without importing customer graphs/crews or starting servers."""
     snippets = re.findall(r"```python\n(.*?)```", GUIDE.read_text(), re.DOTALL)
-    assert len(snippets) == 6
+    assert snippets
     for snippet in snippets:
         compile(snippet, str(GUIDE), "exec")
-    bridges = [ast.parse(snippet) for snippet in snippets[1:4]]
-    for tree in bridges:
-        bridge = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef))
-        assert bridge.name == "answer_case"
+    trees = [ast.parse(snippet) for snippet in snippets]
+    bridges = [
+        node
+        for tree in trees
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "answer_case"
+    ]
+    assert len(bridges) == 3
+    for bridge in bridges:
         assert [argument.arg for argument in bridge.args.args] == ["query"]
         assert [argument.arg for argument in bridge.args.kwonlyargs] == ["request_id"]
+    # All customer-process snippets are compiled only. They are never imported
+    # merely because new recipes change their position in the guide.
+    assert any("create_app(answer, isolation=" in snippet for snippet in snippets)
+
+
+def _assignment_snippet(snippets: list[str], name: str) -> str:
+    """Select a documented config assignment structurally, not by snippet position."""
+    selected = [
+        snippet
+        for snippet in snippets
+        if any(
+            isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == name for target in node.targets)
+            for node in ast.parse(snippet).body
+        )
+    ]
+    assert len(selected) == 1
+    return selected[0]
 
 
 def test_agent_integration_request_and_bindings_match_public_contracts() -> None:
     """Construct only native models/bindings, without resolver, HTTP or inference."""
     snippets = re.findall(r"```python\n(.*?)```", GUIDE.read_text(), re.DOTALL)
-    source = snippets[4].split("with EvalSurge(", 1)[0]
+    source = _assignment_snippet(snippets, "request").split("with EvalSurge(", 1)[0]
     namespace: dict = {}
     exec(compile(source, str(GUIDE), "exec"), namespace)
     request = namespace["request"]
@@ -40,7 +63,7 @@ def test_agent_integration_request_and_bindings_match_public_contracts() -> None
     assert http.registration.protocols == ("http-json",)
     translated = request.translate(http.target, set())
     assert translated.evaluation.samples[0].inputs == request.cases[0].input
-    app_source = snippets[5].split("with EvalSurge(", 1)[0]
+    app_source = _assignment_snippet(snippets, "target").split("with EvalSurge(", 1)[0]
     exec(compile(app_source, str(GUIDE), "exec"), namespace)
     app = namespace["target"]
     assert app.registration.kind == "databricks-app"

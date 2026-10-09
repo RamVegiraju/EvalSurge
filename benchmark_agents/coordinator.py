@@ -22,6 +22,7 @@ from .locust_runner import preflight_result, run_load, run_preflight
 from .models import (
     Accepted,
     Evaluation,
+    EvaluationError,
     EvaluationPreflight,
     LoadError,
     Plan,
@@ -620,6 +621,53 @@ class RunCoordinator:
         )
         atomic_json(self.root / run_id / "profiling.json", profiling.model_dump())
 
+    async def _probe_readiness(
+        self, run_id: str, plan: Plan, row: dict[str, Any]
+    ) -> EvaluationPreflight:
+        """Check selected judges against one protected, already captured probe.
+
+        Args:
+            run_id: Admitted run's correlation identifier.
+            plan: Frozen scorer definitions and operator-owned evidence scope.
+            row: Successful excluded probe record, never a measured attempt.
+
+        Returns:
+            Readiness execution state, independent of the assessment's quality.
+
+        Required trace-collection failures return safe readiness errors and do
+        not execute judges; the caller retains the failed phase and skips load.
+        Only trace-required registered judges cause probe trace reads. Collection
+        writes content-free readiness artifacts; selected judges may incur their
+        separately configured model calls. The target is never invoked here.
+        Work runs in owned threads, not a hard deadline or execution sandbox.
+        """
+        probe_traces = {}
+        trace_scorers = [
+            item for item in plan.registered_scorers if "trace" in item.required_fields
+        ]
+        if trace_scorers:
+            try:
+                _coverage, probe_traces = await asyncio.to_thread(
+                    collect_profiles,
+                    [row],
+                    run_id,
+                    plan.trace_source.model_copy(update={"max_traces": 1})
+                    if plan.trace_source
+                    else None,
+                    self.root / "preflights" / run_id / "readiness-profiles",
+                )
+            except Exception:  # noqa: BLE001
+                return EvaluationPreflight(
+                    status="failed",
+                    error=EvaluationError(
+                        code="evaluation_trace_collection_failed",
+                        message="Required inference-probe trace evidence could not be collected.",
+                        guidance="Check operator trace-store access, exact experiment/correlation scope, and readiness artifact storage before a new run. Load did not start.",
+                        scorer=f"registered:{trace_scorers[0].alias}",
+                    ),
+                )
+        return await asyncio.to_thread(run_evaluation_preflight, row, plan, probe_traces)
+
     async def _execute(
         self, run_id: str, request: RunRequest, plan: Plan | None, connection: Connection
     ) -> None:
@@ -713,20 +761,7 @@ class RunCoordinator:
                 probe_rows, _ = recover_rows(self.root / "preflights" / run_id)
                 if len(probe_rows) != 1 or not probe_rows[0].get("success"):
                     raise RuntimeError("Successful inference probe capture is unavailable")
-                probe_traces = {}
-                if any("trace" in item.required_fields for item in plan.registered_scorers):
-                    _coverage, probe_traces = await asyncio.to_thread(
-                        collect_profiles,
-                        probe_rows,
-                        run_id,
-                        plan.trace_source.model_copy(update={"max_traces": 1})
-                        if plan.trace_source
-                        else None,
-                        self.root / "preflights" / run_id / "readiness-profiles",
-                    )
-                checked = await asyncio.to_thread(
-                    run_evaluation_preflight, probe_rows[0], plan, probe_traces
-                )
+                checked = await self._probe_readiness(run_id, plan, probe_rows[0])
                 run["evaluation_preflight"] = checked.model_dump()
                 atomic_json(
                     self.root / "preflights" / run_id / "evaluation.json", checked.model_dump()

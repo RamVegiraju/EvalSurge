@@ -50,6 +50,9 @@ class EvaluationCapability(OperatorModel):
     catalog_judges: Readiness
     executable_catalog_scorers: tuple[str, ...] = ("relevance", "correctness", "safety")
     registered_scorers: tuple[str, ...] = ()
+    answer_evaluation_requires_traces: Literal[False] = False
+    trace_required_judges_require_correlated_probe: Literal[True] = True
+    captured_answers_only: Literal[True] = True
 
 
 class TraceCapability(OperatorModel):
@@ -58,6 +61,7 @@ class TraceCapability(OperatorModel):
     readiness: Readiness
     max_traces: int
     max_spans: int
+    optional_for_load_and_answer_evaluation: Literal[True] = True
 
 
 class Capabilities(OperatorModel):

@@ -72,6 +72,7 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 | `evalsurge/` | `Agent.http()` separates protocol and connection; `EvalSurge.local()/local_async()` expose run handles without starting a server or nesting event loops. |
 | `evalsurge/facade.py` | `EvalSurge.remote()` stays dependency-light; local factories and lazy exports verify the explicit server extra before loading the existing local implementation. |
 | `evalsurge/local.py` | Direct v2 admission, operator snapshot ownership and typed handles over the existing local runtime; legacy overloads remain. |
+| `evalsurge/serving.py` | Optional agent-side `create_app()` calls the customer async handler, preserves bounded JSON inputs, validates completed answers and propagates explicit correlation/state keys; no framework loading in the runner or automatic auth/tracing. |
 | `run_views.py` | Shared status/result/report projections, including planless terminal failures; no target or judge execution. |
 | `validation.py` | `validate_request()` detaches schema inputs and emits safe bounded `RequestValidationError`; no raw submitted values. |
 | `v2_models.py` | Canonical request plus typed result/evaluation/coverage/evidence-gap variants; completion and quality remain independent. |
@@ -123,6 +124,14 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
   MLflow's hidden rate-limit retry layer. Readiness uses zero SDK retries; quality
   uses the frozen SDK cap. Only explicitly trace-required registered scorers
   receive a homogeneous native Trace column, never missing traces converted to NaN.
+- Required probe trace collection is handled by `RunCoordinator._probe_readiness()`.
+  Store/artifact exceptions become fixed `evaluation_trace_collection_failed`
+  readiness errors; missing correlation remains `evaluation_missing_trace`.
+  Both prevent judging/load and retain the failure independently of the passed
+  inference probe. Ordinary answer judging does not perform probe trace reads.
+- V2 `Result.evidence` projects configured and observed capabilities from existing
+  phase outcomes, frozen plans and supplied coverage, without extra evidence reads.
+  Probe success is not measured coverage, nor does observed judging imply a pass.
 - TTFT and request latency begin after authentication, just before HTTP dispatch.
   The run window also includes ramp-up, authentication, journaling, and drain.
 - Failed attempts affect error rates. Successful-only percentiles and partial
@@ -137,8 +146,28 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 
 ## Examples and retained history
 
-- `examples/journeys/` demonstrates direct HTTP/App execution and a consent-gated
-  classic notebook driver context; these samples are not live-validation evidence.
+- `examples/journeys/local_runner_http_target.py` and
+  `local_runner_databricks_app_target.py` distinguish the load-generator machine
+  from the separately hosted HTTP/App agent, sharing a five-attempt v2 workload.
+  The classic notebook context is retained but deferred; notebook compute is a
+  runner location, not agent hosting. Samples alone are not live evidence.
+- [The serverless runner-only notebook](../examples/journeys/serverless_runner_databricks_app_target.py)
+  and [its readiness harness](../scripts/validation/serverless_runner_app_target.py)
+  are **prepared, authentication-blocked—not live-validated**. The notebook runs
+  EvalSurge/Locust only and targets an already deployed App. The unchanged public
+  binding is profile-only, rejects ambient identity/destination overrides, and
+  requires independently refreshable worker OAuth. Native driver OAuth is not
+  worker evidence. Gates cover exact driver/profile identity, worker auth and
+  deployed readiness before separately approved traffic. Initial load is one
+  excluded probe plus one measured invocation, concurrency one, evaluation off;
+  the reviewed no-tool deployment must enforce <=512 output tokens. This does
+  not establish notebook API execution, cancellation, fail-fast or capacity.
+- `scripts/validation/serverless_sdk_journeys.py` and
+  `serverless_helper_notebook.py` are retained historical notebook-hosted helper
+  diagnostics. They are neither the advertised runner→App sample nor another
+  agent-hosting option. `serverless_prerequisites.py` checks native driver and
+  independent subprocess authentication without inference; inspect individual
+  receipt checks rather than treating a Jobs `SUCCESS` as a passed journey.
 - `examples/quality/` shows client-loaded datasets, explicit catalog/registered
   judges, automatic planning priorities, and deliberately rejected/not-ready
   edge cases. No uploaded scorer code or dataset-path request field is added.
@@ -147,6 +176,13 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
   existing deployed agent. It verifies typed retrieval, the HTTP pre-provider
   fail-fast boundary, optional active-dispatch cancellation and context cleanup.
   No fixture fallback exists. Notebook and optional REST validation are separate.
+- `scripts/validation/hosted_journeys.py` adds a no-network plan and explicit
+  live-consent gate for already-running generic HTTP, existing native App and
+  typed remote registered targets. Framework/model/source labels are operator
+  attestations, not automatic deployed-source verification. It retains failed
+  receipts, uses no model fallback and makes no deployment or notebook changes.
+  The bounded matrix and unresolved source/auth gaps are documented in
+  [the hosted-journey review](HOSTED_JOURNEY_VALIDATION.md).
 
 - `examples/mock_agent.py` serves deterministic local SSE without model credentials.
 - `examples/python_benchmark.py` is a minimal public Python request: five concurrent

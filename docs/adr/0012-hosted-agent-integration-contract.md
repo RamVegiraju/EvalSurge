@@ -1,7 +1,7 @@
 # ADR 0012: A small hosted-agent contract with independent evidence capabilities
 
 - Date: October 8, 2026
-- Status: Proposed; documentation applied, no runtime/API removal implemented
+- Status: Proposed for designated maintainer review; additive helper/readiness implemented locally, release/live validation pending, no protocol removal
 - Review owner: designated repository maintainer
 
 ## Context and load assumptions
@@ -20,7 +20,7 @@ can make multiple model/tool calls; request caps are not spend caps. Optional
 evaluation adds judge readiness and sampled assessments, plus planning in automatic
 mode. Trace collection remains opt-in and bounded, currently up to 200 traces.
 
-## Proposed design and current documentation decisions
+## Design decisions and additive implementation contract
 
 1. Publish two onboarding choices: an existing HTTP endpoint and a deployed
    Databricks App. Direct Python is the default; remote execution stays optional.
@@ -57,14 +57,45 @@ mode. Trace collection remains opt-in and bounded, currently up to 200 traces.
    New hosts reuse an existing protocol where possible. A new trace exporter does
    not require a new load engine or hosting provider. Do not add unused abstract
    dispatchers or untrusted runtime plugins just to represent this separation.
-7. A future capability/readiness presentation should distinguish configured,
+7. An additive capability/readiness presentation distinguishes configured,
    observed and unavailable evidence, with safe corrective guidance. Static doctor
    must remain non-invoking. One consented inference preflight stays explicit; no
    hidden diagnostic model calls, retries or synthetic trace substitution.
-8. A future convenience serving helper can normalize customer-owned execution to
-   the simple contract and propagate correlation. It must preserve actual inputs,
-   failure/completion, state isolation and timing. It is not shipped by this ADR;
-   framework recipes are documentation, not production deployments or live parity.
+8. An optional `evalsurge.serving.create_app(handler, *, isolation, path="/invoke")`
+   normalizes customer-owned async execution to `http-json`. The handler receives
+   the unchanged bounded nonempty input object and an `InvocationContext`, then
+   returns an `AgentAnswer` with completed nonblank `outputs` and optional validated
+   trace/output-token evidence. It runs inside the customer's agent process; Locust
+   never imports the handler or framework. Exceptions produce a fixed safe failed
+   HTTP response, not a successful answer containing an error. Authentication,
+   tracing, handler deadlines, tools and state stores remain customer-owned.
+9. The helper requires an explicit `request`, `case` or `shared` state-key choice.
+   Request keys are attempt-scoped; case keys are scoped by run and case; shared
+   keys are scoped by run. The runner adds `X-Benchmark-Case-ID` alongside its
+   existing run/request correlation headers. Case/shared modes require benchmark
+   context; request mode also supports standalone calls with generated opaque
+   context. A generated context is not a fabricated trace. Keys are untrusted
+   correlation data, never authenticated identity, and do not isolate customer
+   globals, caches, tools or stores. The excluded probe can affect shared case/run
+   state. The helper does not implement persistence, native streaming or TTFT.
+10. V2 results add defaulted typed `EvidenceCapabilities` entries for load
+    measurements, captured-answer evaluation, internal profiling and trace-aware
+    evaluation. Each separates nullable historical configuration from
+    `pending`, `observed`, `unavailable` or `off` state and optional coverage.
+    Presentation uses existing frozen plans, phases and supplied evidence only;
+    it performs no new target, judge or trace calls. Successful probe readiness
+    is not measured evidence. Valid false assessments count as observed execution,
+    never passing quality. Partial assessments remain visible alongside gaps.
+    Static capabilities explain trace prerequisites but remain unverified.
+11. Preserve existing public preflight error codes while improving fixed guidance
+    for authentication rejection, invalid input and incomplete answers. Failure
+    to retrieve a required probe trace must terminate evaluation readiness with
+    a safe evidence error and skip load, rather than escape as an unrelated worker
+    failure. Missing optional traces must not block captured-answer judges.
+
+These contracts are additive implementation instructions, not a maintainer
+approval or live deployment claim. Framework recipes and validation harnesses
+remain separate from successful real-model/deployed-App evidence.
 
 ## Data flow and ownership
 
@@ -95,6 +126,19 @@ operator-owned, not submitted in public `RunCreate`.
 - Native Runtime session ordering may serialize a fixed shared session; default
   per-attempt sessions do not themselves enable history or memory. Runtime Store
   persistence is not trace instrumentation.
+- The convenience helper adds bounded JSON parsing and HTTP serialization at the
+  target, not another runner. That overhead belongs to endpoint latency; it is not
+  subtracted or labeled agent-only time. Cancellation cannot roll back tools, and
+  handler failure does not prove no side effects occurred. Explicit state keys
+  trade caller convenience for customer-managed isolation/authentication.
+- New v2 evidence fields are defaulted for older documents; `/v1` schemas and
+  protocol choices remain unchanged. This is updated-client/old-document
+  compatibility only: older strict typed SDKs can reject additive response fields
+  from a new server, so typed clients must be updated with the server for this
+  proposed 0.x contract. No response version-negotiation promise is introduced.
+  Error guidance changes do not expose inputs,
+  response bodies or raw provider exceptions. No uploaded decoder or automatic
+  response-shape inference is introduced.
 - A successful first-case probe cannot guarantee all cases, concurrency capacity,
   future trace export, judge calibration or sustainable throughput. Missing
   optional evidence and independent phase failures must stay visible.

@@ -57,7 +57,7 @@ async def submit_and_wait(
 @pytest.mark.parametrize(
     "mode,timeout,code",
     [
-        ("denied", 1, "target_http_error"),
+        ("denied", 1, "authentication_failed"),
         ("redirect", 1, "target_http_error"),
         ("provider_error", 1, "invalid_stream"),
         ("empty", 1, "invalid_stream"),

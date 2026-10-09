@@ -25,7 +25,8 @@ from uuid import UUID
 import httpx
 from evalsurge import (
     Acknowledgment, AssessmentOutcome, Case, EvalSurge, EvaluationOutcome,
-    EvaluationPolicy, Load, MissingServerDependenciesError, RemoteClient, RemoteRunFailed,
+    EvaluationPolicy, EvidenceCapabilities, EvidenceCapability, Load,
+    MissingServerDependenciesError, RemoteClient, RemoteRunFailed,
     Report, RequestValidationError, Result, RunCreate, RunStatus, ScorerOutcome,
     TargetReference, TypedRemoteClient,
 )
@@ -42,6 +43,8 @@ for package in ('fastapi', 'uvicorn', 'locust', 'gevent', 'mlflow', 'openai',
 assert 'benchmark_agents.coordinator' not in sys.modules
 assert 'evalsurge.client' not in sys.modules
 assert 'site-packages' in str(Path(sys.modules['evalsurge'].__file__).resolve())
+assert isinstance(EvidenceCapabilities().answer_evaluation, EvidenceCapability)
+assert EvidenceCapabilities().answer_evaluation.configured is None
 identifier = str(UUID('00000000-0000-0000-0000-000000000042'))
 body = {'target': {'connection_id': 'test-agent'}, 'cases': [{'input': {'query': 'safe'}}],
         'load': {'concurrency': 1, 'duration_seconds': 0.1, 'max_requests': 1}}

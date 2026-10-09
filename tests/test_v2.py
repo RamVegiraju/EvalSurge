@@ -63,10 +63,13 @@ async def test_sdk_v2_runs_actual_locust_without_planner_or_judge(
             assert http.get(f"/v1/runs/{handle.id}").status_code == 200
             assert http.get("/v2/capabilities").json()["runtime_verified"] is False
             result = http.get(f"/v2/runs/{handle.id}/result").json()
-            Result.model_validate(result)
+            typed_result = Result.model_validate(result)
             assert result["summary"]["quality"] == "off"
             assert result["summary"]["performance"] == "complete"
-            assert "internal_trace_coverage" in result["summary"]["evidence_gaps"]
+            assert "internal_trace_coverage" not in result["summary"]["evidence_gaps"]
+            assert typed_result.evidence.internal_profiling.configured is False
+            assert typed_result.evidence.internal_profiling.state == "off"
+            assert typed_result.evidence.internal_profiling.observed_count == 0
             assert base not in json.dumps(report)
             return report
 

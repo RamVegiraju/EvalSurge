@@ -11,6 +11,7 @@ REQUIRED_FILES = {
     "evalsurge/facade.py",
     "evalsurge/remote.py",
     "evalsurge/cli.py",
+    "evalsurge/serving.py",
     "benchmark_agents/__init__.py",
     "benchmark_agents/api.py",
     "benchmark_agents/coordinator.py",

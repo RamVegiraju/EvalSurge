@@ -1,6 +1,7 @@
 """Static notebook topology/consent contracts; no agent/provider completions."""
 
 import ast
+import inspect
 import json
 import subprocess
 import sys
@@ -22,6 +23,8 @@ def arguments() -> list[str]:
         "approved-model",
         "--framework",
         "langgraph",
+        "--model-api",
+        "mlflow-responses",
     ]
 
 
@@ -36,6 +39,8 @@ def test_budget_accounts_for_both_sdk_modes_and_excluded_probes() -> None:
     assert record["deployed_app_tested"] is False
     assert record["inference_stubbed"] is False
     assert record["evaluation_mode"] == "off"
+    assert record["max_model_calls"] == 12
+    assert record["metadata_retry_window_seconds"] == 1
     assert "approved-model" not in json.dumps(record)
     assert "approved-workspace" not in json.dumps(record)
 
@@ -49,6 +54,101 @@ def test_cancellation_is_a_second_independently_bounded_run_per_mode() -> None:
     assert record["max_model_bearing_probe_invocations"] == 4
 
 
+def test_crewai_native_executor_budget_is_explicit() -> None:
+    """Parse declared limits only; CrewAI is not imported or substituted."""
+    options = parse_options(arguments() + ["--framework", "crewai"])
+    record = budget_record(options)
+    assert record["max_model_calls_per_agent_invocation"] == 2
+    assert record["max_model_calls"] == 24
+    assert record["model_api"] == "mlflow-responses"
+
+
+def test_every_notebook_scenario_uses_terminal_payload_parity() -> None:
+    """Inspect actual scenario wiring, not an agent or a provider completion.
+
+    Normal success, intentional pre-provider failure and observed cancellation
+    must each compare status, result and report payloads, not merely identifiers.
+    Shared metadata comparison behavior has independent pure-schema coverage in
+    ``test_hosted_journey_harness``; no network or inference is exercised here.
+    """
+    source = (ROOT / "scripts/validation/serverless_sdk_journeys.py").read_text()
+    tree = ast.parse(source)
+    for name in ("_exercise_direct", "_exercise_api"):
+        function = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == name
+        )
+        comparisons = [
+            node
+            for node in ast.walk(function)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "retrieval_evidence"
+        ]
+        assert len(comparisons) == 3
+        function_source = ast.get_source_segment(source, function)
+        assert function_source is not None
+        assert function_source.count('parity["retrieval_agrees"]') == 3
+        for comparison in comparisons:
+            remote = next(
+                keyword.value for keyword in comparison.keywords if keyword.arg == "remote"
+            )
+            assert isinstance(remote, ast.Constant)
+            assert remote.value is (name == "_exercise_api")
+
+
+def test_prerequisite_sdk_budgets_use_native_config_boundary() -> None:
+    """Read native SDK signatures and source only, without initializing credentials.
+
+    WorkspaceClient does not accept Config's timeout/retry keyword arguments.
+    Passing them directly creates TypeError before runtime auth is tested.
+    """
+    from databricks.sdk import WorkspaceClient
+
+    signature = inspect.signature(WorkspaceClient)
+    source = (ROOT / "scripts/validation/serverless_prerequisites.py").read_text()
+    tree = ast.parse(source)
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "WorkspaceClient"
+    ]
+    assert len(calls) == 1
+    assert {keyword.arg for keyword in calls[0].keywords} <= set(signature.parameters)
+    config = next(keyword.value for keyword in calls[0].keywords if keyword.arg == "config")
+    assert isinstance(config, ast.Call)
+    assert isinstance(config.func, ast.Name) and config.func.id == "Config"
+    assert {keyword.arg for keyword in config.keywords} >= {
+        "host",
+        "auth_type",
+        "scopes",
+        "http_timeout_seconds",
+        "retry_timeout_seconds",
+    }
+    assert "w=WorkspaceClient(config=Config(" in source
+    retry = next(
+        keyword.value for keyword in config.keywords if keyword.arg == "retry_timeout_seconds"
+    )
+    assert isinstance(retry, ast.Constant) and retry.value == 1
+
+
+def test_native_metadata_retry_zero_is_not_no_retries() -> None:
+    """Construct actual native HTTP sessions; no auth/request/provider executes."""
+    from databricks.sdk._base_client import _BaseClient
+
+    zero = _BaseClient(retry_timeout_seconds=0)
+    bounded = _BaseClient(retry_timeout_seconds=1)
+    try:
+        assert zero._retry_timeout_seconds == 300
+        assert bounded._retry_timeout_seconds == 1
+    finally:
+        zero._session.close()
+        bounded._session.close()
+
+
 @pytest.mark.parametrize(
     "extra",
     [
@@ -56,6 +156,9 @@ def test_cancellation_is_a_second_independently_bounded_run_per_mode() -> None:
         ["--max-requests", "21"],
         ["--duration", "nan"],
         ["--timeout", "inf"],
+        ["--timeout", "31"],
+        ["--model-api", "auto"],
+        ["--max-output-tokens", "513"],
         ["--duration", "181"],
         ["--live"],
         ["--live", "--accept-paid-traffic"],
@@ -118,7 +221,15 @@ def test_driver_auth_source_never_exports_or_substitutes_credentials() -> None:
     assert "DATABRICKS_CONFIG_PROFILE" not in source
     assert "MockTransport" not in source
     assert "fixture_provider" not in source
-    assert "framework_app(live=True, workspace=workspace)" in source
+    assert "helper = _create_driver_helper(options, workspace)" in source
+    assert 'DispatchObserver(helper, "/invoke")' in source
+    assert "examples.framework_agent" not in source
+    assert "response_completion_guard" in source
+    assert '"response": [response_completion_guard, record_completion]' in source
+    assert '"request": [record_dispatch]' in source
+    assert 'record["model_transport_evidence"] = dict(helper.state.inference_evidence)' in source
+    assert "DatabricksAuth(workspace)" in source
+    assert "max_retries=0" in source
     assert "await asyncio.to_thread(_exercise_api" in source
 
 

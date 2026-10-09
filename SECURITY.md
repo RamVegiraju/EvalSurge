@@ -41,6 +41,22 @@ exclusive artifacts, but cannot roll back agent tools or kill trusted scorer cod
 
 These controls do not make a general public load-testing service safe. Multi-tenant deployment additionally requires connection ACLs, network egress enforcement (including DNS rebinding controls), quotas, audit logging, request-body limits at the gateway, secret management, and durable job ownership. Only benchmark endpoints and agent actions you are authorized to exercise; load retries are intentionally disabled.
 
+The optional `evalsurge.serving` helper is an agent-side integration convenience,
+not an authenticated hosting service. Customer middleware must protect nonlocal
+endpoints. Benchmark run/request/case headers and resulting state keys are
+untrusted correlation data, never an authorization boundary or user identity.
+Explicit request/case/run-shared keys do not isolate customer globals, tools or
+stores. The handler executes only in the customer's agent process; EvalSurge does
+not accept uploaded handler/decoder code. Inputs and completed outputs are bounded,
+and helper errors use fixed value-free responses. Failures or cancellation do not
+roll back tools, memory writes or other side effects. Optional trace IDs still
+require exact authorized store/experiment/run/request validation before judging.
+
+V2 evidence capability states are projections over already-owned evidence, not
+extra target/trace/provider queries. Required probe trace-collection failures
+stop readiness with safe fixed guidance and no raw exception details; they never
+permit measured load or substitute invented traces.
+
 The API limits decoded request bodies to 8 MB, including chunked bodies. Admission
 limits concurrent planning and runs. It is not a distributed rate limiter or a spend
 quota. The static report shell is public and data-free; report JSON is authenticated,
