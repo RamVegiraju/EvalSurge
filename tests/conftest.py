@@ -45,7 +45,7 @@ def successful_preflight(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         coordinator,
         "run_evaluation_preflight",
-        lambda *args: EvaluationPreflight(status="passed"),
+        lambda *args, **kwargs: EvaluationPreflight(status="passed"),
     )
 
 

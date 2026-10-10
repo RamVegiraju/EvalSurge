@@ -166,6 +166,9 @@ async def native_target() -> AsyncIterator[tuple[str, dict[str, Any]]]:
 
 def install_boundaries(monkeypatch: pytest.MonkeyPatch, url: str, *, mode: str = "yes"):
     """Control provider transports/configuration, not Locust/scorers/native MLflow."""
+    from tests.evaluation_unit_boundary import install_inline_native
+
+    install_inline_native(monkeypatch)
     for name in SDK_PROFILE_OVERRIDE_ENV:
         monkeypatch.delenv(name, raising=False)
     calls = []

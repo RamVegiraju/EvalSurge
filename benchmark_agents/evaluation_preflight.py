@@ -88,7 +88,11 @@ def configuration_error(plan: Plan, sample: Sample) -> EvaluationError | None:
 
 
 def run_evaluation_preflight(
-    row: dict[str, Any], plan: Plan, traces: dict[str, Any] | None = None
+    row: dict[str, Any],
+    plan: Plan,
+    traces: dict[str, Any] | None = None,
+    *,
+    cancellation: Any = None,
 ) -> EvaluationPreflight:
     """Run one native assessment per criterion, stopping at the first execution failure.
 
@@ -96,14 +100,18 @@ def run_evaluation_preflight(
         row: Successful inference-probe capture, never a measured load row.
         plan: Frozen evaluation policy; the original is never modified.
         traces: Verified actual probe Trace objects for explicitly trace-required scorers.
+        cancellation: Optional owner event; cancels native judging, not trace reads.
 
     Returns:
         Readiness only: false/zero quality verdicts are valid completed assessments.
-        Missing assessments or execution failures prevent measured load.
+        Missing assessments or execution failures prevent measured load. Safe
+        worker diagnostics are retained; owner cancellation is a cancelled check,
+        not an absent assessment.
 
     Catalog judging makes at most one provider attempt per criterion with the
     frozen timeout/token cap and zero SDK retries. Trusted registered scorers own
-    their own deadlines/retries; this thread is not a hard execution sandbox.
+    their own deadlines/retries inside an owned phase-bounded native process.
+    Process termination cannot undo already dispatched calls or scorer effects.
     Native runs are tagged evaluation-preflight and excluded from quality results.
     """
     outcome = EvaluationPreflight(status="running")
@@ -138,6 +146,7 @@ def run_evaluation_preflight(
                 traces,
                 fail_fast=True,
                 phase="evaluation-preflight",
+                cancellation=cancellation,
             )
         except Exception as error:  # noqa: BLE001
             outcome.status = "failed"
@@ -151,8 +160,7 @@ def run_evaluation_preflight(
             or assessments[0].get("scored") != 1
             or assessments[0].get("status") != "completed"
         ):
-            outcome.status = "failed"
-            detail = assessments[0].get("error") if assessments else None
+            detail = result.get("error") or (assessments[0].get("error") if assessments else None)
             outcome.error = (
                 EvaluationError.model_validate(detail)
                 if detail
@@ -162,6 +170,11 @@ def run_evaluation_preflight(
                     guidance="Check its frozen definition, required evidence, and configured judge model.",
                     scorer=name,
                 )
+            )
+            if outcome.error.scorer is None:
+                outcome.error = outcome.error.model_copy(update={"scorer": name})
+            outcome.status = (
+                "cancelled" if outcome.error.code == "evaluation_worker_cancelled" else "failed"
             )
             return outcome
     outcome.status = "passed"

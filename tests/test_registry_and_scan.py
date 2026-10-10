@@ -1,4 +1,9 @@
-"""Exercise actual MLflow registered scorers and conservative non-executing setup scans."""
+"""Actual native registry/scans with explicitly controlled judge-provider responses.
+
+Scoring stays at the test-only inline native boundary so provider monkeypatches
+cannot be lost at process startup. Storage/worker isolation has separate coverage;
+these controlled judge assessments do not establish actual LLM inference.
+"""
 
 import json
 from pathlib import Path
@@ -10,10 +15,10 @@ from mlflow.entities import Feedback
 from mlflow.genai import judges
 from mlflow.genai.scorers import Correctness, RetrievalGroundedness
 
-from benchmark_agents.evaluator import evaluate
 from benchmark_agents.models import Evaluation
 from benchmark_agents.planner import create_plan
 from scripts.scan_agent import scan
+from tests.evaluation_unit_boundary import evaluate_inline_native as evaluate
 
 
 async def test_exact_registered_version_and_expectation_coverage(tmp_path, monkeypatch):

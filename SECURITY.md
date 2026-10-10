@@ -37,7 +37,28 @@ owns its own registered aliases; a remote client cannot upload a local binding.
 CLI target discovery is static and secret-free. Ordinary summaries omit protected
 assessment content; explicit `--json` output can contain rationales and must be
 treated as a protected export. Direct context cleanup drains work and releases
-exclusive artifacts, but cannot roll back agent tools or kill trusted scorer code.
+exclusive artifacts, but cannot roll back agent tools or scorer side effects.
+
+Native readiness/quality evaluation now uses an owned child process. Operator
+credentials enter through its detached OS environment, never a persisted settings
+snapshot; captured input/trace transfers are bounded files with mode 0600 inside
+0700 temporary directories. Fixed native flags are established before MLflow
+imports, leaving caller-global environment and cached exporters untouched. Owner
+deadline/shutdown cleanup reaps the child; this is not a sandbox for trusted
+registered scorers, a rollback of dispatched calls, or parent-crash recovery.
+Public cancellation retains its documented load-phase contract. Optional private
+judge-attempt and worker-receipt journals are operator-owned, content-free and
+absent from public results. The attempt cap covers the built-in catalog transport,
+not arbitrary registered scorer code. Planner/trace collection and parent-side
+scorer setup still have their separate ownership limitations; see proposed
+[ADR 0013](docs/adr/0013-native-evaluation-process-ownership.md).
+
+The child's detached environment still inherits operator target/auth settings;
+it is not a least-privilege credential allowlist. A cleanup-verification failure
+cannot produce evaluation success, but the current tests do not establish ongoing
+ownership of an unreaped live child after cleanup failure. Shared hosting requires
+stronger failure/crash supervision. Bounded validation recovery independently
+checks worker reaping and PID/process-group absence before proceeding.
 
 These controls do not make a general public load-testing service safe. Multi-tenant deployment additionally requires connection ACLs, network egress enforcement (including DNS rebinding controls), quotas, audit logging, request-body limits at the gateway, secret management, and durable job ownership. Only benchmark endpoints and agent actions you are authorized to exercise; load retries are intentionally disabled.
 

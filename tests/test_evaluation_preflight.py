@@ -13,6 +13,7 @@ from openai import APIStatusError, APITimeoutError
 from benchmark_agents import api, coordinator, judges
 from benchmark_agents.models import Evaluation, EvaluationPreflight, Plan
 from benchmark_agents.planner import create_plan
+from tests.evaluation_unit_boundary import install_inline_native
 from tests.test_preflight import submit_and_wait
 from tests.test_template import configuration
 
@@ -21,6 +22,7 @@ def install_judge(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str | None = None
 ) -> list[dict[str, Any]]:
     """Use actual MLflow with a controlled provider boundary and no workspace access."""
+    install_inline_native(monkeypatch)
     monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path}/mlflow.db")
     monkeypatch.setenv("MLFLOW_ENABLE_ASYNC_TRACE_LOGGING", "false")
     monkeypatch.setenv("BENCHMARK_JUDGE_MODEL", "controlled-judge")
@@ -269,7 +271,7 @@ async def test_cancel_during_judge_readiness_does_not_start_load(
     install_judge(tmp_path, monkeypatch)
     entered, release = threading.Event(), threading.Event()
 
-    def waiting(*args: Any) -> EvaluationPreflight:
+    def waiting(*args: Any, **kwargs: Any) -> EvaluationPreflight:
         entered.set()
         assert release.wait(5)
         return EvaluationPreflight(status="passed", checked_scorers=["relevance"])

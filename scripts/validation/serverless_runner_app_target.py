@@ -148,8 +148,8 @@ def readiness(options: argparse.Namespace) -> dict[str, Any]:
         options: Exact operator App/profile selectors previously validated.
 
     Returns:
-        Content-free booleans and fixed actionable blockers. No token, SDK message,
-        profile content, raw child output or headers are returned.
+        Content-free booleans, fixed blocker codes and actionable guidance. No
+        token, SDK message, profile content, raw child output or headers are returned.
 
     Side Effects:
         When the profile/ambient-override guard permits admission, may make bounded
@@ -160,9 +160,18 @@ def readiness(options: argparse.Namespace) -> dict[str, Any]:
     Native notebook runtime-OAuth is not copied to the child. The child must own a
     supported refreshable OAuth source itself, using the unchanged public binding.
     No missing profile is generated or read from a laptop as a workaround.
+
+    The diagnostic harness uses the resolver's unchanged override and origin guards
+    directly so it can verify the exact workspace before App discovery and identify
+    the failing stage. SDK construction may itself initialize host/auth metadata.
     """
+    from benchmark_agents.connections import Connection
     from benchmark_agents.providers import workspace_client
-    from benchmark_agents.target_resolver import TargetResolutionError, resolve_registered_target
+    from benchmark_agents.target_resolver import (
+        TargetResolutionError,
+        _app_origin,
+        _reject_profile_overrides,
+    )
     from evalsurge import Agent
 
     agent = Agent.databricks_app(options.app_name, profile=options.profile)
@@ -170,29 +179,78 @@ def readiness(options: argparse.Namespace) -> dict[str, Any]:
         "driver_profile_ready": False,
         "worker_oauth_ready": False,
         "inference_invocations": 0,
+        "blocker_codes": [],
         "blockers": [],
     }
+
+    def blocked(code: str, guidance: str) -> dict[str, Any]:
+        """Attach one fixed, content-free admission failure to the safe receipt."""
+        result["blocker_codes"].append(code)
+        result["blockers"].append(guidance)
+        return result
+
     try:
-        _, connection = resolve_registered_target("agent", {"agent": agent.registration})
+        _reject_profile_overrides()
     except TargetResolutionError:
-        result["blockers"].append(
-            "Current App binding needs an exact portable OAuth profile and rejects ambient "
-            "notebook destination/identity overrides. Native driver OAuth alone cannot bind "
-            "this profile. No token copying or override-guard bypass is supported."
+        return blocked(
+            "profile_conflict",
+            "Current App binding rejects ambient notebook destination/identity overrides "
+            "or conflicting configuration selectors. Use an isolated, explicitly selected "
+            "portable OAuth profile. No token copying or override-guard bypass is supported.",
         )
-        return result
     try:
-        workspace_matches = (
-            workspace_client(profile=options.profile).config.host.rstrip("/") == options.workspace
-        )
+        workspace = workspace_client(profile=options.profile)
+        host = workspace.config.host
     except Exception:  # noqa: BLE001 - provider messages may contain private configuration
-        workspace_matches = False
-    if not workspace_matches:
-        result["blockers"].append(
-            "Selected profile does not establish the explicitly approved workspace. "
-            "No alternate profile, host or authentication fallback is permitted."
+        return blocked(
+            "driver_authentication_failed",
+            "Selected-profile SDK construction or authentication failed. Verify that this "
+            "runner has the explicitly selected supported OAuth configuration; no alternate "
+            "profile, host or authentication fallback is permitted.",
         )
-        return result
+    if not isinstance(host, str) or host.rstrip("/") != options.workspace:
+        return blocked(
+            "workspace_mismatch",
+            "Selected profile does not establish the explicitly approved workspace. "
+            "No alternate profile, host or authentication fallback is permitted.",
+        )
+    try:
+        token = workspace.config.oauth_token()
+        if not token.access_token or token.token_type not in {None, "Bearer", "bearer"}:
+            raise ValueError
+    except Exception:  # noqa: BLE001 - provider messages may contain private configuration
+        return blocked(
+            "driver_oauth_unavailable",
+            "Selected driver profile has no verified refreshable App OAuth token. "
+            "PAT/basic credentials and driver-token copying are not supported; configure "
+            "the reviewed OAuth source before App discovery or load.",
+        )
+    del token
+    try:
+        app = workspace.apps.get(name=options.app_name)
+    except Exception:  # noqa: BLE001 - provider messages may contain resource or token values
+        return blocked(
+            "app_discovery_failed",
+            "App discovery failed in the explicitly approved workspace. Verify the selected "
+            "App exists and the selected identity can read its metadata; no other workspace "
+            "or App is substituted.",
+        )
+    try:
+        origin = _app_origin(app.url)
+    except Exception:  # noqa: BLE001 - SDK-returned deployment values stay private
+        return blocked(
+            "app_deployment_unavailable",
+            "Selected App has no valid deployed HTTPS origin. Verify its deployment is "
+            "ready before retrying; no guessed URL, redirect or local substitute is used.",
+        )
+    selected = agent.registration.protocols[0]
+    path = "/api/invocations" if selected == "databricks-agent-runtime" else "/responses"
+    connection = Connection(
+        url=origin + path,
+        auth="databricks-app",
+        profile=options.profile,
+        app_name=options.app_name,
+    )
     result["driver_profile_ready"] = True
     try:
         child = subprocess.run(
@@ -203,14 +261,17 @@ def readiness(options: argparse.Namespace) -> dict[str, Any]:
             check=False,
         )
         checked = json.loads(child.stdout.splitlines()[-1]) if child.returncode == 0 else {}
-        result["worker_oauth_ready"] = checked.get("worker_oauth_ready") is True
+        result["worker_oauth_ready"] = (
+            isinstance(checked, dict) and checked.get("worker_oauth_ready") is True
+        )
     except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):
         result["worker_oauth_ready"] = False
     if not result["worker_oauth_ready"]:
-        result["blockers"].append(
+        return blocked(
+            "worker_oauth_unavailable",
             "Independent Locust worker has no verified refreshable App OAuth source. "
             "Driver-native runtime-OAuth depends on notebook context unavailable to that "
-            "subprocess. Stop before load; request a reviewed operator-auth design."
+            "subprocess. Stop before load; request a reviewed operator-auth design.",
         )
     return result
 

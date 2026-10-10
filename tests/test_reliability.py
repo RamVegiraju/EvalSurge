@@ -123,7 +123,7 @@ def test_plan_reuse_idempotency_and_evaluation_failure(tmp_path, monkeypatch, su
         return [], {"load_status": "completed"}
 
     monkeypatch.setattr(coordinator, "run_load", fake_load)
-    monkeypatch.setattr(coordinator, "evaluate", lambda *args: {"status": "failed"})
+    monkeypatch.setattr(coordinator, "evaluate", lambda *args, **kwargs: {"status": "failed"})
     monkeypatch.setenv("BENCHMARK_API_KEY", "test-key")
     monkeypatch.setenv("BENCHMARK_JUDGE_MODEL", "frozen-model")
     app = api.create_app(tmp_path)

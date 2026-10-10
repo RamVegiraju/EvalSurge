@@ -1,12 +1,182 @@
 # Hosted journey validation: evidence and next authorization
 
-Reviewed October 8, 2026. Fresh results below are scoped to their exact journey;
+Reviewed October 10, 2026. Fresh results below are scoped to their exact journey;
 the remaining matrix is a validation plan, **not** a blanket live pass.
+
+Subsequent [offline evaluation-storage diagnosis](EVALUATION_STORAGE_DIAGNOSIS.md)
+reproduced a shared native SQLite pool/persistence failure independently of App
+versus local hosting. A fresh serial/synchronous process retained exact durable
+storage assessments; those deterministic checks made zero model calls and are
+not real-LLM quality coverage. Original failed quality evidence remains unchanged.
+The separately approved supplemental LangGraph/OpenAI recovery completed on
+October 10. Original failed evidence remains unchanged.
+
 Use the same endpoint boundary for LangGraph, OpenAI Agents, CrewAI, or any other
 customer-owned implementation. Framework names below are examples, not a runtime
 allowlist. The load runner never imports their graphs, agents or crews.
 
-## Current short-smoke scope and fresh evidence
+## October 10 recovery — real-model evaluation completed
+
+The same local runner and exact selected `e2-demo-field-eng` profile targeted
+the retained workspace `1444828305810485` Apps. Real agent inference used
+`system.ai.gpt-oss-120b`; real explicit relevance/correctness judging used
+`databricks-gpt-5-4-mini`, with frozen references and no target reinvocation,
+planner, fallback or fixture completion. Deployments/resources were unchanged.
+
+| App | Load evidence | Complete sampled quality | Protected report |
+| --- | --- | --- | --- |
+| `agent-bricks-es-lg-1008` | Historical 500/500, zero errors, concurrency 5; zero new target calls | Supplemental 50/50 durable scores per criterion, zero judge errors; relevance 100%, correctness 88% | [Supplemental JSON](/private/tmp/evalsurge-app-quality-recovery-20261009.r4c3jk/langgraph-rejudge/rejudged-report.json) |
+| `agent-bricks-es-oai-1008` | Fresh 500/500, zero errors, concurrency 5, excluded probe/readiness passed | 50/50 durable scores per criterion, zero judge errors; relevance 100%, correctness 86% | [Typed JSON](/private/tmp/evalsurge-app-quality-recovery-20261009.r4c3jk/openai/report.json) |
+
+LangGraph historical successful p50/p95/p99 remain
+1154.21/1171.63/2161.67 ms and whole-window throughput 4.173 requests/sec.
+OpenAI fresh run `1bc6580c-bdc7-408b-a625-348934b72c54` measured
+1164.49/1675.44/2524.54 ms, 3.979 requests/sec, 125.652 elapsed seconds
+including drain. These are descriptive closed-loop results, not capacity claims.
+
+**703 new attempts** (501 agent + 202 confirmed judge) stayed below the 1,103
+approved ceiling, with complete accounting and zero commit-unknown judge attempts.
+Owner gate and independent **45/45** saved-evidence checks passed: exact sample
+membership/source-run feedback, original hashes, durable rates, SQLite integrity,
+probe exclusion, complete journals/metrics, typed report agreement and worker
+PID/group absence. Parent environment remained unchanged.
+[The protected readable aggregate index](/private/tmp/evalsurge-app-quality-recovery-20261009.r4c3jk/reports.html)
+links both JSON reports; it was rendered offline with zero model/network calls,
+not browser/layout verified or deployed. See
+[validation](../VALIDATION.md) for exact commands/receipts. No additional traffic
+was used in the audit; never replay either lease.
+
+Quality remains separate from execution. Read-only review classified LangGraph's
+six false correctness verdicts as one supported policy error and five compound-
+reference completeness-sensitive verdicts; OpenAI's seven as one policy error
+and six completeness-sensitive verdicts. Preserve 88%/86% unchanged. These are
+calibration findings for a future reviewed dataset/criterion, not a reason to
+retroactively edit references or repeat judging to obtain passes.
+
+App coverage remains synchronous `/api/invocations`, not verified `/responses`,
+TTFT/token usage, streaming/internal traces or memory. The public App sample/API/
+cancel/fail-fast matrix, notebook worker OAuth and CrewAI remain separate gaps.
+
+After validation on October 10, compute for both retained Apps was stopped using
+the selected `e2-demo-field-eng` profile. Each stop returned compute `STOPPED`
+and App `UNAVAILABLE`. App definitions, successful deployments, coupled managed
+Runtime Stores and historical runs/evidence remain intact. Restart is required
+before any newly authorized live test; storage may still incur charges. No store
+or historical evidence was deleted, and no new inference accompanied cleanup.
+
+## October 9 larger App load/evaluation lease — historical failure preserved
+
+The user separately approved existing Apps sequentially on `e2-demo-field-eng`,
+with a local EvalSurge runner, concurrency five, and a per-App ceiling of 180
+dispatch seconds or 500 measured attempts plus one excluded probe. Real
+`system.ai.gpt-oss-120b` inference used <=512 output tokens and no model/target
+retries. Ten synthetic refund-policy cases supplied authoritative references;
+explicit relevance/correctness selected up to 50 captured answers per scorer.
+The frozen judge was `databricks-gpt-5-4-mini`; no planner, fixture substitution,
+fallback or target reinvocation occurred. Exact timeout/retry/total allowance
+and the one-use command are recorded in [validation](../VALIDATION.md).
+
+| Existing App | Larger-run outcome | Report |
+| --- | --- | --- |
+| `agent-bricks-es-lg-1008` | 500/500 measured successes, zero load errors, peak concurrency 5; partial relevance, correctness skipped | [Readable](/private/tmp/evalsurge-app-load-quality-20261009.0099be/langgraph/report.html) / [JSON](/private/tmp/evalsurge-app-load-quality-20261009.0099be/langgraph/report.json) |
+| `agent-bricks-es-oai-1008` | Not run: stop-on-failure triggered after LangGraph quality evaluation | No new report |
+
+LangGraph run `2b28bf04-bc4c-40f7-95f4-8a3beedebdc5`: p50/p95/p99 latency
+1154.21/1171.63/2161.67 ms, successful throughput 4.173 requests/second, 118.61
+dispatch / 119.82 elapsed seconds including drain. Inference and both judge
+readiness checks passed. Terminal lifecycle was `completed_with_gaps`, evaluation
+`completed_with_errors`: relevance retained 13 passing scores out of 50 selected,
+one backend-error assessment and 36 missing assessments. Correctness was skipped
+post-load by fail-fast; its readiness pass is not quality coverage.
+
+Native persistence/correlation was incomplete; a particular SQLite-locking,
+autotracing, authentication or returned-body cause is not established. App
+counters recorded 501 model attempts/completions including the probe; judge
+telemetry recorded 51 real HTTP attempts (2 readiness + 49 quality), all HTTP 200.
+The 552 model transport attempts are not billing receipts or 50 retained verdicts.
+Typed reports/pages, journal correlation and cleanup checks passed; SDK closed,
+workers absent, no App handlers remained. Read-only diagnosis/rendering made no
+new inference calls. Original failed evidence is preserved privately.
+
+The [offline report index](/private/tmp/evalsurge-app-load-quality-20261009.0099be/reports.html)
+is a protected local export, not browser-validated or deployed. No sustained
+capacity, TTFT, token usage, internal target tracing, memory or notebook claim
+follows. Deployments/resources are unchanged. The lease is stopped; do not
+replay it or spend its remainder automatically. Diagnose the native evaluation
+failure separately before a newly approved captured-answer-only quality run and
+OpenAI benchmark. Earlier small canary successes below remain separate evidence.
+
+## October 9 deployed-App canaries — real inference passed
+
+After the separate read-only checks, the user renewed only a four-model-call gate.
+The current unified native-async direct SDK ran serially on the local machine;
+the actual native LangGraph/OpenAI agents and real model remained in their Apps.
+No model/framework response was stubbed. Exact selected profile/workspace,
+immutable deployment, model/runtime controls and active identity were checked.
+
+| Deployed App | Run | Excluded preflight | Measured result / latency | Report |
+| --- | --- | --- | --- | --- |
+| `agent-bricks-es-lg-1008` | `86ab5671-d173-423e-932d-691f8570ee12` | passed | 1/1, zero errors / 1458.41 ms | [JSON](/private/tmp/evalsurge-app-canaries-20261009.wQEzfS/langgraph/report.json) |
+| `agent-bricks-es-oai-1008` | `04f77c8c-0bd2-4e77-9c60-dd44d4e0e33e` | passed | 1/1, zero errors / 1467.40 ms | [JSON](/private/tmp/evalsurge-app-canaries-20261009.wQEzfS/openai/report.json) |
+
+Each used concurrency one, one excluded probe plus one measured call, evaluation
+off, `system.ai.gpt-oss-120b`, <=512 output tokens and zero model/target retries.
+Before/after native App counters establish exactly **four actual model HTTP
+attempts and four guarded completed Responses**, zero errors and no active
+handlers. Typed status/result/waited/retrieved-report models agreed; SDK contexts
+closed. The private gate receipt and exact command are recorded in `VALIDATION.md`.
+Native invocation persistence is an expected target side effect, not independently
+verified store/recovery evidence; no deployment/resource configuration, memory or
+tracing was added.
+
+The public App boundary was `databricks-agentbricks==0.4.0`
+DurableAgentServer compatibility through synchronous `/api/invocations`.
+The internal model's `/ai-gateway/mlflow/v1/responses` is a separate boundary;
+public App `/responses` coverage is not established by these canaries.
+
+The approval is exhausted; no broader matrix was started. These are successful
+deployed-inference wiring checks, not capacity or quality evidence. This native
+nonstreaming protocol supplied no TTFT/first-event timing or benchmark token usage.
+Unchanged public sample `main()`, remote API execution, cancellation, negative
+fail-fast, CrewAI and serverless runner coverage remain separate future checks.
+
+## October 9 read-only resumption — before renewed inference
+
+No new model traffic was authorized or executed. Both retained Apps remain
+RUNNING/ACTIVE on the recorded immutable deployments; authenticated `/status`
+returned 200. Explicit `e2-demo-field-eng` selection, the exact workspace/active
+principal, model resource and all four downloaded deployed source/wheel artifacts
+matched the retained records. Before and after inspection, process-local active
+handlers, handler attempts, model HTTP attempts/completions/errors were all zero.
+These counters are process-lifetime observations, not billing receipts or proof
+of earlier process history. Source/readiness checks do not establish inference.
+
+Protected receipt:
+`/private/tmp/evalsurge-app-ready-20261009.HLxSpg/readiness-receipt.json`.
+No App redeployment, deletion or store change occurred. At this checkpoint a
+renewed four-call canary gate was proposed (one probe + one measured call per App,
+serial, concurrency one, evaluation off). It was subsequently approved and
+completed above; that approval is exhausted. The prior 52-call lease was not
+automatically reused. Broader direct/API/cancel validation still needs separate
+explicit traffic approval.
+
+The exact official CrewAI 1.15.25 wheel was downloaded and hash-verified without
+installation. Its public dependency-index dry run still fails with connection
+refused, including an outside-sandbox retry. CrewAI requires exact split packages
+`crewai-core==1.15.25` / `crewai-cli==1.15.25` and OpenAI `<3`, so isolation remains
+necessary; no dependency downgrade or repository lock change occurred. No Crew
+App or successful Crew inference is claimed. Private dependency receipt:
+`/private/tmp/evalsurge-crewai-wheel-20261009.CzZe3b/dependency_receipt.json`.
+
+The two dormant harness fixes are implemented and the combined no-inference
+regressions passed. Existing real local LangGraph/OpenAI results below were not
+repeated. The actual serverless worker-OAuth blocker remains unchanged.
+
+## Historical October 8–9 short-smoke scope and evidence
+
+This load-only checkpoint predates the evaluated October 10 recovery above.
+Its version observations and unused traffic bounds are historical, not a current
+CrewAI dependency choice or permission to replay earlier tests.
 
 The user approved `agent-bricks-es-lg-1008`, `agent-bricks-es-oai-1008` and
 `agent-bricks-es-crew-1008` in the selected `e2-demo-field-eng` workspace.
@@ -24,8 +194,8 @@ memory or TTFT validation is included in this load-only checkpoint.
 | --- | --- | --- |
 | Laptop → real local HTTP, OpenAI Agents | Initial canary `d1a5f8a6-3aac-4b9b-a5d2-fa77ed125730` passed. The later five-user direct/API matrix and the separate unchanged synchronous sample `main()` below passed | Streaming, memory and judging were not exercised by these load-only checks |
 | Laptop → real local HTTP, LangGraph | Initial canary `41f9b79c-3289-4e50-929f-7193364d7d5d` completed two real calls/retrieval but failed agent cleanup; retained as failed. The later five-user direct/API matrix below passed with cleanup | Original failure stays failed; the later runs are new evidence, not a rewrite or replay of that receipt |
-| Laptop → real local HTTP, CrewAI | Exact `crewai==1.15.25` installation blocked: public PyPI connection refused and configured Databricks mirror lacks the release | Isolated environment remains empty; no downgrade, alternate source build or Crew inference claimed |
-| Laptop → deployed native App | Original revisions crashed; corrected revisions are RUNNING with authenticated `/status` and exact identity proof | Readiness is established separately from the bounded inference matrix; failed revisions remain retained |
+| Laptop → real local HTTP, CrewAI | Exact official 1.15.25 wheel verified October 9; public dependency-index resolution still connection-refused | Isolated environment remains empty; no downgrade, alternate source build or Crew inference claimed |
+| Laptop → deployed native App | October 9 unified direct canaries passed for both Apps: one excluded probe + one measured completion each, four real model calls total | Public sample entrypoint, remote API, active cancellation and negative fail-fast matrix remain untested on these Apps; original failed revisions stay failed |
 | Serverless notebook prerequisites | Corrected run `526298221857181` / task `972949342784427`: driver runtime-OAuth, loopback and POSIX lock/fsync passed; zero inference | Independent subprocess runtime-OAuth failed with `ValueError`; Job success is not a blanket auth pass |
 | Serverless notebook runner → deployed App | Intended cloud-runner sample, not yet verified | Agent stays in its App; worker-portable authentication remains a gate; no copied notebook/laptop tokens or notebook-hosted agent substitute |
 | Offline contract checks | Native construction, configuration/status metadata, deliberate pre-provider rejection and docs checks | No successful model inference; do not count these as live passes |
@@ -348,14 +518,19 @@ to a new DurableAgentServer deployment. Runtime invocation persistence is not
 automatically agent conversation memory, custom checkpoints or trace export.
 Provisioning any new App/store still requires separate resource authorization.
 
-CrewAI's current docs distinguish native async `akickoff()` from thread-based
+CrewAI's reviewed docs distinguish native async `akickoff()` from thread-based
 `kickoff_async()` (`asyncio.to_thread`). The prepared handler calls the real crew
 and uses completed `CrewOutput.raw`, with request-local state/counters and a
 two-model-call ceiling. CrewAI is still uninstalled and unexecuted. Official
-metadata advertises 1.15.25 for Python >=3.10,<3.14; an isolated Python 3.12
-environment with `crewai==1.15.25` and `openai==3.22.1` is proposed, not a resolved
-compatible transitive lock. Public main-branch source is not pinned-version
-runtime evidence. Require `CREWAI_DISABLE_TELEMETRY=true` before import and keep
+latest-release metadata rechecked October 10 advertises 1.15.27, published
+October 9 at 22:33:44 UTC. The approved development source exposes 1.15.23 but
+not 1.15.26 or 1.15.27. Earlier 1.15.25/1.15.26 wheel/source inspections remain
+historical preparation, not an approved alternative install route. An isolated
+Python 3.12 resolution with 1.15.23/OpenAI 2.54.0/Pydantic 2.12.5/MLflow skinny
+3.16.1 succeeded but remains uninstalled and unhashed; alternative-version and
+traffic approval are pending. The blocker is source availability, not proven
+incompatibility. Public main-branch source is not pinned-version runtime evidence.
+Require `CREWAI_DISABLE_TELEMETRY=true` before import and keep
 tracing off for this basic sample. Do not install CrewAI/LiteLLM and their
 transitive stack into the project just to claim framework coverage; the reviewed
 isolated dependency setup is a separate consent and compatibility gate.
@@ -444,9 +619,9 @@ fresh local matrix are not a claim that this other script was executed.
 
 | Framework implementation | Laptop → generic HTTP | Laptop → actual App | Optional server → registered target | Notebook → actual App |
 | --- | --- | --- | --- | --- |
-| LangGraph | Fresh five-user native-async direct load, active-cancel/drain and zero-inference fail-fast passed; older cleanup failure retained | Created; runtime startup failed, no inference yet | Owned local API → registered HTTP target load/cancel/fail-fast passed; shared hosting and remote App targets are separate | Worker auth gate |
-| OpenAI Agents | Fresh explicit Responses five-user native-async direct matrix passed; historical Chat Completions failure retained | Created; runtime startup failed, no inference yet | Owned local API → registered HTTP target load/cancel/fail-fast passed; shared hosting and remote App targets are separate | Worker auth gate |
-| CrewAI | Exact 1.15.25 dependency unavailable; isolated environment empty, no inference | Approved name; source/deployment/live check pending | Real crew/provider environment needed | Unverified |
+| LangGraph | Fresh five-user native-async direct load, active-cancel/drain and zero-inference fail-fast passed; older cleanup failure retained | Historical 500/500 load; October 10 supplemental relevance/correctness complete (100%/88%), original failure retained; public sample/API/cancel/fail-fast matrix pending | Owned local API → registered HTTP target load/cancel/fail-fast passed; shared hosting and remote App targets are separate | Worker auth gate |
+| OpenAI Agents | Fresh explicit Responses five-user native-async direct matrix passed; historical Chat Completions failure retained | October 10 fresh 500/500 load and complete relevance/correctness (100%/86%); public sample/API/cancel/fail-fast matrix pending; earlier startup failures retained | Owned local API → registered HTTP target load/cancel/fail-fast passed; shared hosting and remote App targets are separate | Worker auth gate |
+| CrewAI | Latest observed 1.15.27 and earlier selected 1.15.26 unavailable through approved source; 1.15.23 resolved but not installed, empty environment/no inference | Proposed `test-eval-crewai-1009` resource/version/76-attempt lease choices pending | Real crew/provider environment needed | Unverified |
 
 For each selected row, retain source revision, framework/provider versions, actual
 model, hosting and runner location. Validate preserved nontrivial case inputs,

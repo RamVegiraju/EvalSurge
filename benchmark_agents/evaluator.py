@@ -1,5 +1,7 @@
 """Post-run scoring through native MLflow APIs; no agent reinvocation."""
 
+import math
+from numbers import Real
 from typing import Any
 
 from .configuration import getenv
@@ -11,6 +13,20 @@ from .sampling import select_rows
 from .scorer_registry import definition_hash, load_scorer
 
 
+def _verified_metrics(name: str, values: list[Any], expected: int) -> dict[str, float]:
+    """Return a mean only for complete finite, durably verified scalar scores."""
+    if len(values) != expected or not values or not all(isinstance(v, Real) for v in values):
+        return {}
+    try:
+        numeric = [float(value) for value in values]
+        if not all(math.isfinite(value) for value in numeric):
+            return {}
+        mean = math.fsum(value / len(numeric) for value in numeric)
+    except OverflowError:
+        return {}
+    return {f"{name}/mean": mean} if math.isfinite(mean) else {}
+
+
 def evaluate(
     rows: list[dict[str, Any]],
     plan: Plan,
@@ -18,6 +34,7 @@ def evaluate(
     *,
     fail_fast: bool = True,
     phase: str = "evaluation",
+    cancellation: Any = None,
 ) -> dict[str, Any]:
     """Score captured answers using the frozen plan, without reinvoking the target.
 
@@ -28,6 +45,8 @@ def evaluate(
         traces: Correlated actual MLflow Trace objects collected after load.
         fail_fast: Stop dispatching further criteria after an assessment failure.
         phase: MLflow run tag separating readiness assessments from benchmark quality.
+        cancellation: Optional owner event exposing ``is_set``; cancellation stops
+            the evaluation child, but cannot undo already dispatched provider calls.
 
     Returns:
         Separate evaluation status, scorer results, selected request IDs, coverage,
@@ -36,10 +55,47 @@ def evaluate(
         Missing evidence or configuration is an explicit gap;
         a completed assessment can still have a false quality verdict.
 
-    This synchronous function performs paid judge calls and writes MLflow artifacts
-    when configured. Async callers should offload it to a thread. Individual judge
-    failures are captured by MLflow; evaluation-wide exceptions propagate to the
-    API job boundary so load measurements can still be retained.
+    Native work runs in an owned process with startup configuration established
+    before MLflow imports. No caller-global environment, tracking state or cached
+    exporter is changed. Async callers should offload this owner to a thread.
+    """
+    if not any(item.status == "ready" for item in plan.recommendations):
+        return {
+            "status": "no_ready_scorers",
+            "results": [],
+            "needs_data": [
+                item.model_dump() for item in plan.recommendations if item.status == "needs_data"
+            ],
+        }
+    from .evaluation_process import evaluate_in_process
+
+    return evaluate_in_process(
+        rows, plan, traces or {}, fail_fast=fail_fast, phase=phase, cancellation=cancellation
+    )
+
+
+def _evaluate_native(
+    rows: list[dict[str, Any]],
+    plan: Plan,
+    traces: dict[str, Any] | None = None,
+    *,
+    fail_fast: bool = True,
+    phase: str = "evaluation",
+) -> dict[str, Any]:
+    """Execute the frozen policy inside its serial, synchronous native worker.
+
+    Args:
+        rows: Selected captured attempts; never target invocation instructions.
+        plan: Frozen operator-owned scorer and reference configuration.
+        traces: Previously verified native target traces, when explicitly required.
+        fail_fast: Stop criteria after any execution or persistence failure.
+        phase: Readiness/quality tag on new evaluation runs.
+
+    Returns:
+        Safe, request-correlated assessments and independent evaluation outcomes.
+
+    This private implementation makes judge calls and native artifact writes only
+    in a separately owned process; direct use does not establish process isolation.
     """
     model = plan.judge_model
     traces = traces or {}
@@ -187,6 +243,9 @@ def evaluate(
             else recommendation.scorer
         )
         frame = result.result_df
+        from .evaluation_process import verify_durable_assessments
+
+        frame = verify_durable_assessments(frame, selected, metric_name, result.run_id, client)
         assessments = assessment_details(
             frame,
             selected,
@@ -195,9 +254,12 @@ def evaluate(
             catalog=reference is None,
             run_id=result.run_id,
         )
-        values = frame.get(f"{metric_name}/value") if frame is not None else None
-        scored = int(values.notna().sum()) if values is not None else 0
-        observed = values.dropna().tolist() if values is not None else []
+        observed = [
+            item["value"]
+            for item in assessments
+            if item["status"] in {"passed", "failed", "scored"} and item["value"] is not None
+        ]
+        scored = len(observed)
         pass_rate = (
             sum(bool(value) for value in observed) / len(observed)
             if observed and all(isinstance(value, bool) for value in observed)
@@ -217,7 +279,7 @@ def evaluate(
                 "assessments": assessments,
                 "mlflow_run_id": result.run_id,
                 "mlflow_experiment_id": str(experiment_id),
-                "metrics": result.metrics,
+                "metrics": _verified_metrics(metric_name, observed, len(selected)),
                 "pass_rate": pass_rate,
                 "source": "registered-mlflow" if reference else "catalog",
                 "version": reference.version if reference else plan.rubric_version,

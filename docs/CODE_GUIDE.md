@@ -56,7 +56,11 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 6. `profiling.collect_profiles()` validates exact trace correlation and scope after
    load, persists bounded content-free profiles, and retains actual Trace objects
    transiently for native trace-aware judging.
-7. Completed load calls synchronous `evaluator.evaluate(rows, plan, traces)` in a thread.
+7. Completed load calls synchronous `evaluator.evaluate(rows, plan, traces)` in an
+   owner thread, which launches a separate native evaluation process. The child
+   establishes serial/synchronous MLflow settings before imports and returns
+   only request-correlated durably verified feedback. Shutdown propagates the
+   owner's cancellation event; public run cancellation remains load-phase only.
    `sampling.select_rows()` chooses evidence-qualified captured answers;
    `judges.direct_scorer()` uses the frozen plan for direct Databricks calls wrapped
    as MLflow assessments. The target is not reinvoked.
@@ -89,6 +93,8 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 | `sampling.py` | `select_rows()` balances shuffled case/time strata using the frozen seed and assessment budget; it preserves input rows. |
 | `judges.py` | `rubric_hash()` detects prompt-source drift; `build_prompt()` renders installed rubrics; `direct_scorer()` requires a plan and returns a native MLflow scorer. |
 | `evaluator.py` | `evaluate()` uses captured outputs and the plan as the sole evaluation configuration, retaining assessment IDs, coverage, and MLflow result references. |
+| `evaluation_process.py` / `evaluation_worker.py` | Own bounded private transfers, detached native startup environment, a separate phase deadline, cancellation/reaping and exact durable feedback verification; private worker diagnostics never enter typed public outcomes. |
+| `evaluation_attempts.py` | Optional operator-only dispatch reservations, shared catalog-judge attempt caps and content-free transport/worker journals; no provider substitution or arbitrary scorer transport quota. |
 | `evaluation_preflight.py` | `configuration_error()` validates frozen criteria/evidence before agent traffic; `run_evaluation_preflight()` checks one native assessment per criterion without reinvoking the target. |
 | `evaluation_errors.py` | `evaluation_error()` maps exception type/status to fixed safe guidance, never provider messages or bodies. |
 | `evaluation_details.py` | `assessment_details()` joins native result rows by exact request tags, bounds protected judge rationales, separates boolean quality failures from execution errors, and rejects ambiguous correlation. |
@@ -114,8 +120,10 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
   but the scorer selection, references, seed, and budget cannot silently drift.
 - Planner clients injected for tests remain caller-owned. Clients created by planning
   are closed there; each judge client is closed after its assessment.
-- Cancellation stops new load dispatch and drains active requests. It does not cancel
-  evaluation or promise immediate termination.
+- Public run cancellation stops new load dispatch and drains active requests. It
+  does not expose evaluation cancellation or promise immediate termination.
+  Context shutdown separately signals the owned native evaluation child and
+  reaps it; previously dispatched model calls and scorer side effects remain.
 - Preflight uses identical target settings and one extra first-case invocation; it
   can execute tools/change agent state. Failure skips load; selected judges reuse
   its captured answer for excluded readiness only. Historical checks default to
@@ -162,6 +170,14 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
   excluded probe plus one measured invocation, concurrency one, evaluation off;
   the reviewed no-tool deployment must enforce <=512 output tokens. This does
   not establish notebook API execution, cancellation, fail-fast or capacity.
+  The harness checks the selected workspace before App discovery, reuses the
+  unchanged override/origin guards and returns fixed stage-specific blocker codes.
+  SDK construction may initialize metadata/authentication before the check.
+- `scripts/validation/local_helper_canary.py` records optional metadata/source/app
+  setup failures safely before starting an agent. Its 0600 receipt inside a 0700
+  fresh directory retains exception classes and zero-call evidence; it never
+  overwrites prior evidence or invents a run for failed setup. Storage failures
+  propagate when a safe receipt cannot be retained.
 - `scripts/validation/serverless_sdk_journeys.py` and
   `serverless_helper_notebook.py` are retained historical notebook-hosted helper
   diagnostics. They are neither the advertised runner→App sample nor another

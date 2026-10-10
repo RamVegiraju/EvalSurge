@@ -77,6 +77,7 @@ flowchart LR
 - `sampling.py`: fixed-seed randomized case/time strata over the observed dispatch window. The seed reproduces selection from identical records; it does not make model responses deterministic.
 - `evaluation_preflight.py`: validates frozen setup and checks one captured probe assessment per criterion before load, with no target reinvocation.
 - `evaluator.py` / `judges.py`: score captured answers through native MLflow, preserve assessment coverage/errors, and call Databricks directly using MLflow-shipped rubrics. Readiness is tagged separately from post-load quality; provider failures become content-free native assessment errors without extra MLflow retry layering.
+- `evaluation_process.py` / `evaluation_worker.py`: own a separate native evaluation process with detached operator configuration, serial/synchronous native persistence, protected bounded transfers, a phase deadline and shutdown cancellation. Fresh completion requires exact durable request/trace/scorer/source-run feedback, not HTTP success or transient result means. `evaluation_attempts.py` optionally journals and caps real catalog-judge dispatches for an operator-owned validation lease; it does not constrain arbitrary registered scorer transports. See proposed [ADR 0013](docs/adr/0013-native-evaluation-process-ownership.md). Bounded catalog recovery passed; designated review and general trace-scorer/cleanup-failure hardening remain separate gates.
 - `evaluation_details.py`: request-tag correlation and bounded per-assessment quality explanations. Judge rationales are protected content, separate from sanitized profiling and fixed safe execution diagnostics; see ADR 0008.
 - `scorer_registry.py`: exact-version trusted scorer resolution, public serialization hashes, and frozen operator-owned MLflow/trace scope.
 - `profiling.py`: post-load correlation validation, bounded content-free normalization, union-based self time, wall occupancy with explicit parallel work, and descriptive per-name hotspots.
@@ -112,6 +113,12 @@ This is closed-loop load. Each Locust user waits for its response before sending
 For REST runs, the API host is the load generator: `locust_runner.py` starts one local Locust subprocess, which sends the target requests and writes the journal. API clients may be remote, but moving the client does not change the measurement vantage point. Local Python runs start Locust on the Python caller's machine instead. Runner CPU, memory, sockets, network, and journal disk I/O can constrain the observation; this milestone does not capture runner saturation metrics. Place the runner separately from the target and record its resources and network location. See [deployment guidance](docs/USAGE.md#where-to-run-evalsurge).
 
 The measured run window starts at Locust test start and includes user ramp-up, authentication, journaling, and drain. Preflight, subprocess startup, planning, and judging are outside that window. Per-request TTFT and latency start just before HTTP dispatch, after auth. TTFT means first nonempty user-visible answer-text delta received at this client; it does not measure first response byte or browser paint. Apart from the separate first-case probe, warmup is not excluded in this milestone.
+
+The initial [measurement diagnostic](docs/MEASUREMENT_ACCURACY.md) confirms that
+blocking journal writes can delay peer users even though a request's own completion
+write falls outside its latency clock. `auth_ms` includes the initial journal write.
+Small local costs do not establish zero observer effect or cloud-disk behavior;
+timing/persistence redesign and generator-health telemetry require separate review.
 
 Quality sampling stratifies on case and request-start time, not completion order. Successful captured outputs are eligible; correctness further requires references. Failed-request counts and eligible/selected/scored coverage accompany scores. Balancing deliberately changes the sample distribution; scorer means are not unbiased population estimates or confidence intervals.
 

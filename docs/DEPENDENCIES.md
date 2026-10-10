@@ -312,6 +312,31 @@ and hash presence, not artifact validity, licenses or other interpreters. A fres
 full-graph latest-release review and public-index clean install was not performed;
 the October 12 review deadline and existing release gaps still apply.
 
+## Publication metadata recheck — October 10, 2026
+
+Official upstream release metadata was rechecked on October 10:
+
+| Package | Latest stable observed | Adoption status |
+| --- | --- | --- |
+| OpenAI SDK | 3.28.0, published October 9 | Locked 3.22.1 remains; compatibility/update validation pending |
+| OpenAI Agents SDK | 0.23.1 | Locked 0.22.3 remains; framework validation pending |
+| Locust | 2.46.7 | Locked 2.46.6 remains; native load regression validation pending |
+| Databricks SDK | 0.151.0, published October 10 | Locked 0.146.0 remains; auth/profile integration validation pending |
+| MLflow | 3.17.0 | Deliberately excluded by `<3.17`; rubric migration review required |
+| CrewAI (isolated example only) | 1.15.27, published October 9 at 22:33:44 UTC | Not a project dependency; unavailable through the approved development source |
+
+CrewAI 1.15.26 is also absent from that approved source; 1.15.23 is visible and
+resolved in an isolated preparation environment, but was not installed or run.
+Availability is not evidence of compatibility, and absence is not evidence of
+incompatibility. Do not bypass registry policy, install saved artifacts as an
+alternative route, change global package configuration, or publish private index
+provenance. See [the hosted validation record](HOSTED_JOURNEY_VALIDATION.md).
+
+`pyproject.toml` and `uv.lock` remain unchanged for this checkpoint. These are dated
+metadata observations, not validated upgrades, a fresh vulnerability audit or a
+claim that the repository is dependency-current. The existing October 12 review
+deadline and clean-install/compatibility gates remain in force.
+
 ## Primary guidance
 
 - [uv locking and upgrades](https://docs.astral.sh/uv/concepts/projects/sync/)

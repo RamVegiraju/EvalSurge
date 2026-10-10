@@ -77,7 +77,9 @@ async def test_failed_inference_stops_before_load_and_returns_safe_report(
     code: str,
 ) -> None:
     base_url, server = endpoint
-    monkeypatch.setattr(coordinator, "evaluate", lambda *args: pytest.fail("Judging must not run"))
+    monkeypatch.setattr(
+        coordinator, "evaluate", lambda *args, **kwargs: pytest.fail("Judging must not run")
+    )
     monkeypatch.setattr(
         coordinator, "run_load", lambda *args, **kwargs: pytest.fail("Load must not run")
     )
@@ -128,7 +130,10 @@ async def test_passed_preflight_is_one_extra_first_case_and_excluded_from_measur
     base_url, server = endpoint
     evaluated: list[list[dict[str, Any]]] = []
 
-    def evaluate(rows: list[dict[str, Any]], *args: Any) -> dict[str, str]:
+    def evaluate(
+        rows: list[dict[str, Any]], *args: Any, cancellation: Any = None
+    ) -> dict[str, str]:
+        """Capture the post-load phase without performing any judge/model inference."""
         evaluated.append(rows)
         return {"status": "completed"}
 

@@ -5,6 +5,7 @@ collector deliberately fails and the evaluator is a fail-if-called sentinel.
 No target, judge, framework handler or model endpoint executes in these tests.
 """
 
+import asyncio
 from uuid import uuid4
 
 import pytest
@@ -66,7 +67,9 @@ async def test_required_probe_collection_failure_is_safe_readiness_failure(tmp_p
 
     monkeypatch.setattr(coordinator_module, "collect_profiles", failed_collection)
     monkeypatch.setattr(preflight_module, "evaluate", forbidden_judging)
-    outcome = await RunCoordinator(tmp_path)._probe_readiness(run_id, plan, row)
+    owner = RunCoordinator(tmp_path)
+    owner.cancellations[run_id] = asyncio.Event()
+    outcome = await owner._probe_readiness(run_id, plan, row)
     assert outcome.status == "failed"
     assert outcome.checked_scorers == []
     assert outcome.error.code == "evaluation_trace_collection_failed"
@@ -84,7 +87,10 @@ async def test_missing_correlated_probe_trace_never_calls_judge(tmp_path, monkey
         pytest.fail("Missing trace evidence must not call a judge")
 
     monkeypatch.setattr(preflight_module, "evaluate", forbidden_judging)
-    outcome = await RunCoordinator(tmp_path)._probe_readiness(str(uuid4()), plan, row)
+    run_id = str(uuid4())
+    owner = RunCoordinator(tmp_path)
+    owner.cancellations[run_id] = asyncio.Event()
+    outcome = await owner._probe_readiness(run_id, plan, row)
     assert outcome.status == "failed"
     assert outcome.error.code == "evaluation_missing_trace"
     assert outcome.checked_scorers == []
@@ -115,11 +121,15 @@ async def test_answer_only_readiness_does_not_read_optional_probe_traces(tmp_pat
     def forbidden_collection(*args):
         pytest.fail("Answer-only readiness must not access optional trace stores")
 
-    def stop_before_judging(capture, frozen, traces):
+    def stop_before_judging(capture, frozen, traces, *, cancellation):
         assert capture is row and frozen is plan and traces == {}
+        assert not cancellation.is_set()
         raise BeforeJudgeExecution
 
     monkeypatch.setattr(coordinator_module, "collect_profiles", forbidden_collection)
     monkeypatch.setattr(coordinator_module, "run_evaluation_preflight", stop_before_judging)
+    run_id = str(uuid4())
+    owner = RunCoordinator(tmp_path)
+    owner.cancellations[run_id] = asyncio.Event()
     with pytest.raises(BeforeJudgeExecution):
-        await RunCoordinator(tmp_path)._probe_readiness(str(uuid4()), plan, row)
+        await owner._probe_readiness(run_id, plan, row)

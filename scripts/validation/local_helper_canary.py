@@ -30,14 +30,23 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
 
     Returns:
         Lifecycle, actual dispatch/completion counters, package/source identities
-        and typed result/report agreement. Prompts/answers remain private artifacts.
+        and typed result/report agreement. Setup failures retain a failed receipt
+        with the exception class only, zero-call evidence and no fabricated run.
+        Prompts/answers remain private artifacts.
+
+    Raises:
+        ValueError: The selected artifact directory is not fresh and empty.
+        OSError: Protected storage cannot be created or a receipt cannot be saved.
+            Persistence failures propagate rather than claiming retained evidence.
 
     Side Effects:
-        Starts one real loopback framework agent and the existing Locust engine;
-        owns and closes both. Maximum target attempts are two, with at most four
-        model requests for CrewAI and two otherwise. A failed probe skips load.
-        Existing failed receipts are never overwritten; native errors are recorded
-        by class only. Model timeout is 30 seconds, handler 35, HTTP runner 40.
+        After successful setup, starts one real loopback framework agent and the
+        existing Locust engine; owns and closes both. Maximum target attempts are
+        two, with at most four model requests for CrewAI and two otherwise. A
+        failed probe skips load.
+        Existing failed receipts are never overwritten; each new receipt is mode
+        0600 in a mode-0700 directory. Native errors are recorded by class only.
+        Model timeout is 30 seconds, handler 35, HTTP runner 40.
     """
     from benchmark_agents.storage import atomic_json
     from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference
@@ -47,13 +56,6 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("Select fresh empty protected storage")
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(directory, 0o700)
-    selected = ModelSelection(options.profile, options.model, options.api, options.workspace_host)
-    distributions = ["openai", "databricks-sdk", "locust", "mlflow"]
-    distributions.append(
-        {"langgraph": "langgraph", "openai-agents": "openai-agents", "crewai": "crewai"}[
-            options.framework
-        ]
-    )
     record: dict[str, Any] = {
         "framework": options.framework,
         "model": options.model,
@@ -71,26 +73,39 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
             "runner_timeout_seconds": 40,
             "max_model_calls": 4 if options.framework == "crewai" else 2,
         },
-        "versions": {name: version(name) for name in distributions},
-        "sample_sha256": hashlib.sha256(
-            Path("examples/real_framework_agent.py").read_bytes()
-        ).hexdigest(),
+        "versions": {},
+        "agent_started": False,
+        "model_transport_evidence": {"outbound_attempts": 0, "completed_responses": 0},
         "passed": False,
     }
-    atomic_json(directory / "receipt.json", record)
+    receipt_path = directory / "receipt.json"
+    atomic_json(receipt_path, record)
+    receipt_path.chmod(0o600)
     # Suppress native/provider exception text on the terminal; phase receipts and
     # protected normal run artifacts retain failed attempts. No secrets are printed.
     logging.disable(logging.CRITICAL)
-    os.environ["CREWAI_DISABLE_TELEMETRY"] = "true"
-    os.environ["OTEL_SDK_DISABLED"] = "true"
-    app = create_real_app(options.framework, selected)
-    observer = DispatchObserver(app, "/invoke")
+    app = None
     server_task = None
     server = None
     listener = None
+    phase = "setup"
     try:
+        selected = ModelSelection(
+            options.profile, options.model, options.api, options.workspace_host
+        )
+        distributions = ["openai", "databricks-sdk", "locust", "mlflow", options.framework]
+        for name in distributions:
+            record["versions"][name] = version(name)
+        record["sample_sha256"] = hashlib.sha256(
+            Path("examples/real_framework_agent.py").read_bytes()
+        ).hexdigest()
+        os.environ["CREWAI_DISABLE_TELEMETRY"] = "true"
+        os.environ["OTEL_SDK_DISABLED"] = "true"
+        app = create_real_app(options.framework, selected)
+        observer = DispatchObserver(app, "/invoke")
         import uvicorn
 
+        phase = "execution"
         listener = socket.socket()
         listener.bind(("127.0.0.1", 0))
         server = uvicorn.Server(
@@ -106,6 +121,7 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
             await asyncio.sleep(0.01)
         if not server.started:
             raise TimeoutError("Native startup exceeded ten seconds")
+        record["agent_started"] = True
         origin = f"http://127.0.0.1:{listener.getsockname()[1]}/invoke"
         request = RunCreate(
             target=TargetReference(connection_id="agent"),
@@ -118,7 +134,8 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
         ) as client:
             run = await client.start(request)
             record["run_id"] = str(run.id)
-            atomic_json(directory / "receipt.json", record)
+            atomic_json(receipt_path, record)
+            receipt_path.chmod(0o600)
             try:
                 waited = await run.wait(timeout=150)
             except Exception as error:
@@ -150,7 +167,9 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
             )
         record["sdk_context_closed"] = True
     except Exception as error:  # noqa: BLE001 - retain safe failure class, never raw provider content
+        record["passed"] = False
         record["failure_type"] = type(error).__name__
+        record["failure_phase"] = phase
     finally:
         if server is not None:
             server.should_exit = True
@@ -166,13 +185,15 @@ async def execute(options: argparse.Namespace) -> dict[str, Any]:
                     await server_task
         if listener is not None:
             listener.close()
-        record["model_transport_evidence"] = dict(app.state.inference_evidence)
+        if app is not None:
+            record["model_transport_evidence"] = dict(app.state.inference_evidence)
         record["passed"] = bool(
             record["passed"]
             and record.get("sdk_context_closed")
             and record.get("agent_lifespan_closed")
         )
-        atomic_json(directory / "receipt.json", record)
+        atomic_json(receipt_path, record)
+        receipt_path.chmod(0o600)
     return record
 
 

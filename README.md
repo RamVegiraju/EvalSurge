@@ -225,6 +225,11 @@ the browser report, close the direct client and then serve its retained artifact
 directory using [the optional server guide](docs/OPTIONAL_SERVER.md#open-a-retained-report).
 Reports can contain prompts, answers, references, and judge rationales; protect them.
 
+Client timings include transport and load-generator effects. Local diagnostics
+found small native journal costs, but blocking journal I/O can delay other users;
+zero overhead and cloud/serverless disk behavior are not established. See
+[measurement accuracy and its limits](docs/MEASUREMENT_ACCURACY.md).
+
 ## Optional server and compatibility
 
 Use [optional server execution](docs/OPTIONAL_SERVER.md) to move the runner off
@@ -248,6 +253,7 @@ recommended Databricks deployment path.
 - [v2 REST and CLI](docs/V2_API.md) · [Optional server](docs/OPTIONAL_SERVER.md)
 - [Traces, registered judges, and evidence](docs/PROFILING_AND_EVALUATION.md)
 - [Architecture](ARCHITECTURE.md) · [Validation](VALIDATION.md)
+- [Measurement accuracy and observer effects](docs/MEASUREMENT_ACCURACY.md)
 - [Dependencies](docs/DEPENDENCIES.md) · [Security](SECURITY.md) · [Production gates](docs/PRODUCTION_READINESS.md)
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development checks and inference disclosure.

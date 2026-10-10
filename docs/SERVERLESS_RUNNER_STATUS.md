@@ -1,8 +1,17 @@
 # Serverless notebook runner: current authentication blocker
 
-Checkpoint: October 8, 2026. Live validation is paused at the user's request.
+Checkpoint: October 9, 2026. Live notebook→App validation remains blocked and
+has not resumed.
 This describes observed behavior with Databricks SDK 0.146.0, not a general claim
 that serverless cannot run EvalSurge or a promise of a new authentication design.
+
+The prepared harness now verifies the selected profile's exact workspace before
+App discovery and distinguishes profile conflicts, driver authentication/OAuth,
+App discovery/deployment and worker OAuth with fixed safe blocker codes. SDK
+construction may initialize metadata/authentication before that check. Native
+SDK metadata/auth-boundary and deliberate rejection tests passed without cloud
+or model calls. This diagnostic fix does not supply worker-portable OAuth, submit
+a new notebook or establish live notebook-to-App coverage.
 
 ## What failed
 
@@ -49,8 +58,8 @@ errors and conflicting-selector rejection. This is a material authentication
 change requiring an ADR and designated maintainer review, not an environment-
 variable workaround already implemented by this checkpoint.
 
-First verify both processes without inference, and verify the selected profile's
-workspace before App discovery in the prepared harness. Then recheck deployed
+First verify both processes without inference; the prepared harness now verifies
+the selected profile's workspace before App discovery. Then recheck deployed
 readiness and obtain a resumed bounded traffic lease: initially one excluded
 probe plus one measured call, concurrency one, evaluation off. Validate direct
 and loopback-API lifecycle/cancellation/report cleanup separately before widening

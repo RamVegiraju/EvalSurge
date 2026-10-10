@@ -1,8 +1,8 @@
 """Exercise native MLflow evaluation with a controlled judge response."""
 
-from benchmark_agents.evaluator import evaluate
 from benchmark_agents.models import Evaluation
 from benchmark_agents.planner import create_plan
+from tests.evaluation_unit_boundary import evaluate_inline_native as evaluate
 
 
 async def test_native_mlflow_captured_outputs(tmp_path, monkeypatch):

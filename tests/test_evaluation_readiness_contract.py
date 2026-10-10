@@ -1,4 +1,9 @@
-"""Native readiness evidence and durable coordinator failure/recovery contracts."""
+"""Native readiness evidence with controlled providers and durable recovery checks.
+
+Judge-response substitutions stay at the explicit test-only inline native boundary.
+No controlled assessment here establishes real inference or worker ownership;
+actual native process/storage regressions remain in their separate test module.
+"""
 
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -22,6 +27,7 @@ from benchmark_agents.profiling import collect_profiles
 from benchmark_agents.runner import summarize
 from benchmark_agents.scorer_registry import load_scorer
 from benchmark_agents.storage import append_event, atomic_json
+from tests.evaluation_unit_boundary import install_inline_native
 from tests.test_template import configuration
 
 
@@ -47,6 +53,7 @@ def native_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Na
     The previous tracking URI is restored on teardown. Unexpected catalog provider
     construction fails instead of resolving credentials or dispatching paid calls.
     """
+    install_inline_native(monkeypatch)
     previous_uri = mlflow.get_tracking_uri()
     uri = f"sqlite:///{tmp_path}/mlflow.db"
     monkeypatch.setenv("MLFLOW_TRACKING_URI", uri)
@@ -307,7 +314,11 @@ async def test_post_load_evaluator_raise_preserves_metrics_and_safe_durable_erro
         return [row], metrics
 
     def broken_evaluator(
-        rows: list[dict[str, Any]], plan: Plan, traces: dict[str, Any]
+        rows: list[dict[str, Any]],
+        plan: Plan,
+        traces: dict[str, Any],
+        *,
+        cancellation: Any = None,
     ) -> NoReturn:
         """Raise at the post-load boundary without judging or invoking the hosted agent."""
         evaluations.append(rows)

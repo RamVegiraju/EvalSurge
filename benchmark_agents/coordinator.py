@@ -639,7 +639,9 @@ class RunCoordinator:
         Only trace-required registered judges cause probe trace reads. Collection
         writes content-free readiness artifacts; selected judges may incur their
         separately configured model calls. The target is never invoked here.
-        Work runs in owned threads, not a hard deadline or execution sandbox.
+        Trace collection runs in a thread without a hard execution deadline.
+        Native judging owns a separately bounded/cancellable child process;
+        trusted scorer code is not a sandbox and committed calls cannot be undone.
         """
         probe_traces = {}
         trace_scorers = [
@@ -666,7 +668,13 @@ class RunCoordinator:
                         scorer=f"registered:{trace_scorers[0].alias}",
                     ),
                 )
-        return await asyncio.to_thread(run_evaluation_preflight, row, plan, probe_traces)
+        return await asyncio.to_thread(
+            run_evaluation_preflight,
+            row,
+            plan,
+            probe_traces,
+            cancellation=self.cancellations[run_id],
+        )
 
     async def _execute(
         self, run_id: str, request: RunRequest, plan: Plan | None, connection: Connection
@@ -826,7 +834,9 @@ class RunCoordinator:
                 run.update(status="evaluating", evaluation_status="running")
                 self._persist(run_id)
                 try:
-                    run["evaluation"] = await asyncio.to_thread(evaluate, rows, plan, traces)
+                    run["evaluation"] = await asyncio.to_thread(
+                        evaluate, rows, plan, traces, cancellation=cancel
+                    )
                 except Exception as error:  # noqa: BLE001
                     run["evaluation"] = {
                         "status": "failed",
