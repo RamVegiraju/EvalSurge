@@ -1,5 +1,40 @@
 # Validation — 0.2.1.dev2026101202 checkpoint
 
+## Report light/dark theme — October 12, 2026
+
+### Presentation-only verification
+
+The browser report now has a keyboard-accessible **Dark mode: on/off** header
+button with an explicit pressed state. Initial selection follows the system
+preference unless a valid `light`/`dark` choice was saved. Theme-aware panels,
+badges, inputs, tables, heatmaps, anatomy bars and span waterfalls preserve all
+underlying evidence. Stronger heatmap shading means greater occupancy in both
+palettes. The preference uses only `evalsurge.report.theme`; blocked/missing
+storage still allows in-page switching. No API key, run ID or report data is saved.
+
+Checks against the working tree based on `dfd420416ec3d984fc0ba44b3bf6a6ff8be87d6a`:
+
+- `uv run --frozen --no-sync pytest -q tests/test_report_ui.py tests/test_wheel.py tests/test_docs_ui.py`:
+  **105 passed**. These are synthetic report-rendering, archive and static-docs
+  checks, not stubbed inference or live agent validation. The theme regressions
+  cover both directions, saved/invalid preferences, blocked storage, absent media
+  API, failed report retrieval, stable request selection and no extra report fetch.
+- `uv run --frozen --no-sync ruff check .`, `ruff format --check .`, and
+  `git diff --check`: passed.
+- `node --check benchmark_agents/static/report.js` and
+  `node --check tests/report_harness.cjs`: passed.
+- Frozen OpenAPI snapshot export check and schema validator: passed, unchanged.
+- Offline wheel build and archive validation: passed; packaged HTML/CSS/JS bytes
+  match the working tree. This diagnostic build is **not a new frozen release**;
+  a distributable changed build needs a new version.
+
+These presentation checks made no agent/model calls. Dependencies and `uv.lock`
+remain unchanged. Full inference suites were not rerun locally for this
+presentation-only patch. These DOM contracts do **not** establish browser layout
+or visual contrast verification; a desktop/mobile browser check remains before
+release. Private live-validation records and product-design material are excluded
+from this change.
+
 ## Local installed-package milestone — October 12, 2026
 
 The current milestone uses **local Python as the load generator**, with a hosted

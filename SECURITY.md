@@ -105,6 +105,9 @@ quota. The static report shell is public and data-free; report JSON is authentic
 uses no-store, and is subject to the same single-tenant boundary. Keys stay in the
 page's memory, not query strings or persistent browser storage. Dynamic report text
 uses textContent rather than HTML injection and a same-origin CSP restricts scripts.
+The report theme saves only a validated `light`/`dark` preference in the origin's
+`evalsurge.report.theme` browser-storage key. Blocked storage does not prevent
+switching themes; report data and credentials are never persisted there.
 
 MLflow experiment links use recorded experiment IDs and their frozen tracking
 destinations, not the agent/model provider's host. Operator UI overrides apply

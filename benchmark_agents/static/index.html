@@ -11,7 +11,7 @@
   <a href="#main" class="skip-link">Skip to report</a>
   <header>
     <a href="./" class="brand"><span class="mark" aria-hidden="true">▂▅█</span> EvalSurge <span class="brand-tag">AGENT BENCHMARKS</span></a>
-    <nav aria-label="Primary"><a href="./" aria-current="page">Report</a><a href="../docs/">API docs ↗</a></nav>
+    <nav aria-label="Primary"><a href="./" aria-current="page">Report</a><a href="../docs/">API docs ↗</a><button id="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="true" hidden>Dark mode: on</button></nav>
   </header>
   <main id="main">
     <form id="connect" class="card controls">
@@ -46,7 +46,7 @@
         <section class="card"><h2>Observed operation hotspots</h2><p id="hotspot-note" class="muted"></p><div id="hotspots"></div></section>
       </div>
       </section>
-      <section id="traces" class="card"><div class="section-heading"><div><p class="eyebrow">TRACE PROFILING</p><h2>Request latency heatmap</h2><p class="muted">Slow-to-fast within this page · milliseconds · select a request for its waterfall. Brighter cells mean more time; — means unknown.</p></div><span id="coverage" class="badge"></span></div>
+      <section id="traces" class="card"><div class="section-heading"><div><p class="eyebrow">TRACE PROFILING</p><h2>Request latency heatmap</h2><p class="muted">Slow-to-fast within this page · milliseconds · select a request for its waterfall. Stronger shading means more time; — means unknown.</p></div><span id="coverage" class="badge"></span></div>
         <div class="table-scroll"><table id="heatmap"></table></div>
         <div class="pagination"><button id="previous" type="button">← Previous</button><span id="page"></span><button id="next" type="button">Next →</button></div>
       </section>

@@ -32,10 +32,11 @@ def render(report: dict[str, Any], **actions: Any) -> dict[str, Any]:
 
     Args:
         report: Controlled API report evidence; no model/provider is contacted.
-        actions: Optional pagination, invalid-input, or framework-toggle actions.
+        actions: Optional pagination, invalid-input, framework/theme-toggle actions,
+            browser color preference, or storage availability.
 
     Returns:
-        Rendered element trees, fetch calls, and URL history changes.
+        Rendered element trees, fetch calls, URL history and theme/storage state.
 
     Raises:
         AssertionError: Node is unavailable or JavaScript fails.
@@ -58,6 +59,120 @@ def render(report: dict[str, Any], **actions: Any) -> dict[str, Any]:
     )
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
+
+
+@pytest.mark.parametrize("system_theme", ["light", "dark"])
+def test_report_theme_defaults_to_system_preference(evidence, system_theme: str) -> None:
+    output = render(evidence, system_theme=system_theme)
+    assert output["root"]["dataset"]["theme"] == system_theme
+    toggle = output["nodes"]["theme-toggle"]
+    assert not toggle["hidden"]
+    assert toggle["attributes"]["aria-pressed"] == str(system_theme == "dark").lower()
+    assert output["storage"] == {}
+    assert output["storageCalls"] == [{"operation": "get", "key": "evalsurge.report.theme"}]
+
+
+@pytest.mark.parametrize("saved", ["light", "dark"])
+def test_report_theme_restores_valid_saved_choice(evidence, saved: str) -> None:
+    output = render(
+        evidence,
+        system_theme="dark" if saved == "light" else "light",
+        storage={"evalsurge.report.theme": saved},
+    )
+    assert output["root"]["dataset"]["theme"] == saved
+    assert output["storage"] == {"evalsurge.report.theme": saved}
+
+
+@pytest.mark.parametrize("saved", ["", "auto", "LIGHT", '<img src=x onerror="alert(1)">'])
+def test_report_theme_ignores_invalid_saved_values(evidence, saved: str) -> None:
+    output = render(evidence, system_theme="light", storage={"evalsurge.report.theme": saved})
+    assert output["root"]["dataset"]["theme"] == "light"
+    assert output["nodes"]["theme-toggle"]["text"] == "Dark mode: off"
+
+
+@pytest.mark.parametrize("initial", ["light", "dark"])
+def test_report_theme_toggle_preserves_report_and_selection(evidence, initial: str) -> None:
+    baseline = render(evidence, system_theme=initial, select_missing=True)
+    changed = render(evidence, system_theme=initial, select_missing=True, theme_toggles=1)
+    opposite = "dark" if initial == "light" else "light"
+    assert changed["initialTheme"] == initial
+    assert changed["root"]["dataset"]["theme"] == opposite
+    assert changed["storage"] == {"evalsurge.report.theme": opposite}
+    assert (
+        changed["nodes"]["theme-toggle"]["attributes"]["aria-pressed"]
+        == str(opposite == "dark").lower()
+    )
+    assert changed["calls"] == baseline["calls"]
+    assert changed["history"] == baseline["history"]
+    assert {key: node for key, node in changed["nodes"].items() if key != "theme-toggle"} == {
+        key: node for key, node in baseline["nodes"].items() if key != "theme-toggle"
+    }
+    restored = render(evidence, storage=changed["storage"], system_theme=initial)
+    assert restored["root"]["dataset"]["theme"] == opposite
+    twice = render(evidence, system_theme=initial, theme_toggles=2)
+    assert twice["root"]["dataset"]["theme"] == initial
+    assert twice["storage"] == {"evalsurge.report.theme": initial}
+
+
+@pytest.mark.parametrize("failure", ["read", "write", "both", "unavailable"])
+def test_report_theme_works_when_browser_storage_is_denied(evidence, failure: str) -> None:
+    output = render(evidence, system_theme="light", storage_error=failure, theme_toggles=1)
+    assert output["root"]["dataset"]["theme"] == "dark"
+    assert not output["nodes"]["theme-toggle"]["hidden"]
+    assert len(output["calls"]) == 1
+    if failure in {"write", "both", "unavailable"}:
+        assert output["storage"] == {}
+    else:
+        assert output["storage"] == {"evalsurge.report.theme": "dark"}
+
+
+def test_report_theme_falls_back_without_browser_media_api(evidence) -> None:
+    output = render(evidence, no_match_media=True)
+    assert output["root"]["dataset"]["theme"] == "dark"
+
+
+def test_report_theme_stores_only_preference_and_charts_use_theme_tokens(evidence) -> None:
+    output = render(evidence, theme_toggles=1)
+    assert output["storage"] == {"evalsurge.report.theme": "light"}
+    serialized = json.dumps(output["storageCalls"])
+    assert "private-test-key" not in serialized
+    assert evidence["run"]["id"] not in serialized
+    assert "configured-model" not in serialized
+    for item in output["nodes"]["legend"]["children"]:
+        assert item["children"][0]["style"]["background"].startswith("var(--chart-")
+    body = output["nodes"]["heatmap"]["children"][1]
+    heat = body["children"][0]["children"][1]
+    assert float(heat["style"]["--heat-intensity"]) == 1
+    assert "backgroundColor" not in heat["style"]
+    for node in output["nodes"]["waterfall"]["children"]:
+        track = node["children"][1]
+        for bar in track["children"]:
+            assert bar["style"]["background"].startswith("var(--chart-")
+
+
+def test_report_theme_toggle_survives_report_load_failure(evidence) -> None:
+    output = render(
+        evidence,
+        responses=[{"ok": False, "status": 401, "body": {"error": {"message": "Unauthorized"}}}],
+        system_theme="dark",
+        theme_toggles=1,
+    )
+    assert output["root"]["dataset"]["theme"] == "light"
+    assert output["nodes"]["report"]["hidden"]
+    assert output["nodes"]["message"]["text"] == "Unauthorized"
+    assert len(output["calls"]) == 1
+
+
+def test_report_theme_toggle_is_accessible_without_inline_handlers() -> None:
+    html = (STATIC / "index.html").read_text()
+    assert (
+        'id="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="true" hidden' in html
+    )
+    assert "onclick=" not in html
+    css = (STATIC / "report.css").read_text()
+    assert ':root[data-theme="light"]' in css
+    assert "--heat-range: -20%" in css
+    assert "--heat-range: 26%" in css
 
 
 def test_report_shows_safe_mlflow_experiment_links(evidence) -> None:

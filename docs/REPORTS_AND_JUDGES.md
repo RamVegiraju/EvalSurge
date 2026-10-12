@@ -56,6 +56,14 @@ The browser shell at `/reports/?run=YOUR_RUN_ID` displays:
    when real correlated traces exist; missing trace evidence stays visible.
 6. Evidence and measurement notes.
 
+Use **Dark mode: on/off** in the header to switch between light and dark reports.
+The first visit follows your system color preference; a chosen mode is remembered
+on that browser origin. Panels, tables, status badges, heatmaps and span waterfalls
+all adapt. Stronger heatmap shading indicates more time in either mode; unknown
+timings remain gaps. Switching themes does not reload evidence or change the
+selected request. If browser storage is blocked, switching still works for the
+current page.
+
 The section is named "Suggested judges" even for an explicit plan, but its badge
 distinguishes "Explicit selection" from "LLM-suggested". A suggestion is not a
 calibrated quality verdict. In automatic mode the frozen ready selection is used
@@ -70,6 +78,8 @@ profile page is bounded (25 by default, 100 maximum), not the whole run.
 Protected report data can include judge rationales quoting prompts, references,
 and answers. The browser shell is data-free until authenticated fetch; service
 keys stay in memory, never URL/persistent storage. Protect exports and artifacts.
+Only the value `light` or `dark` is saved under `evalsurge.report.theme`; no report
+content, run IDs or API keys are saved with the theme preference.
 
 ## Which judges did the actual App tests use?
 

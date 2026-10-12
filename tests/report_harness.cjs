@@ -10,6 +10,9 @@ class Node {
     this.attributes = {};
     this.dataset = {};
     this.style = {};
+    Object.defineProperty(this.style, "setProperty", {
+      value: (name, value) => { this.style[name] = String(value); },
+    });
     this.listeners = {};
     this.value = "";
     this.checked = false;
@@ -74,8 +77,12 @@ async function main() {
   const nodes = Object.fromEntries(input.ids.map(id => [id, new Node()]));
   const calls = [];
   const history = [];
+  const root = new Node("html");
+  const storage = {...input.storage};
+  const storageCalls = [];
   const context = vm.createContext({
     document: {
+      documentElement: root,
       createElement: tag => new Node(tag),
       getElementById: id => {
         if (!nodes[id]) throw new Error(`Missing element: ${id}`);
@@ -92,6 +99,22 @@ async function main() {
       href: input.origin ?? "http://localhost/reports/",
     },
     history: {replaceState: (...args) => history.push(args)},
+    ...(input.no_match_media ? {} : {matchMedia: query => {
+      if (query !== "(prefers-color-scheme: dark)") throw new Error(`Unsupported media: ${query}`);
+      return {matches: input.system_theme !== "light"};
+    }}),
+    ...(input.storage_error === "unavailable" ? {} : {localStorage: {
+      getItem: key => {
+        storageCalls.push({operation: "get", key});
+        if (["read", "both"].includes(input.storage_error)) throw new Error("Storage denied");
+        return storage[key] ?? null;
+      },
+      setItem: (key, value) => {
+        storageCalls.push({operation: "set", key, value});
+        if (["write", "both"].includes(input.storage_error)) throw new Error("Storage denied");
+        storage[key] = String(value);
+      },
+    }}),
     fetch: async (url, options) => {
       calls.push({url, options});
       const data = input.responses?.shift() ?? {ok: true, body: input.report};
@@ -120,7 +143,11 @@ async function main() {
     nodes["run-id"].value = "not-a-uuid";
     await nodes.connect.listeners.submit({preventDefault() {}});
   }
-  process.stdout.write(JSON.stringify({nodes, calls, history}));
+  const initialTheme = root.dataset.theme;
+  for (let index = 0; index < (input.theme_toggles ?? 0); index++) {
+    await nodes["theme-toggle"].listeners.click();
+  }
+  process.stdout.write(JSON.stringify({nodes, calls, history, root, storage, storageCalls, initialTheme}));
 }
 
 main().catch(error => {

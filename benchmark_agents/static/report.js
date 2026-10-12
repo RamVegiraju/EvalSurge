@@ -2,11 +2,45 @@
 
 const categories = ["model", "retrieval", "tool", "memory", "orchestration", "parallel"];
 const labels = {model: "Model calls", retrieval: "Retrieval", tool: "Tools", memory: "Memory", orchestration: "Orchestration", parallel: "Parallel"};
-const colors = {model: "#b39bef", retrieval: "#80c5ac", tool: "#e9b383", memory: "#ca95bf", orchestration: "#819dd0", parallel: "#9797ab"};
+const colors = Object.fromEntries(categories.map(category => [category, `var(--chart-${category})`]));
+const themePreferenceKey = "evalsurge.report.theme";
 let report;
 let offset = 0;
 let selected;
 let loading = false;
+
+/** Apply presentation only; never reload evidence or persist report/auth data. */
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const toggle = document.getElementById("theme-toggle");
+  toggle.textContent = `Dark mode: ${theme === "dark" ? "on" : "off"}`;
+  toggle.setAttribute("aria-pressed", String(theme === "dark"));
+  toggle.hidden = false;
+}
+
+/** Use a validated saved preference, then the OS preference; storage is optional. */
+function initializeTheme() {
+  let theme;
+  try {
+    const saved = localStorage.getItem(themePreferenceKey);
+    if (saved === "light" || saved === "dark") theme = saved;
+  } catch {
+    // Private/embedded browsers may deny storage. Theme switching still works.
+  }
+  if (!theme) theme = typeof matchMedia === "function" && !matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+  applyTheme(theme);
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    try {
+      localStorage.setItem(themePreferenceKey, next);
+    } catch {
+      // In-memory selection remains usable even if persistence is unavailable.
+    }
+  });
+}
+
+initializeTheme();
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -372,7 +406,7 @@ function drawHeatmap() {
     for (const category of categories) {
       const value = profile.occupancy_ms[category];
       const cell = element("td", number(value), "heat");
-      if (typeof value === "number") cell.style.backgroundColor = `hsl(270 24% ${15 + 26 * value / maximum}%)`;
+      if (typeof value === "number" && Number.isFinite(value)) cell.style.setProperty("--heat-intensity", Math.max(0, Math.min(1, value / maximum)));
       else cell.classList.add("gap");
       cell.title = typeof value === "number" ? `${labels[category]}: ${number(value, 2)} ms wall occupancy` : `Internal timing unknown: ${profile.status}`;
       row.append(cell);

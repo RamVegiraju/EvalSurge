@@ -110,7 +110,7 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 | `profiling.py` | `normalize_trace()` checks complete tree timing/ancestry; `union_duration()` avoids nested overlap; `collect_profiles()` validates correlation and persists profiles; `summarize_profiles()` reports coverage/hotspots. |
 | `middleware.py` | `BodyLimitMiddleware` counts ASGI body chunks before parsing accepts excess data. |
 | `static/` | Report UI uses text-only DOM updates, same-origin authenticated fetches, and bounded report pages; no keys enter URLs or persistent browser storage. |
-| `static/report.js` | `drawSuggestions()` displays frozen rationale/readiness; `drawJudges()` preserves per-scorer assessment/selection/error counts; `focusedSpans()` reduces enclosing-span clutter without modifying evidence; `load()` owns in-memory authentication and serialized pagination. |
+| `static/report.js` | `drawSuggestions()` displays frozen rationale/readiness; `drawJudges()` preserves per-scorer assessment/selection/error counts; `focusedSpans()` reduces enclosing-span clutter without modifying evidence; `load()` owns in-memory authentication and serialized pagination. `initializeTheme()` validates a light/dark-only preference, with system-default and storage-denied fallbacks; CSS tokens update charts without rereading evidence. |
 | `docs_ui/` | Public Swagger shell and external initializer use pinned local vendor assets. `api.legacy_docs()` redirects `/redoc` without inheriting API-operation authorization. |
 | `openapi.py` | `install_schema()` installs a cached renderer that adds common header documentation and request examples. |
 | `scripts/export_openapi.py` | `main()` exports the public schema or verifies the committed snapshot with `--check`. |
