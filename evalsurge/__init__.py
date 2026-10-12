@@ -12,6 +12,10 @@ from benchmark_agents.v2_models import (
     EvaluationPolicy,
     EvidenceCapabilities,
     EvidenceCapability,
+    GeneratorHealth,
+    GeneratorTiming,
+    HubLag,
+    JournalHealth,
     Links,
     Performance,
     PhaseStates,
@@ -29,6 +33,7 @@ from benchmark_agents.v2_models import (
 )
 from benchmark_agents.validation import RequestValidationError
 
+from ._version import __version__
 from .facade import EvalSurge, MissingServerDependenciesError, _local_module
 from .remote import (
     RemoteClient,
@@ -44,6 +49,7 @@ from .remote import (
     TypedRemoteClient,
     TypedRemoteRun,
 )
+from .summary import format_summary
 
 if TYPE_CHECKING:
     from benchmark_agents.connections import Connection as Connection
@@ -73,6 +79,7 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
+    "__version__",
     "Agent",
     "Connection",
     "EvalSurge",
@@ -105,6 +112,10 @@ __all__ = [
     "DecisionSummary",
     "Performance",
     "Timing",
+    "GeneratorHealth",
+    "GeneratorTiming",
+    "HubLag",
+    "JournalHealth",
     "ValidationIssue",
     "RequestValidationError",
     "TypedRemoteClient",
@@ -117,4 +128,5 @@ __all__ = [
     "RequestCoverage",
     "SamplingCoverage",
     "SamplingStratum",
+    "format_summary",
 ]

@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from evalsurge._retrieval import retrieval_evidence as retrieval_evidence
+
 _TERMINAL = {"completed", "completed_with_gaps", "failed", "cancelled", "interrupted"}
 _PREFLIGHT_CODES = {
     "authentication_failed",
@@ -198,46 +200,6 @@ def plan_record(options: argparse.Namespace) -> dict[str, Any]:
         "monetary_quota_enforced": False,
         "sustainable_capacity_established": False,
         "inflight_cancellation_confirmed": False,
-    }
-
-
-def retrieval_evidence(
-    run_id: Any, status: Any, result: Any, report: Any, retrieved: Any, *, remote: bool
-) -> dict[str, Any]:
-    """Compare native typed receipts without traffic or exporting protected values.
-
-    Args:
-        run_id: SDK-owned run identifier.
-        status: Retrieved typed polling metadata.
-        result: Retrieved typed result.
-        report: Report returned by wait or its terminal failure exception.
-        retrieved: Independently retrieved typed report page.
-        remote: Whether work is service owned and could outlive this client.
-
-    Returns:
-        Identity comparison, terminal-state/phase consistency, full result/report
-        equality and the safe preflight code only. Nonterminal or inconsistent
-        evidence cannot claim terminal retrieval parity or stopped remote work.
-        These are schema/evidence comparisons, not successful model inference.
-    """
-    identities = status.id == result.id == report.run.id == retrieved.run.id == run_id
-    outcomes = (status, result, report.run, retrieved.run)
-    terminal = all(item.status in _TERMINAL for item in outcomes)
-    states = all(item.status == result.status for item in outcomes)
-    phases = all(item.phases == result.phases for item in outcomes)
-    result_equal = result == report.run == retrieved.run
-    report_equal = report == retrieved
-    parity = identities and terminal and states and phases and result_equal and report_equal
-    error = report.run.preflight.error
-    code = getattr(error, "code", None)
-    return {
-        "identifiers_agree": identities,
-        "terminal_states_and_phases_agree": terminal and states and phases,
-        "result_payloads_agree": result_equal,
-        "report_pages_agree": report_equal,
-        "retrieval_agrees": parity,
-        "remote_work_may_remain_active": remote and not parity,
-        "preflight_code": code if code in _PREFLIGHT_CODES else None,
     }
 
 

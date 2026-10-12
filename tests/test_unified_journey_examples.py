@@ -4,7 +4,9 @@ import ast
 import json
 import re
 import tomllib
+from inspect import CO_COROUTINE
 from pathlib import Path
+from types import CodeType
 
 import pytest
 from pydantic import ValidationError
@@ -18,6 +20,29 @@ from examples.quality.load_dataset import build_request
 
 ROOT = Path(__file__).resolve().parents[1]
 QUALITY = ROOT / "examples" / "quality"
+
+
+def _compile_journey(path: Path) -> CodeType:
+    """Compile an example without executing notebook or agent operations.
+
+    Args:
+        path: Repository example or test-owned source file.
+
+    Returns:
+        Code compiled with notebook top-level await only for an explicitly
+        marked Databricks source notebook. Ordinary scripts remain strict.
+
+    Raises:
+        SyntaxError: Source is invalid for its declared execution format.
+
+    Side Effects:
+        Reads the source file only; no widgets, imports or code are executed.
+    """
+    source = path.read_text()
+    flags = (
+        ast.PyCF_ALLOW_TOP_LEVEL_AWAIT if source.startswith("# Databricks notebook source") else 0
+    )
+    return compile(source, str(path), "exec", flags=flags, dont_inherit=True)
 
 
 @pytest.mark.parametrize("policy", ["explicit", "registered", "automatic"])
@@ -92,7 +117,7 @@ def test_dataset_loader_rejects_nonfinite_and_wrong_container_shapes(tmp_path: P
 def test_journey_sources_compile_and_notebook_has_an_explicit_consent_gate() -> None:
     """Compile source but do not run main, notebook widgets, or any agent invocation."""
     for path in (ROOT / "examples" / "journeys").glob("*.py"):
-        compile(path.read_text(), str(path), "exec")
+        _compile_journey(path)
     notebook = (ROOT / "examples/journeys/classic_notebook.py").read_text()
     assert notebook.startswith("# Databricks notebook source")
     assert '"allow_paid_inference", "false"' in notebook
@@ -103,6 +128,26 @@ def test_journey_sources_compile_and_notebook_has_an_explicit_consent_gate() -> 
     assert any(isinstance(node, ast.Raise) for node in guard.body)
     assert "profile=profile" in notebook
     assert "max_requests=10" in notebook
+
+
+def test_top_level_await_is_allowed_only_for_explicit_notebook_sources(tmp_path: Path) -> None:
+    """Check format-specific compilation, never execute the named operation."""
+    script = tmp_path / "ordinary.py"
+    notebook = tmp_path / "notebook.py"
+    source = "await operation_not_to_be_executed()\n"
+    script.write_text(source)
+    notebook.write_text("# Databricks notebook source\n" + source)
+    with pytest.raises(SyntaxError, match="await.*outside function"):
+        _compile_journey(script)
+    assert _compile_journey(notebook).co_flags & CO_COROUTINE
+
+
+def test_notebook_compilation_still_rejects_invalid_python(tmp_path: Path) -> None:
+    """Notebook await support does not suppress unrelated syntax errors."""
+    notebook = tmp_path / "invalid_notebook.py"
+    notebook.write_text("# Databricks notebook source\nawait broken(\n")
+    with pytest.raises(SyntaxError):
+        _compile_journey(notebook)
 
 
 def test_typed_assessment_schema_keeps_quality_distinct_from_execution() -> None:
@@ -121,6 +166,8 @@ def test_new_guide_navigation_and_example_inventory_are_complete() -> None:
     guides = (
         ROOT / "README.md",
         ROOT / "examples/README.md",
+        ROOT / "examples/journeys/LOCAL_RUNNER_QUICKSTART.md",
+        ROOT / "examples/journeys/FRAMEWORK_MATRIX.md",
         QUALITY / "README.md",
         ROOT / "docs/PYTHON_API.md",
         ROOT / "docs/OPTIONAL_SERVER.md",

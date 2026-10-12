@@ -394,7 +394,9 @@
                 "evaluation_unavailable",
                 "planning_failed",
                 "internal_trace_coverage",
-                "profiling_failed"
+                "profiling_failed",
+                "generator_health_unavailable",
+                "generator_degraded"
               ],
               "type": "string"
             },
@@ -980,6 +982,199 @@
         "title": "EvidenceCapability",
         "type": "object"
       },
+      "GeneratorHealth": {
+        "additionalProperties": false,
+        "description": "Content-free observations, never an accuracy certification or capacity gate.\n\nUnknown is normal even when observations are available: no calibrated healthy\nthreshold exists. Degraded denotes a known journal failure or uncertain drain.\nCPU, memory, transport and server-only timing remain outside these observations.",
+        "properties": {
+          "hub_lag": {
+            "$ref": "#/components/schemas/HubLag"
+          },
+          "journal": {
+            "$ref": "#/components/schemas/JournalHealth"
+          },
+          "limitations": {
+            "items": {
+              "maxLength": 500,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "observation_window": {
+            "const": "dispatch_and_drain",
+            "title": "Observation Window",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "unknown",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "observation_window",
+          "hub_lag",
+          "journal"
+        ],
+        "title": "GeneratorHealth",
+        "type": "object"
+      },
+      "GeneratorTiming": {
+        "additionalProperties": false,
+        "description": "Constant-space observed durations in milliseconds, not request attribution.",
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "max_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Ms"
+          },
+          "mean_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Ms"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "GeneratorTiming",
+        "type": "object"
+      },
+      "HubLag": {
+        "additionalProperties": false,
+        "description": "Wake-up lateness on the generator hub; includes all hub scheduling work.",
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "interval_ms": {
+            "exclusiveMinimum": 0.0,
+            "title": "Interval Ms",
+            "type": "number"
+          },
+          "max_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Ms"
+          },
+          "mean_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Ms"
+          }
+        },
+        "required": [
+          "count",
+          "interval_ms"
+        ],
+        "title": "HubLag",
+        "type": "object"
+      },
+      "JournalHealth": {
+        "additionalProperties": false,
+        "description": "Durable writer observations; overlapping waits must not be summed.\n\nEvent counts cover fsync-acknowledged events only. Pending events include the\nbounded FIFO and one native write. A drained writer is not proof of disk-loss\ntolerance, an unsaturated generator, or accurate server-only latency.",
+        "properties": {
+          "backpressure_events": {
+            "minimum": 0.0,
+            "title": "Backpressure Events",
+            "type": "integer"
+          },
+          "completed_events": {
+            "minimum": 0.0,
+            "title": "Completed Events",
+            "type": "integer"
+          },
+          "drained": {
+            "title": "Drained",
+            "type": "boolean"
+          },
+          "durable_wait_ms": {
+            "$ref": "#/components/schemas/GeneratorTiming"
+          },
+          "enqueue_wait_ms": {
+            "$ref": "#/components/schemas/GeneratorTiming"
+          },
+          "peak_pending": {
+            "maximum": 17.0,
+            "minimum": 0.0,
+            "title": "Peak Pending",
+            "type": "integer"
+          },
+          "queue_capacity": {
+            "maximum": 16.0,
+            "minimum": 1.0,
+            "title": "Queue Capacity",
+            "type": "integer"
+          },
+          "started_events": {
+            "minimum": 0.0,
+            "title": "Started Events",
+            "type": "integer"
+          },
+          "write_and_fsync_ms": {
+            "$ref": "#/components/schemas/GeneratorTiming"
+          },
+          "writer_failures": {
+            "minimum": 0.0,
+            "title": "Writer Failures",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queue_capacity",
+          "peak_pending",
+          "backpressure_events",
+          "writer_failures",
+          "started_events",
+          "completed_events",
+          "drained",
+          "enqueue_wait_ms",
+          "durable_wait_ms",
+          "write_and_fsync_ms"
+        ],
+        "title": "JournalHealth",
+        "type": "object"
+      },
       "Links": {
         "additionalProperties": false,
         "description": "Same-origin resource paths; credentials never enter links.",
@@ -1162,6 +1357,17 @@
             },
             "title": "Errors",
             "type": "object"
+          },
+          "generator_health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeneratorHealth"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Generator observations, not verified accuracy. Null means historical or missing telemetry; never assume a healthy runner."
           },
           "measurement_complete": {
             "default": false,
@@ -3338,7 +3544,7 @@
     },
     "description": "Check inference once before benchmarking one concurrency level, then evaluate captured answers with a frozen plan. Local, single-tenant prototype; not a maximum-capacity discovery service.",
     "title": "EvalSurge",
-    "version": "0.2.0"
+    "version": "0.2.1.dev2026101202"
   },
   "openapi": "3.1.0",
   "paths": {

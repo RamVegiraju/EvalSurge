@@ -2,9 +2,10 @@
 
 import json
 from collections.abc import Callable
+from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from .configuration import environment, getenv
 from .models import Model, Target
@@ -19,6 +20,53 @@ class Connection(Model):
     token_env: str | None = None
     profile: str | None = Field(default=None, min_length=1, max_length=512)
     app_name: str | None = Field(default=None, pattern=r"^[a-z0-9-]{1,30}$")
+    app_auth: Literal["profile", "app-runtime"] = "profile"
+    workspace: str | None = Field(default=None, max_length=2048, repr=False)
+    workspace_id: str | None = Field(default=None, pattern=r"^[1-9][0-9]{0,19}$", repr=False)
+    runner_app: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9-]{0,29}$", repr=False)
+    client_id: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        repr=False,
+    )
+
+    @field_validator("workspace")
+    @classmethod
+    def validate_workspace(cls, value: str | None) -> str | None:
+        """Validate operator-selected native workspace origins without SDK access."""
+        return app_workspace(value) if value is not None else None
+
+
+def app_workspace(value: str) -> str:
+    """Require one exact HTTPS workspace origin without resolving or authenticating.
+
+    Args:
+        value: Operator-selected workspace, never an incoming benchmark field.
+
+    Returns:
+        Validated origin with only its optional trailing slash removed.
+
+    Raises:
+        ValueError: The origin has credentials, routing components or a non-TLS port.
+    """
+    try:
+        parsed = urlsplit(value)
+        valid = (
+            value.startswith("https://")
+            and parsed.scheme == "https"
+            and bool(parsed.hostname)
+            and not any((parsed.username, parsed.password, parsed.query, parsed.fragment))
+            and parsed.path in {"", "/"}
+            and parsed.port in {None, 443}
+            and not any(character.isspace() for character in value)
+            and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+            and "\\" not in value
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError("Native App authentication requires an exact HTTPS workspace origin")
+    return value.rstrip("/")
 
 
 def validate_connection(target: Target, connection: Connection) -> Connection:
@@ -46,13 +94,24 @@ def validate_connection(target: Target, connection: Connection) -> Connection:
         raise ValueError("Target URL does not match the authorized connection")
     if parsed.scheme != "https" and parsed.hostname not in {"127.0.0.1", "::1", "localhost"}:
         raise ValueError("Remote credential connections require HTTPS")
-    if connection.auth == "databricks-app" and (
-        not connection.profile
-        or not connection.app_name
-        or parsed.scheme != "https"
-        or parsed.path not in {"/api/invocations", "/responses"}
-    ):
-        raise ValueError("Invalid operator Databricks App binding")
+    native = (connection.workspace, connection.runner_app, connection.client_id)
+    if connection.auth == "databricks-app":
+        if (
+            not connection.app_name
+            or parsed.scheme != "https"
+            or parsed.path not in {"/api/invocations", "/responses"}
+            or (
+                connection.app_auth == "profile"
+                and (not connection.profile or any(native) or connection.workspace_id is not None)
+            )
+            or (
+                connection.app_auth == "app-runtime"
+                and (connection.profile is not None or not all(native))
+            )
+        ):
+            raise ValueError("Invalid operator Databricks App binding")
+    elif connection.app_auth != "profile" or any(native) or connection.workspace_id is not None:
+        raise ValueError("Native identity is restricted to Databricks App bindings")
     return connection.model_copy(deep=True)
 
 

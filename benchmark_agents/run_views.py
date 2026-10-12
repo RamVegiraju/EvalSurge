@@ -265,6 +265,15 @@ def result_view(run: dict[str, Any], profiling: ProfilingSummary | None = None) 
         if metrics
         else None
     )
+    health = measured.generator_health if measured else None
+    if health and (
+        health.status == "degraded" or health.journal.writer_failures or not health.journal.drained
+    ):
+        # Fail-safe presentation if a historical/externally stored summary has an
+        # inconsistent completeness flag. This does not rewrite owned artifacts.
+        health.status = "degraded"
+        measured.measurement_complete = False
+        performance = "incomplete"
     evaluation = EvaluationOutcome.model_validate(run.get("evaluation", {}))
     evidence = _evidence_capabilities(run, measured, evaluation, profiling, evaluation_off=off)
     gaps = []
@@ -283,6 +292,11 @@ def result_view(run: dict[str, Any], profiling: ProfilingSummary | None = None) 
         gaps.append("internal_trace_coverage")
     if run.get("profiling_status") == "failed":
         gaps.append("profiling_failed")
+    if measured:
+        if measured.generator_health is None:
+            gaps.append("generator_health_unavailable")
+        elif measured.generator_health.status == "degraded":
+            gaps.append("generator_degraded")
     return Result(
         **status.model_dump(exclude={"poll_after_seconds"}),
         summary=DecisionSummary(performance=performance, quality=quality, evidence_gaps=gaps),
@@ -333,7 +347,9 @@ def report_view(
             notes=["Planning did not permit target traffic."],
         )
         return Report(
-            run=result_view(run, profiling),
+            # An empty presentation shell is not collected profiling evidence.
+            # Preserve unknown totals exactly as standalone result retrieval does.
+            run=result_view(run),
             profiling=profiling,
             requests=[],
             offset=offset,

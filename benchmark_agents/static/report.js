@@ -393,16 +393,42 @@ function drawHeatmap() {
   }
 }
 
+function drawGeneratorHealth(metrics) {
+  const container = document.getElementById("generator-health");
+  container.replaceChildren();
+  const health = metrics.generator_health;
+  if (!health || typeof health !== "object") {
+    container.append(element("p", "Unavailable: historical or missing generator telemetry. Do not assume an unsaturated runner.", "muted"));
+    return;
+  }
+  const state = ["unknown", "degraded"].includes(health.status) ? health.status : "unknown";
+  container.append(element("p", `Generator health: ${state}. Observations are not verified accuracy; no calibrated healthy-runner threshold exists.`, "muted"));
+  const lag = health.hub_lag ?? {};
+  const journal = health.journal ?? {};
+  container.append(element("p", `Hub wake-up lag: mean ${number(lag.mean_ms, 2)} ms / max ${number(lag.max_ms, 2)} ms (${number(lag.count, 0)} observations). Dispatch and drain window, including other scheduling work.`));
+  for (const [key, label] of [["enqueue_wait_ms", "Queue admission wait"], ["durable_wait_ms", "Durable acknowledgment wait"], ["write_and_fsync_ms", "Native write + fsync"]]) {
+    const timing = journal[key] ?? {};
+    container.append(element("p", `${label}: mean ${number(timing.mean_ms, 2)} ms / max ${number(timing.max_ms, 2)} ms (${number(timing.count, 0)} observations).`));
+  }
+  const drained = journal.drained === true ? "yes" : journal.drained === false ? "no" : "unknown";
+  container.append(element("p", `Journal drained: ${drained}. Writer failures: ${number(journal.writer_failures, 0)}. Backpressure events: ${number(journal.backpressure_events, 0)}. Peak pending events: ${number(journal.peak_pending, 0)}.`));
+  if (Number.isInteger(journal.backpressure_events) && journal.backpressure_events > 0) {
+    container.append(element("p", "Journal backpressure observed: achieved throughput may be generator-limited; do not interpret it as target capacity.", "muted"));
+  }
+  container.append(element("p", "Journal waits overlap: do not sum them into latency or subtract a baseline. CPU, memory, transport and server-only timing are not measured. Durable waits can reduce throughput even without queue backpressure.", "muted"));
+}
+
 function drawPerformance() {
   const run = report.run;
   const metrics = run.metrics ?? {};
   const timing = metrics.timing_successful_only ?? {};
   document.getElementById("metrics").replaceChildren(
     metric("Successful throughput", number(metrics.successful_tps, 2), "req/s", "Includes ramp-up and drain; not sustainable capacity"),
-    metric("End-to-end latency · p95", number(timing.latency_ms?.p95), "ms", "Successful attempts only"),
-    metric("Answer-text TTFT · p95", number(timing.ttft_ms?.p95), "ms", "First nonempty answer delta at this client"),
+    metric("End-to-end latency · p95", number(timing.latency_ms?.p95), "ms", `${number(timing.latency_ms?.count, 0)} successful observations / ${number(metrics.requests, 0)} attempts. Failures and timeouts excluded.`),
+    metric("Answer-text TTFT · p95", number(timing.ttft_ms?.p95), "ms", `${number(timing.ttft_ms?.count, 0)} successful observations / ${number(metrics.requests, 0)} attempts. First nonempty answer delta at this client; not first response byte.`),
     metric("Request error rate", percent(metrics.error_rate), "", `${metrics.successful_requests ?? 0} successful / ${metrics.requests ?? 0} attempts`)
   );
+  drawGeneratorHealth(metrics);
   document.getElementById("coverage").textContent = `Trace coverage ${percent(report.profiling.coverage)}`;
   const anatomy = document.getElementById("anatomy");
   anatomy.replaceChildren();

@@ -17,6 +17,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.staticfiles import StaticFiles
 
+from evalsurge._version import __version__
+
 from .configuration import configured_environment, getenv
 from .coordinator import CoordinatorError, RunCoordinator
 from .middleware import BodyLimitMiddleware
@@ -122,7 +124,7 @@ def create_app(artifact_dir: Path | None = None, *, config_path: Path | None = N
     }
     app = FastAPI(
         title="EvalSurge",
-        version="0.2.0",
+        version=__version__,
         description="Check inference once before benchmarking one concurrency level, "
         "then evaluate captured answers with a frozen plan. "
         "Local, single-tenant prototype; not a maximum-capacity discovery service.",

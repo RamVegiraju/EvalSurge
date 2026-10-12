@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-from .connections import Connection, validate_connection
+from .connections import Connection, app_workspace, validate_connection
 from .models import RegisteredScorer, Target, TraceSource
 from .providers import DEFAULT_FM_ENDPOINT
 
@@ -112,11 +112,24 @@ class ConnectionSettings(OperatorModel):
     token_env: str | None = _private(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,255}$")
     app_name: str | None = _private(pattern=r"^[a-z][a-z0-9-]{0,29}$")
     profile: str | None = _private(min_length=1, max_length=512)
+    app_auth: Literal["profile", "app-runtime"] = _private("profile")
+    workspace: str | None = _private(min_length=1, max_length=2048)
+    workspace_id: str | None = _private(pattern=r"^[1-9][0-9]{0,19}$")
+    runner_app: str | None = _private(pattern=r"^[a-z][a-z0-9-]{0,29}$")
+    client_id: str | None = _private(
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    )
     protocols: tuple[ProtocolName, ...] = Field(default=(), max_length=4)
     model: str = _private("agent", min_length=1, max_length=512)
     framework: Literal["langgraph", "openai-agents"] | None = _private()
     request_usage: bool = True
     session_id: str | None = _private(min_length=1, max_length=128)
+
+    @field_validator("workspace")
+    @classmethod
+    def validate_workspace(cls, value: str | None) -> str | None:
+        """Require native App workspace metadata to be a fixed HTTPS origin."""
+        return app_workspace(value) if value is not None else None
 
     @model_validator(mode="after")
     def validate_binding(self) -> Self:
@@ -124,8 +137,20 @@ class ConnectionSettings(OperatorModel):
         if len(set(self.protocols)) != len(self.protocols):
             raise ValueError("Duplicate target protocols")
         if self.kind == "databricks-app":
-            if not self.app_name or not self.profile or self.url or self.token_env:
-                raise ValueError("App targets require an App name and explicit profile")
+            native = (self.workspace, self.runner_app, self.client_id)
+            if (
+                not self.app_name
+                or self.url
+                or self.token_env
+                or (
+                    self.app_auth == "profile"
+                    and (not self.profile or any(native) or self.workspace_id is not None)
+                )
+                or (
+                    self.app_auth == "app-runtime" and (self.profile is not None or not all(native))
+                )
+            ):
+                raise ValueError("App targets require one explicit operator identity binding")
             if self.auth != "none":
                 raise ValueError("App authentication is SDK-owned")
             if not self.protocols:
@@ -135,7 +160,14 @@ class ConnectionSettings(OperatorModel):
             ):
                 raise ValueError("Unsupported App protocol")
         else:
-            if not self.url or self.app_name or self.profile:
+            if (
+                not self.url
+                or self.app_name
+                or self.profile
+                or self.app_auth != "profile"
+                or any((self.workspace, self.runner_app, self.client_id))
+                or self.workspace_id is not None
+            ):
                 raise ValueError("HTTP targets require a destination")
             normalized = _safe_url(self.url)
             binding = Connection(url=normalized, auth=self.auth, token_env=self.token_env)

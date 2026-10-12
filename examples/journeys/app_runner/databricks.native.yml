@@ -1,0 +1,45 @@
+# Standalone native App-target template. Stage as databricks.yml, not an auto-merged overlay.
+bundle:
+  name: evalsurge-private-app-runner
+
+variables:
+  runner_app_name:
+    description: Explicitly approved private runner App name; no automatic default
+  result_volume:
+    description: Existing protected catalog.schema.volume; no volume is provisioned
+  target_app_name:
+    description: Exact separately hosted agent App granted CAN_USE to this runner
+
+sync:
+  include:
+    - wheel/*.whl
+    - operator.json
+
+resources:
+  apps:
+    private_runner:
+      name: ${var.runner_app_name}
+      source_code_path: .
+      resources:
+        - name: result-artifacts
+          uc_securable:
+            securable_full_name: ${var.result_volume}
+            securable_type: VOLUME
+            permission: WRITE_VOLUME
+        - name: result-artifacts-read
+          uc_securable:
+            securable_full_name: ${var.result_volume}
+            securable_type: VOLUME
+            permission: READ_VOLUME
+        - name: benchmark-target
+          app:
+            name: ${var.target_app_name}
+            permission: CAN_USE
+      config:
+        command: ["python", "app.py"]
+        env:
+          - name: EVALSURGE_EXPORT_VOLUME
+            value_from: result-artifacts
+
+targets:
+  reviewed: {}

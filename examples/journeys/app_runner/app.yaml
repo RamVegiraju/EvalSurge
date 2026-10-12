@@ -1,0 +1,4 @@
+command: ["python", "app.py"]
+env:
+  - name: EVALSURGE_EXPORT_VOLUME
+    valueFrom: result-artifacts

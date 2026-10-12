@@ -1,11 +1,75 @@
 """Shared protocol payloads and descriptive benchmark metrics."""
 
 import math
+import time
 from collections import Counter
 from typing import Any
 
 from .adapters import get_adapter
 from .models import RunRequest, Sample
+from .storage import TimingAggregate
+
+
+class HubLagProbe:
+    """Owned gevent scheduling-lag observations, not an unsaturated-runner verdict."""
+
+    def __init__(self, interval_ms: float = 10.0) -> None:
+        """Start a constant-space probe on the caller's owning hub.
+
+        Args:
+            interval_ms: Positive periodic scheduling interval in milliseconds.
+
+        The owner must stop the probe after request and journal drain. The probe
+        does not measure CPU, memory, network, or server-only timing.
+        """
+        import gevent
+
+        if interval_ms <= 0:
+            raise ValueError("Hub-lag interval must be positive")
+        self.interval_ms = interval_ms
+        self._timing = TimingAggregate()
+        self._greenlet: Any = gevent.spawn(self._observe)
+
+    def _observe(self) -> None:
+        """Observe delay beyond each scheduled interval without catch-up bursts."""
+        import gevent
+
+        interval_seconds = self.interval_ms / 1000
+        while True:
+            expected = time.perf_counter() + interval_seconds
+            gevent.sleep(interval_seconds)
+            self._timing.observe(max(0, (time.perf_counter() - expected) * 1000))
+
+    def stop(self) -> None:
+        """Synchronously stop the owned probe from its hub after observation drain."""
+        self._greenlet.kill(block=True)
+
+    def snapshot(self) -> dict[str, Any]:
+        """Return interval/count/mean/max; low observed lag cannot certify capacity."""
+        return {"interval_ms": self.interval_ms, **self._timing.snapshot()}
+
+
+def generator_health(hub_lag: dict[str, Any], journal: dict[str, Any]) -> dict[str, Any]:
+    """Combine bounded content-free generator observations without health thresholds.
+
+    Args:
+        hub_lag: Probe interval and constant-space millisecond observations.
+        journal: Writer evidence, including acknowledged counts and drain state.
+
+    Returns:
+        An unknown verdict normally, or degraded for known writer/drain failure.
+        Overlapping timings remain distinct and never alter request percentiles.
+    """
+    return {
+        "status": "degraded" if journal["writer_failures"] or not journal["drained"] else "unknown",
+        "observation_window": "dispatch_and_drain",
+        "hub_lag": hub_lag,
+        "journal": journal,
+        "limitations": [
+            "Observations do not establish unsaturated runner or sustainable target capacity.",
+            "CPU, memory, transport and server-only timing are not measured.",
+        ],
+    }
 
 
 def payload(request: RunRequest, sample: Sample, request_id: str | None = None) -> dict[str, Any]:

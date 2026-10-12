@@ -1,0 +1,8 @@
+command: ["uv", "run", "--no-dev", "python", "app.py"]
+env:
+  - name: EVALSURGE_SAMPLE_WORKSPACE_HOST
+    value: "REPLACE_WITH_EXACT_HTTPS_WORKSPACE_ORIGIN"
+  - name: MODEL_SERVICE_NAME
+    valueFrom: model
+  - name: CREWAI_DISABLE_TELEMETRY
+    value: "true"

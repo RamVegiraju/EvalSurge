@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from benchmark_agents.validation import RequestValidationError, validate_request
 
 from .remote import MAX_REQUEST_BYTES, RemoteClient, RemoteError
+from .summary import format_summary
 
 
 class _ConfigurationError(ValueError):
@@ -160,102 +161,18 @@ def _document(value: Any) -> dict[str, Any]:
     return value.model_dump(mode="json") if isinstance(value, BaseModel) else value
 
 
-def _number(value: Any, *, percentage: bool = False) -> str:
-    """Format finite numeric observations; absent values are unknown, never zero."""
-    try:
-        finite = type(value) in {int, float} and math.isfinite(value)
-    except OverflowError:
-        finite = False
-    if not finite:
-        return "unavailable"
-    return f"{value * 100:.1f}%" if percentage else f"{value:.2f}"
-
-
 def _summary(report: dict[str, Any]) -> None:
-    """Print metrics and judge coverage, never prompts/rationales or raw errors.
+    """Print the shared public summary, never prompts/rationales or raw errors.
 
     Args:
         report: Validated typed report or the legacy remote report document.
 
-    Missing historical fields remain unavailable. A low quality pass rate does
-    not change the command's exit code; threshold gates are a later milestone.
+    Side effects:
+        Writes to stdout. Missing historical fields remain unavailable. A low
+        quality pass rate does not change the exit code; threshold gates remain
+        a later milestone. Explicit --json output bypasses this renderer.
     """
-    run = report.get("run", {})
-    metrics = run.get("metrics")
-    decisions = run.get("summary", {})
-    if isinstance(decisions, dict):
-        for key, label, allowed in (
-            ("performance", "Performance", {"pending", "complete", "incomplete", "not_run"}),
-            ("quality", "Quality evidence", {"pending", "off", "available", "unavailable"}),
-        ):
-            if isinstance(decisions.get(key), str) and decisions[key] in allowed:
-                print(f"{label}: {decisions[key]}.")
-    evidence = run.get("evidence", {})
-    if isinstance(evidence, dict) and evidence:
-        print("Evidence capability             configured      observed state")
-        for key, label in (
-            ("load_measurements", "Load measurements"),
-            ("answer_evaluation", "Captured-answer judging"),
-            ("internal_profiling", "Internal profiling"),
-            ("trace_aware_evaluation", "Trace-aware judging"),
-        ):
-            entry = evidence.get(key, {})
-            entry = entry if isinstance(entry, dict) else {}
-            configured = entry.get("configured")
-            selection = "yes" if configured is True else "no" if configured is False else "unknown"
-            state = entry.get("state")
-            if not isinstance(state, str) or state not in {
-                "pending",
-                "observed",
-                "unavailable",
-                "off",
-            }:
-                state = "unknown"
-            print(f"{label:<28} {selection:>12} {state:>19}")
-        print("Configured is not verified; observed evidence is not a quality pass.")
-    if not isinstance(metrics, dict):
-        print("Performance metrics: unavailable.")
-    else:
-        print("Successful observations (ms)       p50          p95          p99")
-        timings = metrics.get("timing_successful_only", {})
-        for key, label in (("latency_ms", "Latency"), ("ttft_ms", "Answer-text TTFT")):
-            timing = timings.get(key, {}) if isinstance(timings, dict) else {}
-            timing = timing if isinstance(timing, dict) else {}
-            print(
-                f"{label:<28}"
-                + " ".join(f"{_number(timing.get(p)):>12}" for p in ("p50", "p95", "p99"))
-            )
-        print(f"Successful throughput: {_number(metrics.get('successful_tps'))} requests/s.")
-        print(f"Completed throughput: {_number(metrics.get('completed_tps'))} requests/s.")
-        print(f"Error rate: {_number(metrics.get('error_rate'), percentage=True)}.")
-        print(
-            f"Token-usage coverage: {_number(metrics.get('token_usage_coverage'), percentage=True)}."
-        )
-        print(
-            f"Measurements: {'complete' if metrics.get('measurement_complete') is True else 'incomplete'}."
-        )
-        print(
-            "Throughput includes drain; this single load level does not establish sustainable capacity."
-        )
-    evaluation = run.get("evaluation", {})
-    judges = evaluation.get("results", []) if isinstance(evaluation, dict) else []
-    if isinstance(judges, list) and judges:
-        print("Judge                         selected     scored    pass rate")
-        for judge in judges:
-            if not isinstance(judge, dict):
-                continue
-            name = judge.get("scorer", "")
-            if not isinstance(name, str) or not re.fullmatch(
-                r"(?:registered:)?[a-zA-Z0-9_-]{1,75}", name
-            ):
-                name = "<unknown>"
-            coverage = judge.get("coverage", {})
-            selected = coverage.get("selected") if isinstance(coverage, dict) else None
-            print(
-                f"{name:<28} {_number(selected):>10} {_number(judge.get('scored')):>10} "
-                f"{_number(judge.get('pass_rate'), percentage=True):>12}"
-            )
-        print("Judge completion is separate from quality passing; no CI threshold is applied.")
+    print(format_summary(report))
 
 
 def _public_targets(capabilities: dict[str, Any]) -> list[dict[str, Any]]:
@@ -344,7 +261,6 @@ def _run(
     if args.wait or local:
         report = _document(run.wait(timeout=args.timeout))
         if not structured:
-            print(f"Run {run.id} {report['run']['status']}.")
             _summary(report)
     if args.open_report:
         try:
@@ -538,7 +454,8 @@ def main(
         return 2
     except ImportError:
         print(
-            "Direct CLI execution requires 'evalsurge[server]'; install that extra first.",
+            "Direct CLI execution requires 'evalsurge[local]' "
+            "(or the compatible 'evalsurge[server]' extra). Neither starts an API server.",
             file=sys.stderr,
         )
         return 2

@@ -1,6 +1,6 @@
 """Small v2 contracts translated into the existing evidence pipeline."""
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import Field, field_serializer, model_validator
@@ -42,6 +42,8 @@ EvidenceGap = Literal[
     "planning_failed",
     "internal_trace_coverage",
     "profiling_failed",
+    "generator_health_unavailable",
+    "generator_degraded",
 ]
 
 
@@ -238,6 +240,57 @@ class Timing(Model):
     p99: float | None = None
 
 
+class GeneratorTiming(Model):
+    """Constant-space observed durations in milliseconds, not request attribution."""
+
+    count: int = Field(ge=0)
+    mean_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    max_ms: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
+class HubLag(GeneratorTiming):
+    """Wake-up lateness on the generator hub; includes all hub scheduling work."""
+
+    interval_ms: float = Field(gt=0, allow_inf_nan=False)
+
+
+class JournalHealth(Model):
+    """Durable writer observations; overlapping waits must not be summed.
+
+    Event counts cover fsync-acknowledged events only. Pending events include the
+    bounded FIFO and one native write. A drained writer is not proof of disk-loss
+    tolerance, an unsaturated generator, or accurate server-only latency.
+    """
+
+    queue_capacity: int = Field(ge=1, le=16)
+    peak_pending: int = Field(ge=0, le=17)
+    backpressure_events: int = Field(ge=0)
+    writer_failures: int = Field(ge=0)
+    started_events: int = Field(ge=0)
+    completed_events: int = Field(ge=0)
+    drained: bool
+    enqueue_wait_ms: GeneratorTiming
+    durable_wait_ms: GeneratorTiming
+    write_and_fsync_ms: GeneratorTiming
+
+
+class GeneratorHealth(Model):
+    """Content-free observations, never an accuracy certification or capacity gate.
+
+    Unknown is normal even when observations are available: no calibrated healthy
+    threshold exists. Degraded denotes a known journal failure or uncertain drain.
+    CPU, memory, transport and server-only timing remain outside these observations.
+    """
+
+    status: Literal["unknown", "degraded"]
+    observation_window: Literal["dispatch_and_drain"]
+    hub_lag: HubLag
+    journal: JournalHealth
+    limitations: list[Annotated[str, Field(max_length=500)]] = Field(
+        default_factory=list, max_length=10
+    )
+
+
 class Performance(Model):
     """Typed client metrics from one closed-loop concurrency level."""
 
@@ -255,6 +308,10 @@ class Performance(Model):
     measurement_complete: bool = False
     configured_concurrency: int | None = None
     observed_peak_in_flight: int | None = None
+    generator_health: GeneratorHealth | None = Field(
+        default=None,
+        description="Generator observations, not verified accuracy. Null means historical or missing telemetry; never assume a healthy runner.",
+    )
 
 
 class SamplingStratum(Model):

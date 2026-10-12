@@ -56,8 +56,9 @@ automatic also calls the planner. These are assumptions, not new spend approval.
    `RunReport`, direct `RemoteClient` dictionary methods, and default
    `EvalSurge.remote(...)` dictionary behavior. `typed=True` is deliberate opt-in
    for existing remote callers. New tutorials always use the unified contract.
-   Direct execution still requires the existing `server` extra; changing the
-   execution default does not force the load stack on lightweight remote installs.
+   Direct execution requires the execution dependencies, exposed by the `local`
+   extra or the compatible existing `server` extra. Changing the execution default
+   does not force the load stack on lightweight remote installs.
 6. Preserve safe field-specific validation. Catch Pydantic validation errors
    separately from JSON-encoding errors and share a bounded sanitizer with REST,
    SDK and CLI. Never include submitted values, unknown input keys, raw validator
@@ -98,6 +99,11 @@ explicit profile and refreshable OAuth; a laptop profile is not automatically
 installed or usable on a notebook driver. Missing deployment/authentication or
 evidence fails closed with inspectable phase results, including planless failures.
 Reports retain protected rationales and may quote workload/reference data.
+For failures before a plan exists, status/result/report retrieval preserves the
+same typed lifecycle and result projection. The report's empty profiling display
+shell is not collected evidence: unknown profiling configuration and measured
+totals remain unknown, rather than becoming observed zero. This compatibility
+correction applies to direct SDK and REST through their shared projection.
 
 Factories inherit the effective task-local scope, not just `os.environ`. An
 implicit environment target registry is retained privately and validated when a
@@ -138,6 +144,23 @@ not change load-engine timings, stop semantics, or capacity claims. Original
 cancel-before-dispatch receipts remain explicitly qualified in `VALIDATION.md`.
 
 ## Trade-offs and deferred work
+
+### October 12 installation alias
+
+`evalsurge[local]` is an additive installation alias for `evalsurge[server]`, not a
+different execution backend or a dependency upgrade. It makes the direct Python
+journey explicit without suggesting that a benchmark API server is required.
+Both extras install the same existing coordinator/Locust/provider dependencies;
+the base remote client and existing `server`/`agents` installations remain
+compatible. Wheel metadata and locked exports must prove the alias selects the
+same execution graph without adding server dependencies to the base package.
+
+The current validation scope is local Python generating load against a separate
+HTTP agent or deployed Databricks App. Notebook and App-based generators are
+deferred, not removed or advertised as validated by this naming change. Installing
+the extra establishes neither target authentication nor inference, evaluation,
+measurement accuracy or hosted-runner readiness. Retain the reviewed earlier
+artifacts and use a new versioned snapshot for this packaging change.
 
 Additive wrappers and typed opt-in preserve compatibility but retain a clearly
 labeled legacy surface. Direct execution is easier to start, not dependency-free

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-11",
+  "scope": "prepared native App sources; CrewAI isolated macOS dependency installation compatible but advisory blocked; no fresh native deployment or live inference",
+  "native_distribution": "databricks-agentbricks==0.4.0",
+  "native_namespace": "databricks_agentkit",
+  "native_declared_sdk_floor": "0.124.0",
+  "candidate_sdk_version": "0.148.0",
+  "shared_source_sha256": {
+    "examples/real_framework_handler.py": "b2e1d72acd0da1e141ec2eb0f9708d2d581d73011bcdac993b08b1fa8735c96a",
+    "examples/journeys/agent_apps/shared/native_agent.py": "ba981526d2b2255474ea5a2d614828cb6be62e5ffe83e5ff3260bf552967e320"
+  }
+}

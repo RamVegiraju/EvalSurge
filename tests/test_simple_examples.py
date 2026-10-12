@@ -543,8 +543,43 @@ def test_every_user_example_has_an_explicit_integration_contract() -> None:
         "mock_agent.py",
         "framework_agent.py",
         "real_framework_agent.py",
+        "real_framework_handler.py",
+        "crewai_agent.py",
     }
     examples = {path.name for path in (ROOT / "examples").glob("*.py")}
     assert examples == covered, "Add end-to-end coverage and update the example index."
     index = (ROOT / "examples/README.md").read_text()
     assert all(f"]({filename})" in index for filename in covered)
+
+
+def test_journey_sources_have_named_non_inference_contract_coverage() -> None:
+    """Inventory nested samples without claiming successful live integration.
+
+    This test reads filenames/documentation only. The named modules validate
+    source/configuration/lifecycle boundaries, not model inference, deployment,
+    independent-worker credentials or successful cloud benchmarks.
+    """
+    covered = {
+        "classic_notebook.py": "test_unified_journey_examples.py",
+        "direct_app.py": "test_unified_journey_examples.py",
+        "direct_http.py": "test_unified_journey_examples.py",
+        "local_runner_databricks_app_target.py": "test_unified_journey_examples.py",
+        "local_runner_http_target.py": "test_unified_journey_examples.py",
+        "framework_runner_matrix.py": "test_framework_runner_matrix.py",
+        "serverless_runner_databricks_app_target.py": "test_serverless_notebook_examples.py",
+        "serverless_runner_http_target.py": "test_serverless_notebook_examples.py",
+        "app_runner/app.py": "test_app_direct_runner_example.py",
+        "app_runner/runner.py": "test_app_direct_runner_example.py",
+        "agent_apps/shared/native_agent.py": "test_native_agent_app_examples.py",
+        "agent_apps/stage_shared_sources.py": "test_native_agent_app_examples.py",
+        "agent_apps/langgraph/app.py": "test_native_agent_app_examples.py",
+        "agent_apps/openai_agents/app.py": "test_native_agent_app_examples.py",
+        "agent_apps/crewai/app.py": "test_native_agent_app_examples.py",
+    }
+    source_root = ROOT / "examples" / "journeys"
+    sources = {str(path.relative_to(source_root)) for path in source_root.rglob("*.py")}
+    assert sources == set(covered), "Declare coverage and live gaps for new journey sources."
+    assert all((ROOT / "tests" / filename).is_file() for filename in covered.values())
+    plan = (ROOT / "docs" / "RUNNER_TARGET_VALIDATION.md").read_text()
+    assert "fifteen" in plan and "15" in plan
+    assert "Listed samples are not automatically successful live runs" in plan

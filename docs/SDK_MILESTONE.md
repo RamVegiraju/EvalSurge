@@ -6,6 +6,12 @@ and onboarding examples are implemented. This is not a release sign-off: current
 live journeys, full compatibility checks and designated maintainer review remain
 required. Exact check results are recorded in [validation](../VALIDATION.md).
 
+For the October 13 demo, use the artifact-specific
+[finish-and-validate checkpoint](DEMO_READINESS.md). Historical live App passes
+predate the journal changes and do not validate this build. The packaged
+serverless import repair and shared `format_summary()` are implemented; independently
+refreshable worker authentication and fresh live journeys remain separate gates.
+
 ## Real-inference journey matrix
 
 | Journey | Harness/example | Required evidence before claiming it passed |

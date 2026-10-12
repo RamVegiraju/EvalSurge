@@ -176,6 +176,14 @@ def startup_diagnostics(
         )
     for binding in settings.connections.values():
         if binding.kind == "databricks-app":
+            if binding.app_auth == "app-runtime":
+                add(
+                    "target_app_native_auth_unverified",
+                    "warning",
+                    "Native App identity, declared target resource and independent worker OAuth "
+                    "require runtime validation; configuration alone establishes no readiness.",
+                )
+                continue
             if (
                 settings.provider.host
                 or profile_override_present(environment)

@@ -34,10 +34,11 @@ existing handler inside its own process; neither makes EvalSurge import your age
 
 ### Optional framework-neutral serving helper
 
-Install the optional server dependencies alongside your existing framework:
+Install the [reviewed wheel](INSTALLATION.md) with the server dependencies
+alongside your existing framework; public-index publication is not assumed:
 
 ```bash
-uv add 'evalsurge[server]'
+uv pip install './evalsurge-0.2.1.dev2026101202-py3-none-any.whl[server]'
 ```
 
 Save this as `agent_server.py`. Implement `answer_case` with one of the framework
@@ -257,18 +258,18 @@ agent needs extra fields, extend your server's schema and supply them in
 
 ## 2. Run the same benchmark
 
-Install the execution stack in the benchmark project:
+Install the reviewed execution wheel in the benchmark environment:
 
 ```bash
-uv add 'evalsurge[server]'
+python -m pip install './evalsurge-0.2.1.dev2026101202-py3-none-any.whl[local]'
 ```
 
-Save this as `benchmark.py` and run `uv run python benchmark.py` after authorizing
+Save this as `benchmark.py` and run `uv run --no-project python benchmark.py` after authorizing
 the model/tool traffic. It makes at most ten measured agent invocations plus one
 excluded first-case probe. Each invocation may make several internal model/tool calls.
 
 ```python
-from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference
+from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference, format_summary
 
 request = RunCreate(
     name="first-benchmark",
@@ -283,7 +284,7 @@ with EvalSurge(
 ) as client:
     run = client.start(request)
     report = run.wait(timeout=300)
-    print(report.model_dump_json(indent=2))
+    print(format_summary(report))
 ```
 
 Evaluation is off. Inspect preflight/load outcomes even if the run failed; a wait
@@ -291,6 +292,7 @@ timeout does not cancel work. JSON answers provide latency/throughput/errors, no
 TTFT. Use a supported streaming endpoint for answer-text TTFT, not an artificial
 stream of a previously completed answer. Protect retained inputs/answers and the
 artifact directory. See [reports](REPORTS_AND_JUDGES.md) for typed outcomes and HTML access.
+Full `model_dump_json()` is an explicit protected export, not the default summary.
 
 ## 3. Or bind your deployed Databricks App
 

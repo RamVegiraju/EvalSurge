@@ -7,7 +7,7 @@ and never part of the benchmark request. This script provisions no resources.
 
 import argparse
 
-from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference
+from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference, format_summary
 
 
 def request() -> RunCreate:
@@ -41,7 +41,7 @@ def main() -> None:
         targets={"agent": Agent.databricks_app(args.app_name, profile=args.profile)},
     ) as client:
         report = client.start(request()).wait(timeout=300)
-        print(report.model_dump_json(indent=2))
+        print(format_summary(report))
 
 
 if __name__ == "__main__":

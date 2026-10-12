@@ -1,0 +1,8 @@
+{
+  "name": "model",
+  "uc_securable": {
+    "securable_full_name": "system.ai.REPLACE_WITH_EXPLICIT_MODEL_SERVICE",
+    "securable_type": "MODEL_SERVICE",
+    "permission": "EXECUTE"
+  }
+}

@@ -1,14 +1,15 @@
 # Python API: direct execution first
 
-Install `evalsurge[server]` for direct execution; `evalsurge[agents]` additionally
-includes LangGraph and OpenAI Agents for the repository demos. The base package
+Install the [reviewed wheel](INSTALLATION.md) with `[server]` for direct execution;
+`[agents]` additionally installs LangGraph and OpenAI Agents dependencies for the
+repository demos, not the example source files. The base package
 contains lightweight remote SDK/CLI dependencies. Public request/result models
 are available from `evalsurge` without loading the execution stack.
 
 ## One request, two targets
 
 ```python
-from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference
+from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference, format_summary
 
 request = RunCreate(
     name="baseline",
@@ -17,17 +18,21 @@ request = RunCreate(
     load=Load(concurrency=2, duration_seconds=10, max_requests=10),
 )
 
-agent = Agent.http("http://127.0.0.1:9001/chat")
+agent = Agent.http("http://127.0.0.1:9001/invoke", protocol="http-json")
 # Instead, for an already deployed DurableAgentServer App:
 # agent = Agent.databricks_app("your-app", profile="YOUR_SELECTED_OAUTH_PROFILE")
 
 with EvalSurge(artifact_dir="artifacts/baseline", targets={"agent": agent}) as client:
     run = client.start(request, idempotency_key="baseline-1")
     report = run.wait(timeout=300)
-    print(report.model_dump_json(indent=2))
+    print(format_summary(report))
 ```
 
 `EvalSurge(...)` is direct execution; `EvalSurge.local(...)` is its explicit alias.
+The HTTP endpoint above uses the [framework-neutral JSON contract](AGENT_INTEGRATION.md):
+it accepts `{"query": "..."}` and returns `{"outputs": "completed answer"}`.
+For an existing OpenAI Chat Completions endpoint, explicitly select
+`protocol="openai-chat"`; the constructor's legacy default remains compatible.
 The caller owns target settings and the artifact directory. The request contains
 only an alias, cases, load, and evaluation policy. No server is started.
 `start()` also accepts finite JSON-compatible mappings through the same schema.
@@ -35,6 +40,13 @@ Both modes apply the same eight-million-byte UTF-8 limit without ASCII-escaping
 Unicode. Raw mappings cannot contain Python-only values such as `datetime`; a
 validated `RunCreate` uses its public Pydantic JSON serialization in both modes.
 Unknown fields and invalid values receive bounded field-specific guidance.
+
+`format_summary(run.result())` and `format_summary(run.report())` use the same
+content-free renderer as the CLI: lifecycle, independent phase/quality outcomes,
+metrics, coverage and generator limitations. A completed lifecycle is not a
+passing quality check. Inspect typed fields explicitly for detailed evidence;
+`model_dump_json()` is a protected export that may include prompts, answers and
+judge rationales, not the default presentation.
 
 An explicit `artifact_dir` overrides operator settings. If omitted, supplied
 `Settings.artifact_dir` is used, or settings are loaded once from the operator file
@@ -77,6 +89,33 @@ operator resolver; OAuth refresh stays bound to the discovered origin. PAT App
 access, contradictory ambient SDK settings, and protocol fallback are unsupported.
 An existing legacy AgentServer App uses `protocol="mlflow-agent-server"` explicitly.
 
+For a private Databricks App that **generates load**, native operator authentication
+is an explicit alternative, not a fallback from a failed profile:
+
+```python
+agent = Agent.databricks_app(
+    "your-agent-app",
+    auth="app-runtime",
+    workspace="https://your-workspace.cloud.databricks.com",
+    runner_app="your-runner-app",
+    client_id="00000000-0000-0000-0000-000000000000",  # Actual runner SP client UUID.
+)
+```
+
+Replace every identity placeholder and omit `profile`. The runner App must declare
+the separate target App resource with `CAN_USE`. The expected client ID is its
+`service_principal_client_id`, not the numeric principal or App OAuth audience ID.
+Both actual/scoped native environment selectors must agree before SDK use; explicit
+M2M providers independently refresh in each Locust worker. No user/notebook token or
+profile file is copied. These identity selectors remain outside `RunCreate` and
+do not change hosting/protocol selection or the load engine. See
+[the private App runner](../examples/journeys/app_runner/README.md) and [ADR 0019](adr/0019-explicit-native-app-runner-authentication.md).
+This implemented path has controlled SDK-boundary checks, not live deployment or
+measurement evidence. It is the current dedicated-App runner path; the selected
+`load-test` shell is stopped and undeployed, and protected export still needs an
+exact private schema/volume within `ram_artifacts`. Native App mode does not solve
+serverless notebook auth; notebook validation is deferred from this milestone.
+
 ## Typed lifecycle
 
 | Method | Unified return | Meaning |
@@ -116,9 +155,14 @@ load. No target reinvocation during evaluation. A false quality verdict is a val
 assessment, not a readiness execution failure. Missing correctness references,
 required traces, or provider configuration remain explicit failures/gaps.
 
-## Databricks notebook
+## Retained Databricks notebook path — deferred
 
-**Prepared, authentication-blocked—not live-validated.** Review
+**Deferred by user October 11, 2026; historically authentication-blocked, not
+live-validated.** The active installation/load-generation choices are local
+Python and the [dedicated runner App](../examples/journeys/app_runner/README.md).
+No notebook credential is required for this milestone. Historical failures and
+source remain preserved; the following describes the deferred path, not current
+onboarding or an execution approval. Review
 [the serverless runner-only source notebook](../examples/journeys/serverless_runner_databricks_app_target.py)
 and its [readiness harness](../scripts/validation/serverless_runner_app_target.py).
 Their availability does not establish supported live notebook-to-App execution.
@@ -126,16 +170,26 @@ Their availability does not establish supported live notebook-to-App execution.
 The notebook is the EvalSurge/Locust **load generator**; the target agent remains
 in its deployed Databricks App. This is a runner-location choice, not an additional
 agent-hosting option. Use the same public `RunCreate` request and context cleanup
-as a laptop run. The current scope is serverless only; the retained
+as a laptop run. The former notebook scope was serverless only; the retained
 [classic notebook source](../examples/journeys/classic_notebook.py) is deferred.
 A laptop profile is not notebook authentication, and driver-only credential
 success is not evidence the spawned worker can authenticate.
+The sample now offers a reviewed portable-M2M launcher using an already provisioned
+private profile file and explicitly selected service-principal client ID. Each
+owned process refreshes OAuth independently; the sample does not create credentials
+or copy notebook tokens. This path remains unvalidated live until the operator
+selects the credential source/permissions and bounded traffic. See proposed ADR 0015.
+The installed package provides `evalsurge.serverless`; the source notebook imports
+that helper without a repository checkout or validation-script import. Its repaired
+post-authentication execution branch has offline regression coverage, not a live
+serverless authentication or benchmark pass.
 The [serverless runner status](SERVERLESS_RUNNER_STATUS.md) explains why hosting
 FastAPI in the notebook does not repair worker OAuth, and why calling an external
 API instead changes the load-generator location.
 
-`Agent.databricks_app` currently requires a selected profile; it does not accept
-an injected native notebook SDK client. The operator resolver rejects ambient
+For the notebook journey, `Agent.databricks_app` still requires the selected
+portable profile; native App mode is not notebook auth and accepts no injected
+native notebook SDK client. Profile resolution rejects ambient
 destination/identity overrides before App discovery. Independently, native
 driver `runtime-oauth` relies on notebook context unavailable to the Locust
 subprocess in the retained prerequisite check. Do not copy notebook tokens or
@@ -152,7 +206,7 @@ runner lifecycle; it does not delete Apps or Lakebase. Optional remote/API
 execution, fail-fast and cancellation are separate notebook validation gates.
 See [the validation checklist](../scripts/validation/README.md#serverless-notebook-validation).
 
-Serverless notebook execution is a separate validation gate: subprocess execution,
+If notebook validation is resumed, it has separate gates: subprocess execution,
 credential availability, local storage locking, egress, and notebook shutdown all
 need real checks. Neither sample code nor classic success proves serverless support.
 Samples do not provision compute, Apps or models. The notebook-local helper
@@ -174,7 +228,7 @@ the historical notebook-hosted helper establishes a deployed-App pass. See
 ```python
 with EvalSurge.remote("http://127.0.0.1:8000", typed=True) as client:
     report = client.start(request).wait(timeout=300)
-    print(report.model_dump_json(indent=2))
+    print(format_summary(report))
 ```
 
 The server must register `agent` itself. Local `targets` are not uploaded.
@@ -215,8 +269,8 @@ registry before discovery or admission. Both inherit an enclosing task-local
 operator scope without changing process environment values.
 Existing `EvalSurge.remote(url)` and `RemoteClient` retain dictionary behavior.
 Use `typed=True` for the unified remote return types. Do not mix the return shapes.
-Native local async execution remains `EvalSurge.local_async(...)`. The prepared
-serverless runner-only notebook uses this context with top-level `await`; the
+Native local async execution remains `EvalSurge.local_async(...)`. The retained,
+deferred serverless runner-only notebook uses this context with top-level `await`; the
 retained synchronous examples do not establish notebook authentication support.
 
 ### Three-minute example

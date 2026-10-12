@@ -82,10 +82,13 @@ def _readme_request() -> RunCreate:
 def test_readme_quality_policy_and_output_match_current_contracts() -> None:
     """Validate optional policy and report projections without invoking judges."""
     readme = README.read_text()
-    install = re.search(r"^uv add .+$", readme, re.MULTILINE)
+    install = re.search(r"^python -m pip install .+$", readme, re.MULTILINE)
     assert install is not None
     arguments = shlex.split(install.group())
-    assert arguments == ["uv", "add", "evalsurge[server]"]
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    wheel = f"./evalsurge-{metadata['version']}-py3-none-any.whl"
+    assert arguments == ["python", "-m", "pip", "install", f"{wheel}[local]"]
+    assert "published on PyPI" in readme
     blocks = re.findall(r"```python\n(.*?)```", readme, re.DOTALL)
     namespace: dict[str, Any] = {"request": _readme_request()}
     from evalsurge import Case

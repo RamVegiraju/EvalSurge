@@ -1,0 +1,2 @@
+# Copy the exact reviewed wheel into wheel/ before deployment. Do not commit it.
+./wheel/evalsurge-0.2.1.dev2026101201-py3-none-any.whl[server]

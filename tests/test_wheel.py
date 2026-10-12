@@ -16,12 +16,23 @@ from scripts.verify_wheel import REQUIRED_FILES, verify, verify_sdist
     [
         None,
         "evalsurge/__init__.py",
+        "evalsurge/_version.py",
         "evalsurge/client.py",
         "evalsurge/local.py",
         "evalsurge/facade.py",
+        "evalsurge/calibration.py",
+        "evalsurge/_calibration_locust.py",
+        "evalsurge/serverless.py",
+        "evalsurge/_retrieval.py",
+        "evalsurge/summary.py",
         "benchmark_agents/coordinator.py",
         "benchmark_agents/run_views.py",
         "benchmark_agents/validation.py",
+        "benchmark_agents/providers.py",
+        "benchmark_agents/locust_runner.py",
+        "benchmark_agents/locustfile.py",
+        "benchmark_agents/runner.py",
+        "benchmark_agents/storage.py",
         "benchmark_agents/evaluation_errors.py",
         "benchmark_agents/evaluation_details.py",
         "benchmark_agents/evaluation_preflight.py",
@@ -41,6 +52,27 @@ def test_wheel_assets(tmp_path: Path, omit: str | None) -> None:
             verify(wheel)
     else:
         verify(wheel)
+
+
+@pytest.mark.parametrize(
+    "import_statement", ["from .not_packaged import receipt", "import evalsurge.not_packaged"]
+)
+def test_wheel_rejects_missing_internal_branch_without_executing_code(
+    tmp_path: Path, import_statement: str
+) -> None:
+    """A late retrieval/summary branch cannot escape archive checks via lazy import."""
+    wheel = tmp_path / "evalsurge-test.whl"
+    with ZipFile(wheel, "w") as archive:
+        for filename in REQUIRED_FILES:
+            source = (
+                import_statement + '\nraise RuntimeError("never execute this private body")'
+                if filename == "evalsurge/serverless.py"
+                else 'raise RuntimeError("never execute")'
+            )
+            archive.writestr(filename, source)
+    with pytest.raises(ValueError, match="evalsurge.not_packaged") as error:
+        verify(wheel)
+    assert "private body" not in str(error.value)
 
 
 def test_editable_build_exposes_both_namespaces_without_dynamic_build_dependencies(

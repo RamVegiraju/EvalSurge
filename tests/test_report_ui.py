@@ -130,6 +130,45 @@ def test_historical_report_without_mlflow_links_remains_renderable(evidence) -> 
     assert "1.20req/s" in output["nodes"]["metrics"]["text"]
 
 
+def test_historical_report_does_not_assume_generator_health(evidence) -> None:
+    """Rendering-only evidence; no agent, provider or target invocation."""
+    text = render(evidence)["nodes"]["generator-health"]["text"]
+    assert "historical or missing" in text
+    assert "Do not assume an unsaturated runner" in text
+
+
+def test_report_generator_observations_are_not_an_accuracy_badge(evidence) -> None:
+    """Only fixed labels and numeric timing data are rendered, not raw diagnostics."""
+    from tests.test_generator_presentation import observations
+
+    health = observations(degraded=True)
+    health["limitations"] = ["private-provider-message"]
+    health["journal"]["path"] = "private-path"
+    evidence["run"]["metrics"]["generator_health"] = health
+    text = render(evidence)["nodes"]["generator-health"]["text"]
+    assert "Generator health: degraded" in text
+    assert "not verified accuracy" in text
+    assert "mean 1.25 ms" in text
+    assert "Journal drained: no" in text
+    assert "do not sum" in text
+    assert "Journal backpressure observed" in text
+    assert "may be generator-limited" in text
+    assert "private" not in text
+
+
+def test_report_does_not_hide_successful_only_timing_coverage(evidence) -> None:
+    """Displayed tails retain observation counts and disclose omitted failures."""
+    timing = evidence["run"]["metrics"]["timing_successful_only"]
+    timing["latency_ms"]["count"] = 3
+    timing["ttft_ms"] = {"count": 2, "p50": 20, "p95": 40, "p99": 40}
+    evidence["run"]["metrics"]["requests"] = 4
+    text = render(evidence)["nodes"]["metrics"]["text"]
+    assert "3 successful observations / 4 attempts" in text
+    assert "2 successful observations / 4 attempts" in text
+    assert "Failures and timeouts excluded" in text
+    assert "not first response byte" in text
+
+
 def test_report_shows_each_failed_quality_reason_and_safe_execution_error(evidence) -> None:
     result = evidence["run"]["evaluation"]["results"][0]
     result["assessments"] = [

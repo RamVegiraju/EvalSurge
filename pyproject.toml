@@ -1,6 +1,6 @@
 [project]
 name = "evalsurge"
-version = "0.2.0"
+version = "0.2.1.dev2026101202"
 description = "Concurrency benchmarks and evidence-aware MLflow evaluation for hosted agents"
 readme = "README.md"
 license = "MIT"
@@ -16,6 +16,7 @@ classifiers = [
 dependencies = ["httpx>=0.28.1,<1", "pydantic>=2.13.5,<3"]
 
 [project.optional-dependencies]
+local = ["evalsurge[server]"]
 server = ["fastapi>=0.141.1,<1", "uvicorn>=0.54,<1", "openai>=3.19.2,<4", "mlflow>=3.16.1,<3.17", "databricks-sdk>=0.146,<1", "locust>=2.46.6,<3", "python-dotenv>=1.2.3,<2", "requests>=2.34.2,<3", "gevent>=26.9,<27"]
 agents = ["evalsurge[server]", "langgraph>=1.2.12,<2", "langgraph-checkpoint>=4.2,<5", "langchain-core>=1.6.5,<2", "langchain-openai>=1.6.6,<2", "openai-agents>=0.22.3,<1"]
 

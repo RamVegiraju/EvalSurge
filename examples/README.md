@@ -1,60 +1,110 @@
 # Examples
 
-Start here for the public Python API. These scripts call an existing agent;
-they do not start an EvalSurge server, implement polling, or manage credentials.
-Only benchmark endpoints and agent actions you are authorized to exercise.
+Start with the [local runner quickstart](journeys/LOCAL_RUNNER_QUICKSTART.md):
+install EvalSurge, bind your existing agent, provide cases and load bounds, then
+inspect a typed report. EvalSurge generates traffic on your machine; the agent
+runs at its own HTTP endpoint or in an already deployed Databricks App.
+No separate EvalSurge API server, operator TOML, notebook or runner App is needed
+for this journey. Credentials stay in target configuration, outside `RunCreate`.
 
-New integrations use one `RunCreate` request and direct execution by default:
-
-| Example | Load-generator location | Agent target |
+| Choose your agent target | Example | Where traffic originates |
 | --- | --- | --- |
-| [local_runner_http_target.py](journeys/local_runner_http_target.py) | Local Python/laptop | Separately hosted real HTTP agent |
-| [local_runner_databricks_app_target.py](journeys/local_runner_databricks_app_target.py) | Local Python/laptop | Already deployed Databricks App |
-| [serverless_runner_databricks_app_target.py](journeys/serverless_runner_databricks_app_target.py) | Serverless notebook; prepared/authentication-blocked | Already deployed App; not yet live-validated from a notebook |
-| [Classic notebook](journeys/classic_notebook.py) | Retained classic driver; deferred | Deployed App; not evidence of serverless support |
-| [Dataset and judges](quality/README.md) | Caller selects the runner | Explicit catalog, reviewed custom alias, automatic, and readiness edges |
+| Existing HTTP endpoint | [local_runner_http_target.py](journeys/local_runner_http_target.py) | Your local Python process and its Locust worker |
+| Already deployed Databricks agent App | [local_runner_databricks_app_target.py](journeys/local_runner_databricks_app_target.py) | Your local Python process and its Locust worker |
 
-Install `evalsurge[server]`, then run a selected real target only after reviewing
-the bound of five measured agent invocations plus one excluded probe (not a
-model/tool-call or spend quota):
+Both scripts use the same cases, load and evaluation policy: five concurrent
+users, at most five measured invocations, a ten-second dispatch window and one
+excluded readiness probe. Evaluation defaults to off. These are short functional
+smokes, not sustainable-capacity tests or model/token/spend quotas.
+
+Install the [reviewed wheel](../docs/INSTALLATION.md) with `[local]`; `[server]`
+remains the compatible extra name and neither requires starting an API server.
+The wheel does not include example source files. Copy either script into the
+installed environment, review your exact target and six possible agent
+invocations, then explicitly authorize traffic:
 
 ```bash
-uv run python -m examples.journeys.local_runner_http_target \
+python local_runner_http_target.py \
   http://127.0.0.1:9001/invoke --allow-paid-inference
-uv run python -m examples.journeys.local_runner_databricks_app_target \
+python local_runner_databricks_app_target.py \
   your-deployed-app --profile YOUR_SELECTED_OAUTH_PROFILE --allow-paid-inference
 ```
 
-These scripts do not deploy targets, select a default profile, or substitute
-fixture completions when a live target is unavailable. Static schema checks are
-not a claim of end-to-end notebook/live coverage. The new serverless sample is
-**prepared, authentication-blocked—not live-validated**. It runs only the load
-generator, never an agent/helper in the notebook. Its initial budget is one
-excluded probe plus one measured App invocation at concurrency one, evaluation
-off; a reviewed no-tool App must enforce the declared <=512 output-token limit.
-Driver/profile, independent-worker OAuth and deployed-App readiness must pass
-before separately approved model traffic. See
-[the notebook checklist](../scripts/validation/README.md#serverless-notebook-validation),
-[the target guide](../docs/TARGETS.md) and
-[actual validation](../VALIDATION.md).
+From a reviewed source checkout, the equivalent module commands are
+`uv run --frozen --no-sync python -m examples.journeys.local_runner_http_target`
+and `uv run --frozen --no-sync python -m examples.journeys.local_runner_databricks_app_target`,
+with the same arguments. Framework implementation examples require their source
+files and separately installed framework dependencies; `[agents]` installs the
+LangGraph/OpenAI Agents dependencies, not those files.
+
+These scripts do not deploy targets, select a default profile or substitute
+fixture completions when a live target is unavailable. LangGraph, OpenAI Agents
+and CrewAI are customer-agent examples, not a framework allowlist. The
+[framework/hosting matrix](journeys/FRAMEWORK_MATRIX.md) keeps six local-runner
+combinations explicit. No framework-specific EvalSurge setting is required when
+an endpoint satisfies the documented contract.
+Four reduced real-model basic smokes passed on October 12 against the reviewed
+pip-installed `0.2.1.dev2026101202` wheel: LangGraph and OpenAI Agents, each hosted
+over local HTTP or in an existing Databricks agent App. All used actual
+`system.ai.gpt-oss-120b`, one excluded probe plus one measured invocation,
+concurrency one and evaluation off, without fixtures. Typed retrieval and cleanup
+passed; the two target Apps were stopped with resources/deployments preserved.
+That is **4/6 basic cells**, not six passes, unchanged five-request sample coverage,
+judging, active cancellation, accuracy certification or current-template deployment.
+Runner-App installation/execution is a separate gate, not established by local
+traffic to an App target. CrewAI's advisory and native deployment gates remain
+unresolved. See [the retained live evidence](../docs/LIVE_MATRIX_RESULTS.md)
+and [current demo readiness](../docs/DEMO_READINESS.md).
+
+## Prepared and deferred runner options
+
+These sources remain available separately from the local quickstart:
+
+| Example | Load-generator location | Current boundary |
+| --- | --- | --- |
+| [Private direct runner App](journeys/app_runner/README.md) | Dedicated `load-test` App; separate from the agent App | Prepared, disabled; dependency installation and live execution remain unverified |
+| [serverless_runner_http_target.py](journeys/serverless_runner_http_target.py) | Serverless notebook | Retained optional source, outside requested live scope |
+| [serverless_runner_databricks_app_target.py](journeys/serverless_runner_databricks_app_target.py) | Serverless notebook | Deferred; historical authentication blocker retained |
+| [Classic notebook](journeys/classic_notebook.py) | Classic notebook driver | Retained, deferred; not serverless evidence |
+| [Dataset and judges](quality/README.md) | Your selected supported runner | Explicit, registered and automatic judging; readiness edges |
+
+The runner-App template requires its own reviewed installation, resource binding,
+private artifact export and fresh bounded-traffic approval. Its stopped diagnostic
+deployment did not install or execute EvalSurge or make model calls. The managed
+volume `ram_artifacts.evalsurge_validation.runner_artifacts` and grants were
+provisioned, but do not establish a successful cloud benchmark. See
+[the App-runner handoff](../docs/SESSION_HANDOFF.md) for exact retained state.
+For a cloud runner, `localhost` is that cloud runtime, not your laptop; a local
+HTTP agent needs a separately authorized reachable HTTPS origin. Samples create
+no tunnel or network-permission changes. Notebook validation remains deferred.
 
 ## Sample classifications
 
 Examples are customer implementations, not an EvalSurge framework allowlist.
 Keep hosting and inference claims separate:
 
+The [demo readiness matrix](../docs/DEMO_READINESS.md) ties these claims to the
+current versioned artifact. The four fresh installed-runner basic-smoke receipts
+are separate from example code and older historical validation. They establish
+observed execution/completeness, not calibrated accuracy of the measurement implementation.
+
 | Sample or harness | Hosting / execution | Inference and evidence boundary |
 | --- | --- | --- |
-| [real_framework_agent.py](real_framework_agent.py) | Real customer-process LangGraph, OpenAI Agents or CrewAI behind the optional JSON helper | Explicit real Responses model; no fixture fallback. Stateless/nonstreaming; no memory, traces or TTFT. CrewAI uses a separate reviewed environment |
+| [real_framework_agent.py](real_framework_agent.py) | Real customer-process agent behind the optional EvalSurge JSON helper | Explicit real Responses model; no fixture fallback. The observed CrewAI candidate cannot share this helper's dependency stack; use the standalone endpoint below. No memory, traces or TTFT |
+| [real_framework_handler.py](real_framework_handler.py) | Shared customer-owned model/handler source, not a runner or server | Standard-library import boundary; optional real framework imports at construction. Does not make an incompatible environment compatible or establish inference |
+| [crewai_agent.py](crewai_agent.py) | Standalone loopback CrewAI HTTP agent, in its own environment | Isolated dependency install/check passed; ChromaDB advisory gate failed, so no actual-model inference. See the [prerequisite record](journeys/agent_apps/crewai/README.md) |
+| [native agent-App projects](journeys/agent_apps/README.md) | Separate LangGraph/OpenAI Agents/CrewAI agent Apps, not the runner App | Prepared DurableAgentServer source; dependencies, supported deployment/Runtime Store provisioning and actual inference remain separate gates. No fresh live deployment evidence |
 | [local_runner_http_target.py](journeys/local_runner_http_target.py) | Laptop → already hosted HTTP endpoint | Calls the supplied endpoint; does not deploy or establish its framework/model by itself |
 | [local_runner_databricks_app_target.py](journeys/local_runner_databricks_app_target.py) | Laptop → already deployed Databricks App | Exact App/profile selection; not a local stand-in for App hosting |
-| [serverless_runner_databricks_app_target.py](journeys/serverless_runner_databricks_app_target.py) / [serverless_runner_app_target.py](../scripts/validation/serverless_runner_app_target.py) | Serverless EvalSurge/Locust runner → existing deployed App | Prepared/authentication-blocked. Zero-inference guards pass; no live notebook-to-App success, API execution, cancellation or fail-fast claim |
+| [Private direct runner App](journeys/app_runner/README.md) | Dedicated `load-test` App → separate HTTP/App agent | Prepared; disabled installation failed and stopped diagnostic remains. EvalSurge startup, live native worker OAuth, protected export and actual-model traffic remain unverified |
+| [serverless_runner_databricks_app_target.py](journeys/serverless_runner_databricks_app_target.py) / [serverless_runner_app_target.py](../scripts/validation/serverless_runner_app_target.py) | Deferred serverless EvalSurge/Locust runner → existing deployed App | Historical authentication blocker retained; zero-inference guards do not establish notebook-to-App success |
 | [serverless_sdk_journeys.py](../scripts/validation/serverless_sdk_journeys.py) | Retained notebook-local helper diagnostic | Not the intended notebook-runner → deployed-App sample; it does not validate that journey and is not an additional agent-hosting option |
 | [quality examples](quality/README.md) | Explicit/automatic evaluation over supplied cases and captured answers | Separate opt-in planner/judge budget; not exercised by the current load-only smokes |
 | [framework_agent.py](framework_agent.py) / [mock_agent.py](mock_agent.py) | Retained instrumented demo / deterministic transport tutorial | Controlled inference paths are explicitly labeled; require disclosure/approval and never count as real-model validation |
 
-Notebook validation is **serverless-only**; local-Python real-agent checks are a
-separate runner journey. Use short functional smokes before any larger tests.
+The primary quickstart uses a **local-Python runner** for either target hosting
+choice. Dedicated-App runner installation is separately gated; notebook
+validation is **deferred**. Use short functional smokes before any larger tests.
 The notebook-to-App authentication blocker, approved App names and exact pass/failure
 records are in [hosted journey validation](../docs/HOSTED_JOURNEY_VALIDATION.md).
 An approved name or a successful local run is not evidence that an App was deployed.

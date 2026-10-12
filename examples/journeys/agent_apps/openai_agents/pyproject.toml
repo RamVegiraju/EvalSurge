@@ -1,0 +1,14 @@
+[project]
+name = "evalsurge-sample-openai-agents-agent-app"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "databricks-agentbricks==0.4.0",
+    "databricks-sdk==0.148.0",
+    "openai==3.22.1",
+    "openai-agents==0.22.3",
+    "uvicorn==0.54.0",
+]
+
+[tool.uv]
+package = false

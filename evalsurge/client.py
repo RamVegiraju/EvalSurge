@@ -77,6 +77,11 @@ class Agent:
                 kind="databricks-app",
                 app_name=binding.app_name,
                 profile=binding.profile,
+                app_auth=binding.app_auth,
+                workspace=binding.workspace,
+                workspace_id=binding.workspace_id,
+                runner_app=binding.runner_app,
+                client_id=binding.client_id,
                 protocols=(self._target.adapter,),
                 model=self._target.model,
                 framework=self._target.framework,
@@ -142,7 +147,12 @@ class Agent:
         cls,
         name: str,
         *,
-        profile: str,
+        profile: str | None = None,
+        auth: Literal["profile", "app-runtime"] = "profile",
+        workspace: str | None = None,
+        workspace_id: str | None = None,
+        runner_app: str | None = None,
+        client_id: str | None = None,
         protocol: Literal[
             "databricks-agent-runtime", "mlflow-agent-server"
         ] = "databricks-agent-runtime",
@@ -154,6 +164,16 @@ class Agent:
         Args:
             name: Operator-selected App resource name, not an arbitrary App URL.
             profile: Exact explicitly selected SDK profile; no default selection.
+                Required in unchanged profile mode, forbidden in native mode.
+            auth: Explicit profile authentication (default), or the runner App's
+                own independently refreshable native service-principal OAuth.
+            workspace: Exact expected workspace HTTPS origin, native mode only.
+            workspace_id: Optional pinned positive numeric workspace identifier;
+                required when native App runtime metadata supplies one. Both
+                coordinator and worker environments must match it exactly.
+            runner_app: Expected load-generator App name, native mode only.
+            client_id: Expected runner service-principal client UUID, native only;
+                not its numeric principal ID or an App OAuth audience/client ID.
             protocol: Native Runtime JSON, or explicit legacy AgentServer compatibility.
             model: Invocation model label; this does not choose the App's LLM.
             session_id: Optional fixed ordering session; omission isolates attempts.
@@ -168,6 +188,11 @@ class Agent:
             kind="databricks-app",
             app_name=name,
             profile=profile,
+            app_auth=auth,
+            workspace=workspace,
+            workspace_id=workspace_id,
+            runner_app=runner_app,
+            client_id=client_id,
             protocols=(protocol,),
             model=model,
             session_id=session_id,

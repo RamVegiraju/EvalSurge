@@ -1,0 +1,20 @@
+{
+  "enabled": false,
+  "accept_paid_traffic": false,
+  "real_inference_attested": false,
+  "approval_id": "replace-with-reviewed-unique-approval",
+  "approval_expires_at": "1970-01-01T00:00:00Z",
+  "workspace": "https://your-workspace.cloud.databricks.com",
+  "workspace_id": "1234567890123456",
+  "target_kind": "databricks-app",
+  "app_name": "your-agent-app",
+  "app_auth": "app-runtime",
+  "runner_app": "your-runner-app",
+  "oauth_client_id": "00000000-0000-0000-0000-000000000000",
+  "target_model": "replace-with-reviewed-real-model",
+  "source_revision": "replace-with-reviewed-agent-revision",
+  "deployed_max_output_tokens": 512,
+  "reviewed_version": "0.2.1.dev2026101201",
+  "reviewed_wheel": "wheel/evalsurge-0.2.1.dev2026101201-py3-none-any.whl",
+  "reviewed_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}

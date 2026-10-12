@@ -12,7 +12,8 @@ storage and formatting checks make no inference calls.
 
 Direct Python execution is the onboarding default; an API server is optional.
 The base package remains the lightweight remote client and CLI (HTTPX/Pydantic).
-Direct execution and the REST server require `evalsurge[server]`; `evalsurge[agents]`
+Direct execution uses `evalsurge[local]`; the compatible `evalsurge[server]` extra
+also supplies direct execution and the optional REST server. `evalsurge[agents]`
 includes that stack plus both example frameworks. Keep the existing agents/dev sync
 for full development and verification. Test built-wheel remote isolation as well as
 the full environment so eager imports cannot reintroduce the load stack for clients.

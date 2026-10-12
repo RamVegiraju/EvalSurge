@@ -11,6 +11,9 @@ Do not replace this statement with a marketing label after a smoke test.
   profile selection, no caller-supplied credentials or tracking destinations.
 - One active run/plan, POSIX ownership lock, fsync journals, atomic snapshots, torn
   UTF-8 recovery, restart-aware idempotency, compact history, completed-state eviction.
+- Bounded cooperative/native journal owner with durable dispatch acknowledgments,
+  explicit failure/drain recovery and content-free hub/journal observations. These
+  observations are not calibrated generator saturation or accuracy gates.
 - Frozen plans, exact registered scorer versions/hashes, evidence-qualified sampling,
   separate phase outcomes, preserved metrics when judging/profiling fails.
 - Correlation/experiment validation, bounded trace/span/report collection, overlap-safe

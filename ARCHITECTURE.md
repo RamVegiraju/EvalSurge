@@ -11,6 +11,13 @@ contracts. Legacy local keyword calls, dictionary-returning remote calls and
 and [the Python guide](docs/PYTHON_API.md). Maintainer review and new live journey
 validation remain separate gates, not claims established by schema checks.
 
+The October 12 onboarding milestone is local traffic generation to either a
+separately hosted HTTP agent or a deployed agent App. `evalsurge[local]` is an
+additive installation alias for the existing execution stack; `[server]` and
+the lightweight base/remote interface remain compatible. It adds no runner or
+request shape. Cloud-hosted load generation is deferred, not an installation
+requirement or a new agent-hosting option.
+
 The additive `/v2` façade selects registered targets and defaults evaluation to off.
 Registered targets can be ordinary HTTP endpoints (including runner-local agents)
 or deployed Databricks Apps. Hosting/discovery and invocation protocol are separate:
@@ -73,7 +80,9 @@ flowchart LR
 - `streaming.py`: shared event semantics for OpenAI Chat Completions and Responses-style SSE. Supported adapters expect JSON in single-line `data:` events. `[DONE]`, a normal chat finish followed by EOF, or `response.completed` terminates a response. Missing terminal events, filtered/truncated output, invalid JSON, empty output, and deadlines are failures.
 - `runner.py`: payload construction and descriptive metrics only. There is no alternate async load engine.
 - `adapters.py`: bounded supported wire decoding, including the explicit `http-json` contract; JSON TTFT/first-event timing is unavailable.
-- `storage.py`: fsync'd request events, atomic snapshots, and recovery of interrupted attempts. A killed writer's incomplete final line is ignored.
+- `storage.py`: fsync'd request events, a bounded cooperative journal owner/native writer,
+  atomic snapshots, and recovery of interrupted attempts. A killed writer's incomplete
+  final line is ignored; uncertain journal drain cannot certify complete measurements.
 - `sampling.py`: fixed-seed randomized case/time strata over the observed dispatch window. The seed reproduces selection from identical records; it does not make model responses deterministic.
 - `evaluation_preflight.py`: validates frozen setup and checks one captured probe assessment per criterion before load, with no target reinvocation.
 - `evaluator.py` / `judges.py`: score captured answers through native MLflow, preserve assessment coverage/errors, and call Databricks directly using MLflow-shipped rubrics. Readiness is tagged separately from post-load quality; provider failures become content-free native assessment errors without extra MLflow retry layering.
@@ -110,15 +119,24 @@ The process lock enforces one coordinator owner on local POSIX storage. Compact 
 
 This is closed-loop load. Each Locust user waits for its response before sending another. As response times rise, achieved request rate falls. The workload cannot infer maximum sustainable throughput from one concurrency level. See [Locust's task and pacing documentation](https://docs.locust.io/en/stable/writing-a-locustfile.html).
 
-For REST runs, the API host is the load generator: `locust_runner.py` starts one local Locust subprocess, which sends the target requests and writes the journal. API clients may be remote, but moving the client does not change the measurement vantage point. Local Python runs start Locust on the Python caller's machine instead. Runner CPU, memory, sockets, network, and journal disk I/O can constrain the observation; this milestone does not capture runner saturation metrics. Place the runner separately from the target and record its resources and network location. See [deployment guidance](docs/USAGE.md#where-to-run-evalsurge).
+For REST runs, the API host is the load generator: `locust_runner.py` starts one local Locust subprocess, which sends the target requests and writes the journal. API clients may be remote, but moving the client does not change the measurement vantage point. Local Python runs start Locust on the Python caller's machine instead. Runner CPU, memory, sockets, network, and journal disk I/O can constrain the observation. New runs expose content-free hub-lag and journal observations, not calibrated saturation gates or CPU/memory telemetry. Place the runner separately from the target and record its resources and network location. See [deployment guidance](docs/USAGE.md#where-to-run-evalsurge).
 
 The measured run window starts at Locust test start and includes user ramp-up, authentication, journaling, and drain. Preflight, subprocess startup, planning, and judging are outside that window. Per-request TTFT and latency start just before HTTP dispatch, after auth. TTFT means first nonempty user-visible answer-text delta received at this client; it does not measure first response byte or browser paint. Apart from the separate first-case probe, warmup is not excluded in this milestone.
 
 The initial [measurement diagnostic](docs/MEASUREMENT_ACCURACY.md) confirms that
 blocking journal writes can delay peer users even though a request's own completion
 write falls outside its latency clock. `auth_ms` includes the initial journal write.
-Small local costs do not establish zero observer effect or cloud-disk behavior;
-timing/persistence redesign and generator-health telemetry require separate review.
+Small local costs do not establish zero observer effect or cloud-disk behavior.
+[Proposed ADR 0014](docs/adr/0014-measurement-integrity-and-journal-ownership.md)
+records the cooperative writer implementation: one bounded FIFO, one persistent
+native file writer, fsync acknowledgment before dispatch, and frozen response
+timings before completion persistence. Writer failure or uncertain drain retains
+partial evidence without complete measurements. Journal waits can still limit
+throughput; CPU/GIL/auth/parser work can still delay the hub. New typed generator
+observations have only `unknown`/`degraded` states, never an accuracy certification.
+Historical absence stays unavailable. No baseline subtraction or changed
+successful-only percentiles are introduced. Maintainer review, cloud-disk
+calibration and fresh real-agent validation remain separate gates.
 
 Quality sampling stratifies on case and request-start time, not completion order. Successful captured outputs are eligible; correctness further requires references. Failed-request counts and eligible/selected/scored coverage accompany scores. Balancing deliberately changes the sample distribution; scorer means are not unbiased population estimates or confidence intervals.
 

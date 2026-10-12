@@ -1,0 +1,6 @@
+schema_version = 1
+
+[agent]
+framework = "langgraph"
+server = "agentbricks"
+deployment_name = "REPLACE_WITH_OPERATOR_SELECTED_APP_NAME"

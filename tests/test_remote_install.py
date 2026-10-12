@@ -57,12 +57,14 @@ def test_built_wheel_base_metadata_and_lazy_public_compatibility(
     requirements = metadata.get_all("Requires-Dist", [])
     base = {item.split("<", 1)[0].split(">", 1)[0] for item in requirements if ";" not in item}
     assert base == {"httpx", "pydantic"}
-    assert set(metadata.get_all("Provides-Extra", [])) == {"server", "agents"}
+    assert set(metadata.get_all("Provides-Extra", [])) == {"local", "server", "agents"}
     # Hatchling expands a self-referenced extra in wheel metadata. Both uv's
     # editable graph and normal wheel installers must receive the full server set.
     server = {item.split(";", 1)[0] for item in requirements if "extra == 'server'" in item}
+    local = {item.split(";", 1)[0] for item in requirements if "extra == 'local'" in item}
     agents = {item.split(";", 1)[0] for item in requirements if "extra == 'agents'" in item}
     assert server and server < agents
+    assert local == server
     from benchmark_agents.connections import Connection as ExistingConnection
     from evalsurge import Agent, Connection, EvalSurge, RunFailed
     from evalsurge.client import Agent as ExistingAgent

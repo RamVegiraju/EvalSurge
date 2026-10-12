@@ -907,7 +907,7 @@ wheels = [
 
 [[package]]
 name = "evalsurge"
-version = "0.2.0"
+version = "0.2.1.dev2026101202"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -922,6 +922,9 @@ agents = [
     { name = "langgraph" },
     { name = "langgraph-checkpoint" },
     { name = "openai-agents" },
+]
+local = [
+    { name = "evalsurge", extra = ["server"] },
 ]
 server = [
     { name = "databricks-sdk" },
@@ -949,6 +952,7 @@ dev = [
 requires-dist = [
     { name = "databricks-sdk", marker = "extra == 'server'", specifier = ">=0.146,<1" },
     { name = "evalsurge", extras = ["server"], marker = "extra == 'agents'" },
+    { name = "evalsurge", extras = ["server"], marker = "extra == 'local'" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.141.1,<1" },
     { name = "gevent", marker = "extra == 'server'", specifier = ">=26.9,<27" },
     { name = "httpx", specifier = ">=0.28.1,<1" },
@@ -965,7 +969,7 @@ requires-dist = [
     { name = "requests", marker = "extra == 'server'", specifier = ">=2.34.2,<3" },
     { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.54,<1" },
 ]
-provides-extras = ["agents", "server"]
+provides-extras = ["agents", "local", "server"]
 
 [package.metadata.requires-dev]
 dev = [

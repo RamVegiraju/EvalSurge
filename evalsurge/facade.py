@@ -1,4 +1,4 @@
-"""Dependency-light factories; local execution explicitly needs the server extra."""
+"""Dependency-light factories; direct execution needs the local or server extra."""
 
 from collections.abc import Mapping
 from importlib import import_module
@@ -39,7 +39,7 @@ def _local_module() -> ModuleType:
         Local client module; importing it does not acquire artifacts or send traffic.
 
     Raises:
-        MissingServerDependenciesError: A server dependency is absent. The fixed
+        MissingServerDependenciesError: An execution dependency is absent. The fixed
             message identifies the installation option, not local configuration.
         ImportError: An installed dependency has an unrelated import failure.
 
@@ -51,8 +51,9 @@ def _local_module() -> ModuleType:
         available = False
     if not available:
         raise MissingServerDependenciesError(
-            "Local benchmarking requires server dependencies; install 'evalsurge[server]' "
-            "(or 'evalsurge[agents]' for framework examples)."
+            "Direct benchmarking requires execution dependencies; install 'evalsurge[local]' "
+            "(or the compatible 'evalsurge[server]' extra). "
+            "Neither extra starts an API server."
         )
     return import_module("evalsurge.client")
 
@@ -116,7 +117,7 @@ class EvalSurge:
             load generator, and entering acquires exclusive storage ownership.
 
         Raises:
-            MissingServerDependenciesError: Install the server extra before use.
+            MissingServerDependenciesError: Install the local or server extra before use.
         """
         _local_module()
         return import_module("evalsurge.local").Client(
@@ -143,7 +144,7 @@ class EvalSurge:
             Unopened context; traffic location and ownership match local().
 
         Raises:
-            MissingServerDependenciesError: Install the server extra before use.
+            MissingServerDependenciesError: Install the local or server extra before use.
         """
         _local_module()
         return import_module("evalsurge.local").AsyncClient(

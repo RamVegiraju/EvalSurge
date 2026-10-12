@@ -1,7 +1,40 @@
 # Hosted journey validation: evidence and next authorization
 
+## October 12 fresh installed-wheel basic smoke checkpoint
+
+The [current live evidence](LIVE_MATRIX_RESULTS.md) records **4/6** fresh basic
+local-runner cells against the reviewed **0.2.1.dev2026101202** wheel, SHA256
+`a1a58a4513c4659aee41f9c5570bbcca6da371b4b185b629e7842be4eac23285`.
+LangGraph and OpenAI Agents each passed through local HTTP and the existing
+real Databricks agent App, with actual `system.ai.gpt-oss-120b` and no provider
+fixtures. Each used one excluded probe and one measured request at concurrency
+one, evaluation off. Typed retrieval and SDK/worker/HTTP cleanup passed; App
+source/identity/counters agreed and final confirmation at **17:23:32 UTC**
+found both target Apps stopped/unavailable, deployments/resources preserved.
+
+These are current installed-runner interoperability smokes against retained old
+App deployments, not current-template deployment or new quality/cancellation/
+capacity/accuracy evidence. Two separate intentional pre-provider failed probes
+made zero model calls and prevented measured load. CrewAI's two cells remain
+blocked. Dedicated runner-App installation/execution is not established by
+local traffic to an App; notebook work remains deferred. The protected
+consolidated receipt is
+`/private/tmp/evalsurge-local-only-20261012.D2MG3y/milestone.safe.json` and
+App readiness/counter/cleanup receipts are in
+`/private/tmp/evalsurge-target-readiness-20261012.RxUvhu/`.
+
+## Retained October 10–11 evidence and proposals
+
 Reviewed October 10, 2026. Fresh results below are scoped to their exact journey;
 the remaining matrix is a validation plan, **not** a blanket live pass.
+
+Historical October 11 sample expansion: [the retained runner/target plan](RUNNER_TARGET_VALIDATION.md)
+covers 18 combinations across three frameworks, two target hosts and three direct
+runner locations. New examples and non-inference checks do not refresh the real
+results below. OAuth was refreshed for the same selected profile; exact metadata
+reads confirmed both retained LangGraph/OpenAI Apps remain stopped/unavailable.
+`test-eval-crewai-1009` was reported nonexistent or deleted. No new model calls,
+App start/deployment, notebook Job or cloud evidence export occurred.
 
 Subsequent [offline evaluation-storage diagnosis](EVALUATION_STORAGE_DIAGNOSIS.md)
 reproduced a shared native SQLite pool/persistence failure independently of App

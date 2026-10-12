@@ -16,13 +16,15 @@ runner-relative localhost, protocol/input limits, and current live evidence.
 
 ## Installation surfaces
 
-For a remote service client, install `evalsurge` (`uv add evalsurge` in an agent
-project). It requires HTTPX and Pydantic only; `EvalSurge.remote()`, `evalsurge run`,
+Use the reviewed `evalsurge-0.2.1.dev20261011-py3-none-any.whl` artifact and the
+[installation guide](INSTALLATION.md); public-index publication is not established.
+For a remote service client, install that wheel without extras. It requires
+HTTPX and Pydantic only; `EvalSurge.remote()`, `evalsurge run`,
 and remote `evalsurge doctor` do not load MLflow, Locust, or server/framework modules.
 The service host retains ownership of connections, load, and evaluation.
 
-For local benchmarking or hosting the API, use `uv add 'evalsurge[server]'`.
-For both example agent frameworks, use `uv add 'evalsurge[agents]'`; that extra also
+For local benchmarking or hosting the API, install the wheel with `[server]`.
+For both example agent frameworks, install it with `[agents]`; that extra also
 includes the server stack. Existing Python imports remain supported, but local
 factories and local-only exports explain the required extra in a base-only install.
 From this checkout, the full developer command remains
@@ -108,9 +110,9 @@ network bandwidth and egress quotas, authentication, and journal disk I/O can
 limit dispatch or raise latency. The target, its model/tool dependencies, and
 the network path can limit it too. Client latency is measured from this runner
 after authentication at HTTP dispatch; it is not browser latency. Run throughput
-includes ramp-up, authentication, journaling, and drain. This release does not
-measure runner resource saturation or distinguish a runner ceiling from a target
-ceiling. Record runner size/region, target region, network path, workload, and
+includes ramp-up, authentication, journaling, and drain. New runs expose hub-lag
+and journal aggregates, but these do not measure all runner resources or distinguish
+a runner ceiling from a target ceiling. Record runner size/region, target region, network path, workload, and
 concurrency with results; monitor runner CPU, memory, sockets, egress, and disk
 I/O separately. If those saturate, increase runner resources and repeat before
 making a target-capacity claim. One closed-loop load level is descriptive, not a
@@ -452,6 +454,23 @@ overlap without summing inclusive spans into wall time. Parallel occupancy can
 include duplicate instrumentation; client-minus-agent time is unattributed.
 Endpoint-only reports cannot invent internal timing or causal bottlenecks.
 Short smoke tests establish wiring, not capacity or judge calibration.
+
+The owned journal uses a bounded FIFO and one native writer with per-event fsync.
+Started events are acknowledged before target dispatch; completion timings freeze
+before completion persistence. Cooperative waits let peer users progress, but
+the user's durability waits still reduce achieved rate. `metrics.generator_health`
+shows hub wake-up lag, queue/durable/native-write timings and drain/failure counts.
+Those waits overlap: never sum them into latency or subtract a baseline. `unknown`
+means no calibrated healthy-runner threshold exists; `degraded` means a known
+journal failure or uncertain drain, with incomplete measurements. Historical
+runs without telemetry remain unavailable, not healthy. CPU, memory, network and
+cloud-disk calibration remain separate. See [measurement integrity](MEASUREMENT_ACCURACY.md).
+
+CLI and browser summaries show successful latency/TTFT observation counts versus
+all attempts and explicitly disclose that failures/timeouts are excluded from the
+percentiles. Observed journal backpressure gets a fixed warning that achieved
+throughput may be generator-limited, not a target-capacity verdict. Durable waits
+can still constrain throughput when the bounded FIFO never becomes full.
 
 Flushed journals, atomic snapshots, and partial recovery retain local evidence.
 Restarts mark abandoned work interrupted; they do not resume a durable queue.

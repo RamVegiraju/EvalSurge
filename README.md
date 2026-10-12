@@ -9,12 +9,21 @@ Use any agent framework or your own implementation. The integration boundary is
 the hosted endpoint's input/answer contract, not the framework inside it. Run
 directly from Python; an EvalSurge API server is optional.
 
+The current quickstart generates traffic **locally**, against either a locally
+hosted HTTP agent or a deployed Databricks App. You do not need a notebook,
+runner App, or EvalSurge API server.
+
 - Performance: latency, throughput, errors, and answer-text TTFT for supported SSE.
 - Evaluation: opt-in catalog or reviewed MLflow judges, with per-judge coverage.
 - Profiling: heatmaps and waterfalls when the agent exports correlated MLflow traces.
 
 Local alpha: Linux/macOS, single tenant, one active run per artifact owner. A single
 load level is an observation, not proof of sustainable capacity.
+
+Measurement accuracy is a release priority, not a zero-overhead claim. The load
+generator's machine, storage and network affect the observations. Inspect the
+report's generator evidence and timing coverage alongside latency and throughput;
+a complete journal does not establish an unsaturated generator.
 
 ## Bring your agent
 
@@ -48,17 +57,29 @@ endpoints need no wrapper.
 
 ## Start in Python
 
-Requires Python 3.11+ and an authorized agent that already uses a real model.
-Install the execution dependencies in your project:
+Requires Python 3.11+ on Linux/macOS and an authorized agent that already uses a
+real model. Use the reviewed demo wheel in a dedicated environment; this alpha
+does not claim to be published on PyPI. Replace the filename with the artifact
+you actually received:
 
 ```bash
-uv add 'evalsurge[server]'
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install './evalsurge-0.2.1.dev2026101202-py3-none-any.whl[local]'
+python -c 'from evalsurge import Agent, EvalSurge, RunCreate; print("Direct SDK imports available")'
 ```
+
+The `[local]` extra supplies direct execution dependencies. The existing `[server]`
+extra remains compatible; neither starts an API server. The runner does not need
+LangGraph, OpenAI Agents, or CrewAI installed just to call their hosted endpoints.
+No source checkout or development group is needed to run the Python code below.
+See [installation and verification boundaries](docs/INSTALLATION.md) for the
+remote-only install and the packaged diagnostics.
 
 No EvalSurge server, operator TOML, or REST polling is needed:
 
 ```python
-from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference
+from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference, format_summary
 
 request = RunCreate(
     name="first-benchmark",
@@ -73,8 +94,13 @@ with EvalSurge(
 ) as client:
     run = client.start(request)
     report = run.wait(timeout=300)
-    print(report.model_dump_json(indent=2))
+    print(format_summary(report))
 ```
+
+`format_summary(report)` shows lifecycle, load observations, quality coverage and
+generator limits without printing prompts or answers. Inspect the typed report
+directly or explicitly use `print(report.model_dump_json(indent=2))` when you want
+the full protected evidence. Keep that JSON output private.
 
 Evaluation defaults to off: no planner or judge calls. The agent itself can incur
 cost and execute tools. Before measured load, one extra first-case invocation
@@ -107,7 +133,7 @@ with EvalSurge(
     },
 ) as client:
     report = client.start(request).wait(timeout=300)
-    print(report.model_dump_json(indent=2))
+    print(format_summary(report))
 ```
 
 The default is DurableAgentServer's synchronous `/api/invocations` contract.
@@ -117,57 +143,67 @@ negotiate protocols, or retry model requests. Native invocation JSON does not
 provide answer-text TTFT or token usage. See [the local-runner App-target script](examples/journeys/local_runner_databricks_app_target.py)
 and [framework/hosting examples](docs/FRAMEWORK_TARGET_EXAMPLES.md).
 
-## From a Databricks notebook
+For copyable LangGraph, OpenAI Agents, and CrewAI agent setup plus the same two
+runner commands, see [the local-runner quickstart](examples/journeys/LOCAL_RUNNER_QUICKSTART.md).
+The framework is an example implementation, not an EvalSurge target type.
+Prepared examples and installation checks are not successful real-model tests;
+[the validation record](docs/LIVE_MATRIX_RESULTS.md) states what actually ran.
 
-**Prepared, authentication-blocked—not live-validated.** The
-[runner-only serverless notebook sample](examples/journeys/serverless_runner_databricks_app_target.py)
-is available for review and dry-run planning. Do not submit its model-bearing Job
-until the supported operator-owned authentication design and deployed-App
-readiness have been reviewed.
+## Interpret measurement evidence
 
-Notebook compute is a **load-generator location**, not another agent-hosting
-option. The intended serverless journey runs EvalSurge/Locust on the notebook
-driver and sends traffic to an already deployed App; it does not host an agent
-inside that notebook. The same v2 cases/load/evaluation vocabulary applies.
-Classic compute is deferred from the current validation. The retained
-[classic source](examples/journeys/classic_notebook.py) is not a serverless pass.
+Latency and answer-text TTFT are client-observed timings starting at HTTP
+dispatch, after authentication and the durable START record. They are not
+server-only inference timings. The CLI and report display the successful timing
+observation counts; failed and timed-out attempts affect the error rate but are
+excluded from those percentiles. Inspect both before drawing conclusions.
 
-Authentication must work both for App discovery and in the spawned load worker.
-A profile on your laptop is not automatically present in a notebook, and notebook
-driver OAuth alone does not establish worker authentication. The current public
-App binding requires an explicit profile and rejects contradictory ambient
-identity/destination settings. Native notebook OAuth is unavailable to the
-independent worker in the retained serverless prerequisite check. No token is
-copied into sample source, workload JSON or Job parameters to bypass either gate.
-See [the serverless/API topology diagnosis](docs/SERVERLESS_RUNNER_STATUS.md)
-for what failed and the reviewed authentication work still needed.
+The journal writer keeps disk I/O off Locust's event loop, but durable waits can
+still reduce achieved throughput. `generator_health` shows scheduling lag,
+journal waits, backpressure and drain evidence. `unknown` is not a healthy-runner
+certification; `degraded` means known persistence or drain failure. Observed
+backpressure is a warning that achieved rate may be generator-limited. Do not
+subtract a calibration baseline, sum overlapping waits into latency or treat
+one load level as sustainable capacity.
 
-The initial notebook sample is bounded to **one excluded probe plus one measured
-App invocation**, concurrency one, with evaluation off. Select an already deployed,
-ready no-tool agent whose reviewed source enforces at most 512 output tokens per
-model response. App invocations are not a generic model/tool-call or spending cap.
-Driver/profile readiness, independent worker OAuth, deployed App readiness and
-explicit traffic approval are all required; optional API execution, fail-fast and
-cancellation need separate validation. See [the notebook validation checklist](scripts/validation/README.md#serverless-notebook-validation).
+See [measurement definitions and calibration evidence](docs/MEASUREMENT_ACCURACY.md).
+The current local timing calibration does not establish serverless, cloud-disk
+or real-agent coverage of this implementation.
 
-The samples' static contract coverage is not evidence that all notebook/hosting
-combinations passed live validation. Consult
-[the validation record](VALIDATION.md) for actual model, hosting, and traffic bounds.
-The [hosted-journey matrix](docs/HOSTED_JOURNEY_VALIDATION.md) lists current
-resources, retained failures and the bounded next live-validation plan.
-The retained October 8 notebook-local HTTP/API run failed without a final receipt;
-later zero-inference prerequisites confirmed driver OAuth but failed independent
-worker OAuth. These are distinct from notebook-to-App validation. Current journey
-results and blockers are kept in the hosted-journey record, not inferred from an
-example's presence.
+## Validation scope
+
+The active [framework/hosting inventory](examples/journeys/FRAMEWORK_MATRIX.md)
+has six local-runner journeys: three example frameworks, each served over HTTP
+or as a Databricks App. App-hosted and notebook-hosted load generation are
+deferred, not prerequisites for using EvalSurge locally. Their prepared samples
+and failure evidence remain available for future work; no cloud resources are
+created, started, or deleted by this quickstart.
+
+See [the exact real-model evidence](docs/LIVE_MATRIX_RESULTS.md) for passed,
+blocked, and untested journeys against the selected package artifact.
+
+### Notebooks: deferred
+
+The user deferred notebook validation on October 11, 2026. The
+[serverless source](examples/journeys/serverless_runner_databricks_app_target.py)
+and [detailed authentication/failure record](docs/SERVERLESS_RUNNER_STATUS.md)
+remain available; no successful notebook-generated App load is claimed and this
+milestone does not require notebook credentials or classic compute.
 
 ## Where requests originate
 
-Direct Python sends benchmark traffic from the Python caller's machine: your
-laptop, or the notebook driver. Optional remote SDK/REST execution sends traffic
-from the EvalSurge API host, not the submitting laptop. Thus `127.0.0.1` means
-the runner's loopback. Network location and runner resources affect the result.
-Use a runner separate from the target for repeatable measurements.
+Direct Python starts the owned Locust worker in the environment where EvalSurge
+is installed. For this milestone, that environment is your local machine;
+the target agent can be hosted locally over HTTP or deployed on Databricks Apps.
+Notebook and runner-App sources are retained but deferred. Neither primary
+journey requires a separately deployed EvalSurge API server.
+
+Optional remote SDK/REST execution instead sends traffic from the EvalSurge API
+host, not the submitting client. Thus `127.0.0.1` means the runner's loopback:
+a cloud runner cannot use that address to reach an agent on your laptop. Select
+an approved reachable HTTPS origin for that combination; no example opens a
+tunnel automatically. Network location and runner resources affect the result.
+Use a runner separate from the target for repeatable measurements. The App-runner
+example remains prepared, not a successful live-validation claim.
 
 ## Add your dataset and judges
 
@@ -226,8 +262,11 @@ directory using [the optional server guide](docs/OPTIONAL_SERVER.md#open-a-retai
 Reports can contain prompts, answers, references, and judge rationales; protect them.
 
 Client timings include transport and load-generator effects. Local diagnostics
-found small native journal costs, but blocking journal I/O can delay other users;
-zero overhead and cloud/serverless disk behavior are not established. See
+found small native journal costs, but blocking journal I/O can delay other users.
+The cooperative journal writer moves disk work off the load event loop while
+preserving per-event fsync. Reports show hub lag, journal waits and drain/failures;
+these are observations, not a guarantee of an unsaturated or zero-overhead runner.
+Cloud/serverless disk behavior is not established. See
 [measurement accuracy and its limits](docs/MEASUREMENT_ACCURACY.md).
 
 ## Optional server and compatibility

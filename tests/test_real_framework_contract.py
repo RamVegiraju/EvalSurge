@@ -117,14 +117,13 @@ async def test_native_wiring_with_intentional_pre_provider_rejection(framework):
     Invalid input is rejected before inference. This is not successful real-model
     execution, and does not replace the separately gated live integration matrix.
     """
-    import httpx
-    from openai import AsyncOpenAI
+    from openai import AsyncOpenAI, DefaultAsyncHttpxClient
 
     from evalsurge.serving import InvocationContext
 
     selected = selection()
     async with (
-        httpx.AsyncClient(event_hooks={"response": [response_completion_guard]}) as http,
+        DefaultAsyncHttpxClient(event_hooks={"response": [response_completion_guard]}) as http,
         AsyncOpenAI(
             base_url=selected.base_url,
             api_key="constructor-only-no-traffic",
@@ -190,12 +189,11 @@ async def test_nonstreaming_guard_rejects_sse_without_answer_parsing():
 
 
 async def test_native_client_without_raw_status_guard_rejected_before_provider():
-    import httpx
-    from openai import AsyncOpenAI
+    from openai import AsyncOpenAI, DefaultAsyncHttpxClient
 
     selected = selection()
     async with (
-        httpx.AsyncClient() as http,
+        DefaultAsyncHttpxClient() as http,
         AsyncOpenAI(
             base_url=selected.base_url, api_key="constructor-only-no-traffic", http_client=http
         ) as client,

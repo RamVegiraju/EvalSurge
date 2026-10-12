@@ -11,6 +11,27 @@ before App resolution. See [v2 configuration](docs/V2_API.md).
 App configuration-file selectors must also agree between the API process and
 private runtime snapshot; SDK CLI credential subprocesses inherit process values.
 
+Explicit operator `auth="app-runtime"` is an additive native runner-App mode,
+not a relaxed profile guard or credential fallback. Its fixed workspace, runner
+App and service-principal client UUID remain outside `RunCreate`. Both actual and
+detached environments must agree on the injected M2M identity/secret and reject
+token/profile/config-file/account/alternate-auth selectors before SDK construction.
+The optional private `workspace_id` pins the platform's numeric routing selector.
+If configured or injected, canonical positive IDs must agree between the operator,
+actual environment, detached worker environment and resulting SDK Config before
+credential use. Legacy native calls without either ID remain compatible; profile
+mode rejects native identity fields. The October 12 ADR 0019 amendment remains a
+deployment-review gate. The SDK explicitly uses its native refreshable M2M
+strategy; metadata must map the
+runner App's `service_principal_client_id` to the configured UUID and declare the
+exact target App resource with `CAN_USE`. The target endpoint comes from that
+workspace's Apps API, and every worker independently verifies the binding/refresh.
+No injected secret is put in a connection file or copied user/notebook token.
+This is trusted operator/runtime agreement, not cryptographic platform attestation,
+and controlled SDK tests do not establish a deployed runner or live OAuth. Profile
+mode remains unchanged; serverless notebooks still require their portable-source
+gate. See [ADR 0019](docs/adr/0019-explicit-native-app-runner-authentication.md).
+
 Fixed message adapters reject unsupported top-level inference fields instead of
 silently dropping them. This includes identity/routing/resume/custom-input fields;
 operator-governed mapping is deferred. V2 schema diagnostics expose only bounded
@@ -139,6 +160,24 @@ span/tool names can still be sensitive. Full source traces and captured request 
 remain protected evidence, not sanitized public telemetry.
 
 Artifacts contain input prompts, responses, reference data, model/profile identifiers, and request metadata. Protect the artifact directory and MLflow store with filesystem permissions and a retention policy. Do not commit live artifacts. Deleting artifacts also deletes local idempotency history. Journal flushing protects against worker-process interruption, not disk failure or filesystem loss.
+
+The Locust journal now has one owned bounded FIFO/native file writer. Start
+dispatch requires a per-event fsync acknowledgment; completion clocks freeze
+before persistence. Queued lifecycle snapshots cannot be changed by an interrupted
+caller. The writer rejects symlink destinations, propagates fixed content-free
+failures and stops new dispatch. Failure, uncertain drain or count mismatch cannot
+produce complete measurements. A stuck native syscall cannot be forcibly stopped
+safely; the existing parent subprocess watchdog remains the hard cleanup boundary.
+Content-free generator aggregates expose no paths, prompts or auth configuration;
+they do not certify capacity or absence of observer effects. See proposed ADR 0014.
+
+The serverless sample's portable OAuth launcher reads an existing protected
+operator-owned M2M profile and builds a fresh allowlisted process environment.
+It does not populate secrets, create identities, copy driver tokens or relax
+target-resolver guards. Each owner/worker must independently refresh OAuth and
+verify the selected workspace/App boundary. The operator owns permissions,
+rotation and removal of the long-lived source; no live coverage or least-privilege
+sign-off follows from configuration tests. See proposed ADR 0015.
 
 Local assistant configuration under `.isaac/` is not project source. Keep it out
 of commits and source distributions; release verification checks archive member

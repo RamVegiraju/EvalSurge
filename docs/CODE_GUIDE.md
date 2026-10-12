@@ -16,8 +16,11 @@ Both local HTTP agents and registered Databricks Apps are implemented targets;
 session identifier is ordering state, not proof of transcript or long-term memory.
 `evalsurge/facade.py` exposes remote access without server dependencies and defers
 local execution imports until explicitly requested. Package-level `Agent`,
-`Connection`, and `RunFailed` remain compatible lazy exports requiring the server
-extra; the public Pydantic models and HTTP client need only the base installation.
+`Connection`, and `RunFailed` remain compatible lazy exports requiring the direct
+execution stack; the public Pydantic models and HTTP client need only the base installation.
+`evalsurge[local]` is the clearer direct-execution install; `[server]` remains a
+compatible alias for the same runtime stack. Current onboarding generates load
+locally against HTTP or App targets; cloud runner examples are deferred.
 
 `evalsurge/local.py` adds the v2 request vocabulary to direct execution. Its
 operator snapshot binds opaque request aliases to `Agent.http()` or lazy
@@ -76,6 +79,10 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 | `evalsurge/` | `Agent.http()` separates protocol and connection; `EvalSurge.local()/local_async()` expose run handles without starting a server or nesting event loops. |
 | `evalsurge/facade.py` | `EvalSurge.remote()` stays dependency-light; local factories and lazy exports verify the explicit server extra before loading the existing local implementation. |
 | `evalsurge/local.py` | Direct v2 admission, operator snapshot ownership and typed handles over the existing local runtime; legacy overloads remain. |
+| `evalsurge/summary.py` | Public `format_summary()` shares bounded content-free Result/Report presentation with the CLI, without reading request evidence or invoking resources. |
+| `evalsurge/serverless.py` | Packaged portable-M2M readiness/execution launcher; operator-owned protected profile, isolated process environment and independent worker authentication remain required. |
+| `evalsurge/_retrieval.py` | Pure status/result/report receipt consistency shared by the packaged launcher and historical validation scripts; no inference or authentication work. |
+| `evalsurge/calibration.py` | Explicitly NON-agent bounded localhost timing diagnostic over the production Locust path; owns native handlers and cancellation-resistant cleanup receipts, never certifies accuracy. |
 | `evalsurge/serving.py` | Optional agent-side `create_app()` calls the customer async handler, preserves bounded JSON inputs, validates completed answers and propagates explicit correlation/state keys; no framework loading in the runner or automatic auth/tracing. |
 | `run_views.py` | Shared status/result/report projections, including planless terminal failures; no target or judge execution. |
 | `validation.py` | `validate_request()` detaches schema inputs and emits safe bounded `RequestValidationError`; no raw submitted values. |
@@ -89,7 +96,7 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 | `locustfile.py` | `start()` starts the measured window; `finish()` writes the aggregate snapshot; `AgentUser.invoke()` owns sequential request lifecycle and active counters. |
 | `streaming.py` | `consume()` mutates one measurement row from a supported single-line SSE data event. It does not open connections or measure its own clock. |
 | `runner.py` | `payload()` builds adapter envelopes; `percentile()` computes nearest-rank statistics; `summarize()` reports descriptive performance, not capacity or a quality verdict. |
-| `storage.py` | `atomic_json()` replaces snapshots; `append_event()` flushes journal progress; `recover_rows()` reconstructs latest per-attempt state without resuming work. |
+| `storage.py` | `CooperativeJournal` owns a bounded FIFO, one native file writer and per-event fsync acknowledgments in Locust; `atomic_json()` replaces snapshots; legacy `append_event()` remains for callers outside the worker; `recover_rows()` reconstructs latest per-attempt state without resuming work. |
 | `sampling.py` | `select_rows()` balances shuffled case/time strata using the frozen seed and assessment budget; it preserves input rows. |
 | `judges.py` | `rubric_hash()` detects prompt-source drift; `build_prompt()` renders installed rubrics; `direct_scorer()` requires a plan and returns a native MLflow scorer. |
 | `evaluator.py` | `evaluate()` uses captured outputs and the plan as the sole evaluation configuration, retaining assessment IDs, coverage, and MLflow result references. |
@@ -109,6 +116,7 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 | `scripts/export_openapi.py` | `main()` exports the public schema or verifies the committed snapshot with `--check`. |
 | `scripts/verify_remote_install.py` | Builds an isolated base-only dependency environment, installs the actual wheel, checks absent server distributions, and exercises remote SDK/CLI behavior plus missing-extra guidance without target traffic. |
 | `scripts/verify_wheel.py` | Checks required wheel/source assets, including unified SDK modules, and rejects local assistant metadata in the sdist by member name; never extracts or executes archive contents. |
+| `scripts/verify_install.py` | Fresh base/server installations outside the checkout; verifies the installed distribution, public models/summary/helpers and optional production NON-agent timing without provider calls. |
 
 ## Contracts worth preserving
 
@@ -144,6 +152,10 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
   The run window also includes ramp-up, authentication, journaling, and drain.
 - Failed attempts affect error rates. Successful-only percentiles and partial
   provider token usage must be interpreted with their coverage counts.
+- `generator_health` is content-free hub-lag/journal evidence, not an accuracy
+  badge. Durability waits overlap and still affect achieved rate; native write
+  offloading does not remove CPU/GIL/parser effects. Historical absence is unknown;
+  journal failure/uncertain drain prevents complete measurements. See ADR 0014.
 - Journal rows are returned in attempt-start order, which includes attempts that fail
   before HTTP dispatch.
 - Restart recovery marks abandoned phases interrupted and idempotency replay agrees
@@ -161,15 +173,21 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
   runner location, not agent hosting. Samples alone are not live evidence.
 - [The serverless runner-only notebook](../examples/journeys/serverless_runner_databricks_app_target.py)
   and [its readiness harness](../scripts/validation/serverless_runner_app_target.py)
-  are **prepared, authentication-blocked—not live-validated**. The notebook runs
-  EvalSurge/Locust only and targets an already deployed App. The unchanged public
-  binding is profile-only, rejects ambient identity/destination overrides, and
+  are **prepared, authentication-blocked—not live-validated**. The portable-M2M
+  launcher validates an existing protected operator profile, isolates the owner
+  environment and verifies driver/independent worker auth before traffic. It
+  creates no credential source and copies no notebook token. See ADR 0015. The notebook runs
+  EvalSurge/Locust only and targets an already deployed App. This notebook sample
+  uses the explicit-profile binding, rejects ambient identity/destination overrides, and
   requires independently refreshable worker OAuth. Native driver OAuth is not
   worker evidence. Gates cover exact driver/profile identity, worker auth and
   deployed readiness before separately approved traffic. Initial load is one
   excluded probe plus one measured invocation, concurrency one, evaluation off;
   the reviewed no-tool deployment must enforce <=512 output tokens. This does
   not establish notebook API execution, cancellation, fail-fast or capacity.
+  ADR 0019 adds a separate explicit App-runtime binding for a dedicated App
+  runner. Its October 12 private workspace-ID amendment remains a deployment
+  review gate. It does not supply notebook credentials or relax the profile guard.
   The harness checks the selected workspace before App discovery, reuses the
   unchanged override/origin guards and returns fixed stage-specific blocker codes.
   SDK construction may initialize metadata/authentication before the check.

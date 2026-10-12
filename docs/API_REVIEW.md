@@ -1,5 +1,31 @@
 # API and implementation review — 0.2.0
 
+## Generator observation additions — October 10, 2026
+
+[Proposed ADR 0014](adr/0014-measurement-integrity-and-journal-ownership.md)
+records native cooperative journal ownership and unchanged request-clock/per-event
+durability semantics. `Performance.generator_health` is a nullable typed aggregate;
+new `GeneratorHealth`, `JournalHealth`, `HubLag` and `GeneratorTiming` exports require
+only the same dependency-light Pydantic boundary. No endpoint, request credential
+field, second load engine, warmup exclusion, successful-percentile redefinition or
+accuracy certification is added. The CLI/browser show fixed guidance and numeric
+observations, never arbitrary worker paths/provider errors.
+
+Generator `unknown` is normal even with observations; no calibrated healthy
+threshold exists. `degraded` denotes known journal failure/uncertain drain, not a
+latency SLO. Result summary gaps add `generator_health_unavailable` for missing
+historical telemetry and `generator_degraded` for observed journal failure.
+Historical complete measurements remain complete with an explicit health-evidence
+gap; degraded observations cannot be presented as complete. Aggregate waits
+overlap, and throughput still includes the user's durability waits and drain.
+
+Compatibility is directional: new typed models accept old responses without the
+field; older strict clients can reject new fields/gap enum values. Update typed
+clients together with the server. V1 request/response schemas are unchanged;
+its existing untyped metrics dictionary carries additive worker aggregates.
+Designated maintainer review, fresh real-model and cloud/serverless calibration
+remain separate gates; local numeric/storage/rendering passes do not establish them.
+
 ## Hosted endpoint and evidence additions — October 8, 2026
 
 [ADR 0012](adr/0012-hosted-agent-integration-contract.md) records the additive

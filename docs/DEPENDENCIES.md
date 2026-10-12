@@ -7,6 +7,9 @@ exact reproducible environment. Widening a range is not proof of compatibility.
 ## Remote and execution dependency surfaces
 
 The default distribution has only HTTPX and Pydantic as direct dependencies.
+`evalsurge[local]` is the clearer additive installation name for direct execution;
+it expands to the unchanged `[server]` dependency set. Framework dependencies
+remain in the agent's own environment, not the load generator.
 `evalsurge[server]` installs the existing REST/local Locust, MLflow, provider and
 Databricks SDK stack; `evalsurge[agents]` includes server plus both example frameworks.
 The agents extra refers to the server extra in project metadata, preserving the
@@ -17,7 +20,7 @@ Remote imports defer local-only modules. Tests build and install a real wheel in
 a fresh base-only uv environment, assert that server distributions are absent,
 exercise SDK submit/wait and CLI run/doctor through controlled HTTP transports, and
 check the installed entry point and helpful missing-server errors. Run
-`uv run --no-sync python scripts/verify_remote_install.py --offline` after a full
+`uv run --frozen --no-sync python scripts/verify_remote_install.py --offline` after a full
 locked sync and build; CI includes this gate on every supported Python version.
 This is remote-install isolation, not a published-release install or live service test.
 
@@ -29,7 +32,25 @@ were retained. `uv lock --check --offline --default-index https://pypi.org/simpl
 and full agents/dev locked offline sync accepted the migrated metadata. This is a
 verified metadata migration, not a fresh latest-compatible dependency resolution.
 
+The October 12 `0.2.1.dev2026101202` update likewise changes only the editable
+project version and extra metadata. All 189 non-editable package records remain
+identical, including dependency graphs, hashes and registry/artifact origins.
+Offline lock checking accepts 190 packages; frozen local/server hashed exports are
+byte-for-byte identical. This does not establish newest-compatible dependencies
+or public-index publication. Fresh pip installation evidence is recorded separately
+in [validation](../VALIDATION.md).
+
 ## Update workflow
+
+Verification is not a dependency update. In a checkout with a configured package
+mirror, use `uv run --frozen --no-sync ...` for inspection/tests: `--no-sync` alone
+does **not** prevent lock resolution or changes. Keep locked export/sync commands
+explicit about the lock's index identity, use offline checks when appropriate and
+retain approved-source install provenance separately. Never rewrite mirror URLs
+into public origins or commit an unintended mirror resolution. The October 11
+installation gate caught such a verification-time mutation; its failed candidates
+remain private evidence, and the known baseline lock was restored with only the
+deliberate project-version change before final verification.
 
 1. Verify published versions and migration guidance using official PyPI metadata
    and upstream release notes. Record the date, interpreter, and index.
@@ -48,7 +69,7 @@ uv lock --upgrade
 uv sync --locked --extra agents --group dev
 uv export --quiet --locked --extra agents --group dev --no-emit-project \
   --output-file artifacts/audit-requirements.txt
-uv run --no-sync pip-audit --disable-pip --require-hashes \
+uv run --frozen --no-sync pip-audit --disable-pip --require-hashes \
   --progress-spinner off --vulnerability-service osv \
   --requirement artifacts/audit-requirements.txt
 ```
@@ -152,7 +173,7 @@ Repeat the upstream version check; this table is a dated snapshot, not a live li
 Read-only GitHub inspection confirmed runs `37311757111` (main `d83ef4a`) and
 `37322866817` (docs merge on main `fb8ce89`) failed all eight Python 3.11–3.14
 test/security jobs during `uv sync --locked --extra agents --group dev`.
-Each download failure timed out against `pypi-proxy.cloud.databricks.com`;
+Each download failure timed out against the configured internal registry mirror;
 tests, schema/build checks, and the advisory audit did not run. This is an
 installation failure, not evidence of eight code regressions or vulnerabilities.
 The affected `d83ef4a` lock has 211 registry entries pointing at that mirror.

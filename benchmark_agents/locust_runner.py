@@ -1,11 +1,13 @@
 """Isolated Locust subprocess with durable partial-result recovery."""
 
 import asyncio
+import importlib.util
 import json
 import math
 import os
 import sys
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Literal
 
@@ -14,6 +16,72 @@ from .connections import Connection, resolve_connection, validate_connection
 from .models import Load, PreflightError, PreflightResult, RunRequest
 from .runner import summarize
 from .storage import atomic_json, recover_rows
+
+CalibrationMode = Literal[
+    "native", "native_fsync_delay", "fail_start_before_write", "fail_completion_before_write"
+]
+CALIBRATION_MODES = {
+    "native",
+    "native_fsync_delay",
+    "fail_start_before_write",
+    "fail_completion_before_write",
+}
+CALIBRATION_ENVIRONMENT_KEYS = (
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "TZ",
+    "PYTHONUTF8",
+    "PYTHONIOENCODING",
+    "SYSTEMROOT",
+)
+
+
+def _calibration_environment() -> dict[str, str]:
+    """Copy only runtime basics for timing children, excluding operator credentials."""
+    return {key: os.environ[key] for key in CALIBRATION_ENVIRONMENT_KEYS if key in os.environ}
+
+
+def journal_integrity_failed(summary: dict[str, Any], rows: list[dict[str, Any]]) -> bool:
+    """Check owned writer acknowledgments against durable recovered attempts.
+
+    Args:
+        summary: Worker receipt; historical receipts may lack writer telemetry.
+        rows: Durable recovery, including starts without acknowledged completions.
+
+    Returns:
+        True for known failure/uncertain drain or issued/acknowledged/durable count
+        mismatch. Missing historical telemetry is not a health certification.
+
+    A failed initial START can leave no recoverable row. Never infer completeness
+    solely from zero unfinished rows or a successful worker exit.
+    """
+    issued = summary.get("attempted_requests")
+    if issued is not None and (type(issued) is not int or issued < 0 or issued != len(rows)):
+        return True
+    health = summary.get("generator_health")
+    if health is None:
+        return False
+    if not isinstance(health, dict) or health.get("status") != "unknown":
+        return True
+    writer = health.get("journal")
+    if not isinstance(writer, dict):
+        return True
+    return (
+        type(writer.get("writer_failures")) is not int
+        or writer.get("writer_failures") != 0
+        or writer.get("drained") is not True
+        or type(issued) is not int
+        or type(writer.get("started_events")) is not int
+        or type(writer.get("completed_events")) is not int
+        or writer.get("started_events") != issued
+        or writer.get("completed_events") != issued
+        or sum(row.get("error") != "WorkerInterrupted" for row in rows) != issued
+    )
 
 
 def preflight_result(rows: list[dict[str, Any]], summary: dict[str, Any]) -> PreflightResult:
@@ -49,7 +117,13 @@ def preflight_result(rows: list[dict[str, Any]], summary: dict[str, Any]) -> Pre
     else:
         result.status = "failed"
     error_type = row.get("error")
-    if result.status == "interrupted" or not row or summary.get("worker_exit_code") not in {0, 1}:
+    if summary.get("journal_integrity_failed"):
+        code, guidance = (
+            "worker_failed",
+            "The request journal could not be durably completed. Check protected worker logs "
+            "and the runner disk before retrying; partial evidence is retained.",
+        )
+    elif result.status == "interrupted" or not row or summary.get("worker_exit_code") not in {0, 1}:
         code, guidance = "worker_failed", "The inference-check worker did not finish."
     elif row.get("error_phase") == "authentication":
         code, guidance = "authentication_failed", "Check the server-owned target credentials."
@@ -160,6 +234,48 @@ async def run_preflight(
     return result
 
 
+async def _reap_worker(process: asyncio.subprocess.Process) -> asyncio.CancelledError | None:
+    """Own TERM/grace/KILL/reap despite repeated owner cancellation.
+
+    Args:
+        process: The exact locally spawned Locust worker owned by run_load.
+
+    Returns:
+        Cancellation observed during cleanup, propagated only after reaping.
+
+    Raises:
+        OSError: Native process termination fails for reasons other than exit.
+
+    Side Effects:
+        Sends TERM if live, allows five seconds of grace, then KILL and waits.
+        The single cleanup task is shielded but always awaited, never detached.
+        This reaps the owned child, not arbitrary descendants or target effects.
+    """
+
+    async def stop() -> None:
+        if process.returncode is None:
+            with suppress(ProcessLookupError):
+                process.terminate()
+            try:
+                await asyncio.wait_for(process.wait(), timeout=5)
+            except TimeoutError:
+                with suppress(ProcessLookupError):
+                    process.kill()
+                await process.wait()
+        else:
+            await process.wait()
+
+    cleanup_task = asyncio.create_task(stop())
+    cancellation = None
+    while not cleanup_task.done():
+        try:
+            await asyncio.shield(cleanup_task)
+        except asyncio.CancelledError as error:
+            cancellation = error
+    cleanup_task.result()
+    return cancellation
+
+
 async def run_load(
     request: RunRequest,
     run_id: str,
@@ -168,6 +284,7 @@ async def run_load(
     *,
     phase: Literal["load", "preflight"] = "load",
     connection: Connection | None = None,
+    _calibration_mode: CalibrationMode | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Run the production Locust subprocess and recover its request measurements.
 
@@ -178,6 +295,8 @@ async def run_load(
         artifact_dir: Storage root, defaulting to BENCHMARK_ARTIFACT_DIR or artifacts.
         phase: Worker ownership label; preflight uses a separate artifact root.
         connection: Optional trusted exact binding; never a resolved secret.
+        _calibration_mode: Internal timing-only selector for the fixed bundled
+            wrapper; never exposed through benchmark requests or customer targets.
 
     Returns:
         Recovered request rows and a summary with independent load status,
@@ -192,6 +311,14 @@ async def run_load(
     outer deadline terminates and, if needed, kills an unresponsive worker. Missing
     worker results use diagnostic parent-observed timing, not comparable load timing.
     """
+    entrypoint = Path(__file__).with_name("locustfile.py")
+    if _calibration_mode is not None:
+        if _calibration_mode not in CALIBRATION_MODES:
+            raise ValueError("Unsupported internal calibration mode")
+        spec = importlib.util.find_spec("evalsurge._calibration_locust")
+        if spec is None or spec.origin is None:
+            raise RuntimeError("The packaged calibration worker is unavailable")
+        entrypoint = Path(spec.origin)
     root = (
         artifact_dir or Path(os.getenv("BENCHMARK_ARTIFACT_DIR", "artifacts"))
     ).resolve() / run_id
@@ -208,13 +335,20 @@ async def run_load(
     atomic_json(root / "connection.json", binding.model_dump())
     if cancel.is_set():
         cancel_path.touch(exist_ok=True)
+    # Timing-only children need runtime basics, never operator/cloud/model secrets.
+    # The actual benchmark path retains the existing task-local operator snapshot.
+    inherited_environment = (
+        _calibration_environment() if _calibration_mode is not None else operator_environment()
+    )
     environment = {
-        **operator_environment(),
+        **inherited_environment,
         "BENCHMARK_LOCUST_CONFIG": str(config_path),
         "BENCHMARK_LOCUST_RESULT": str(result_path),
         "BENCHMARK_LOCUST_CANCEL": str(cancel_path),
         "BENCHMARK_RUN_ID": run_id,
     }
+    if _calibration_mode is not None:
+        environment["EVALSURGE_CALIBRATION_MODE"] = _calibration_mode
     started = time.monotonic()
     with (root / "locust.log").open("wb") as log:
         process = await asyncio.create_subprocess_exec(
@@ -222,7 +356,7 @@ async def run_load(
             "-m",
             "locust",
             "-f",
-            str(Path(__file__).with_name("locustfile.py")),
+            str(entrypoint),
             "--headless",
             "--users",
             str(request.load.concurrency),
@@ -250,13 +384,9 @@ async def run_load(
                     break
                 await asyncio.sleep(0.05)
         finally:
-            if process.returncode is None:
-                process.terminate()
-                try:
-                    await asyncio.wait_for(process.wait(), timeout=5)
-                except TimeoutError:
-                    process.kill()
-                    await process.wait()
+            cleanup_cancellation = await _reap_worker(process)
+            if cleanup_cancellation is not None:
+                raise cleanup_cancellation
     rows, incomplete = recover_rows(root)
     if result_path.exists():
         summary = json.loads(result_path.read_text())["summary"]
@@ -268,20 +398,41 @@ async def run_load(
             observed_peak_in_flight=None,
             dispatched_requests=len(rows),
         )
+    journal_fault = journal_integrity_failed(summary, rows)
+    worker_complete = summary.get("measurement_complete", True) is True
+    issued = summary.get("attempted_requests")
+    incomplete_count = max(incomplete, max(0, issued - len(rows)) if type(issued) is int else 0)
+    if journal_fault:
+        health = summary.get("generator_health")
+        if isinstance(health, dict):
+            # Parent recovery knows integrity failed even if the worker reported
+            # an unknown verdict; preserve counters rather than inventing a write failure.
+            summary["generator_health"] = {**health, "status": "degraded"}
+        # Recovered durable captures, not unacknowledged in-memory successes, own partial metrics.
+        summary.update(
+            summarize(
+                rows,
+                max(summary.get("elapsed_seconds_including_drain", 0.001), 0.001),
+                summary.get("dispatch_seconds", 0),
+            )
+        )
     summary.update(
-        incomplete_measurements=incomplete,
+        incomplete_measurements=incomplete_count,
         worker_exit_code=process.returncode,
         worker_timed_out=expired,
+        journal_integrity_failed=journal_fault,
+    )
+    complete = (
+        result_path.exists()
+        and not incomplete_count
+        and not expired
+        and process.returncode in {0, 1}
+        and not journal_fault
+        and worker_complete
     )
     summary["load_status"] = (
-        "interrupted"
-        if expired or incomplete or not result_path.exists() or process.returncode not in {0, 1}
-        else "cancelled"
-        if cancel.is_set()
-        else "completed"
+        "interrupted" if not complete else "cancelled" if cancel.is_set() else "completed"
     )
-    summary["measurement_complete"] = (
-        result_path.exists() and not incomplete and not expired and process.returncode in {0, 1}
-    )
+    summary["measurement_complete"] = complete
     atomic_json(root / "recovered.json", {"rows": rows, "summary": summary})
     return rows, summary

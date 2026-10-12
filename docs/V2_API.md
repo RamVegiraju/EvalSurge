@@ -268,6 +268,16 @@ It needs the `server` extra. Static target discovery proves registration, not
 credentials, deployment health, or actual inference. Invalid request guidance
 names sanitized public fields; it does not echo inputs or credentials.
 
+New runs include `metrics.generator_health`: typed hub-lag and journal aggregates
+from dispatch through drain. Queue admission, durable acknowledgment and native
+write/fsync durations overlap; do not sum them into request latency. `unknown`
+does not certify an unsaturated runner; `degraded` denotes known journal failure
+or uncertain drain and incomplete measurements. Historical telemetry is null,
+with `generator_health_unavailable` in summary gaps, without rewriting historical
+latency or completion. CLI and browser summaries show these observations; CPU,
+memory, network and cloud-disk calibration are not supplied by this feature.
+See [the measurement contract](MEASUREMENT_ACCURACY.md) and proposed ADR 0014.
+
 For remote access, set `EVALSURGE_API_KEY` without putting the key in arguments or
 URLs. `doctor` retrieves static capabilities; it reports configuration, not live
 health. Local operators can also call `benchmark_agents.diagnostics.doctor()` to

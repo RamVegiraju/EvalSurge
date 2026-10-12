@@ -2,6 +2,7 @@
 
 import importlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +150,19 @@ def test_cli_usage_errors_and_missing_files_do_not_echo_arguments(
     assert SECRET not in capsys.readouterr().err
     assert main(["run", str(tmp_path / SECRET)]) == 2
     assert SECRET not in capsys.readouterr().err
+
+
+def test_direct_cli_missing_dependencies_names_local_and_compatible_server(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Simulate an absent optional module; no client, target or model is invoked."""
+    monkeypatch.setitem(sys.modules, "benchmark_agents.diagnostics", None)
+    assert main(["doctor", "--local"]) == 2
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "evalsurge[local]" in output.err
+    assert "evalsurge[server]" in output.err
+    assert "Neither starts an API server" in output.err
 
 
 def test_cli_oversized_configuration_stops_before_remote_client(
