@@ -1,17 +1,18 @@
 # EvalSurge session handoff — October 12, 2026
 
-## October 13 privacy and CI follow-up
+## October 13 visibility and CI follow-up
 
-The GitHub repository is private; an unauthenticated repository API request
-returns 404. Earlier public commits contain operational identifiers, so do not
-reopen the existing history to the public without a separate disclosure and
-history review. The formerly untracked product briefs and report preview have
-been reviewed for the private repository; the preview's run ID was removed.
+The GitHub repository is public again by the user's explicit decision to retain
+its existing history and operational metadata; an unauthenticated repository API
+request returns 200. The formerly untracked product briefs and report preview
+were reviewed before publication, and the preview's run ID was removed.
 The October 12 technical commit is already on remote `main`. Its CI passed the
 security jobs and Python 3.11–3.13 tests, but Python 3.14 failed one localhost
 timeout test because a 50 ms read budget also applied to submission. A test-only
-timing repair passed both focused cases locally. The complete local suite had
-1,875 passes and two isolated offline-install cache failures; see `VALIDATION.md`.
+timing repair passed both focused cases locally. The first post-push CI passed
+Python 3.12–3.14 and all security jobs, while Python 3.11 failed one existing
+NON-agent scheduling-sensitive authentication control. The complete local suite
+had 1,875 passes and two isolated offline-install cache failures; see `VALIDATION.md`.
 No additional model calls or deployment changes were made in this follow-up.
 
 ## Current checkpoint: installed multi-tool wheel, review and technical publication

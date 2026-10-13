@@ -1,13 +1,12 @@
 # Validation — 0.2.1.dev2026101203 checkpoint
 
-## Private-repository and CI follow-up — October 13, 2026
+## Repository visibility and CI follow-up — October 13, 2026
 
-The repository was changed from public to private before adding the pending product
-briefs and report preview. Authenticated GitHub metadata reports `private=true`;
-an unauthenticated repository API request returns HTTP 404. Earlier public commits
-contained operational identifiers and local evidence paths. Private visibility
-prevents current anonymous repository access, but cannot revoke prior clones or
-caches; do not make the existing history public again without a separate review.
+The repository was temporarily private while the product briefs and report preview
+were reviewed and pushed. The user then explicitly chose to restore public access
+with the existing history and operational metadata. Authenticated GitHub metadata
+reports `private=false`; an unauthenticated repository API request returns HTTP 200.
+Historical commits include workspace/App identifiers and local evidence paths.
 The pending brief and preview were checked for exact workspace/App identifiers,
 credential patterns, and local evidence paths. The HTML preview's historical run
 ID was removed. No real model, deployment, or Databricks workspace call occurred.
@@ -35,9 +34,13 @@ No new full-suite pass is claimed.
 Locked sync passed offline with the lock's public index identity (190 resolved,
 182 installed packages checked). Ruff lint, Ruff format, OpenAPI snapshot and
 schema checks, JavaScript syntax, and `git diff --check` passed. An offline
-wheel/source build and archive verification passed; post-push CI remains a separate
-check. Controlled provider responses in the suite are regression fixtures,
-not actual model inference.
+wheel/source build and archive verification passed. The first post-push CI run
+passed all security jobs and Python 3.12–3.14 test jobs. Python 3.11 reported
+**1 failed, 1,876 passed, 42 warnings**: the existing NON-agent authentication
+single-flight control observed four rather than five unlocked initializations
+under Linux scheduling. That case passed in the earlier isolated macOS Python
+3.11 check; no new full-matrix pass is claimed. Controlled provider responses in
+the suite are regression fixtures, not actual model inference.
 
 ## Pre-demo technical publication verification — October 12, 2026
 
