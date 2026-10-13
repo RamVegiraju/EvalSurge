@@ -1,5 +1,44 @@
 # Validation — 0.2.1.dev2026101203 checkpoint
 
+## Private-repository and CI follow-up — October 13, 2026
+
+The repository was changed from public to private before adding the pending product
+briefs and report preview. Authenticated GitHub metadata reports `private=true`;
+an unauthenticated repository API request returns HTTP 404. Earlier public commits
+contained operational identifiers and local evidence paths. Private visibility
+prevents current anonymous repository access, but cannot revoke prior clones or
+caches; do not make the existing history public again without a separate review.
+The pending brief and preview were checked for exact workspace/App identifiers,
+credential patterns, and local evidence paths. The HTML preview's historical run
+ID was removed. No real model, deployment, or Databricks workspace call occurred.
+
+The October 12 push at `10c34f9` triggered the previously approved controlled
+provider-fixture CI. Security jobs and Python 3.11–3.13 test jobs passed. Python
+3.14 had 1 failure and 1,876 passes: a localhost timeout regression applied a
+50 ms read deadline to submission as well as polling, so a delayed creation
+response could precede the expected report URL. The test now gives submission a
+2-second read budget and delays the poll for 3 seconds; its 10-second overall
+deadline remains bounded. This tests the intended post-admission network timeout
+without changing production transport or server behavior.
+
+Focused localhost regression: `uv run --frozen --no-sync pytest -q
+'tests/test_requests_example.py::test_requests_cli_wait_and_network_timeouts_do_not_retry_or_cancel'`
+passed **2 tests in 4.29 seconds**. This uses a deterministic local HTTP target,
+not model inference. The first sandboxed attempt could not bind loopback; the
+approved outside-sandbox rerun passed. A subsequent full controlled suite reported
+**1,875 passed, 2 failed, 42 warnings in 282.69 seconds**. Both failures were
+isolated `[local]`/`[server]` installation checks lacking artifacts in the local
+offline uv cache. The same source's CI install checks had passed on Python
+3.11–3.13; this local environment failure is retained rather than relabeled.
+No new full-suite pass is claimed.
+
+Locked sync passed offline with the lock's public index identity (190 resolved,
+182 installed packages checked). Ruff lint, Ruff format, OpenAPI snapshot and
+schema checks, JavaScript syntax, and `git diff --check` passed. An offline
+wheel/source build and archive verification passed; post-push CI remains a separate
+check. Controlled provider responses in the suite are regression fixtures,
+not actual model inference.
+
 ## Pre-demo technical publication verification — October 12, 2026
 
 The user approved parallel code/asset review, ten separately bounded real-model

@@ -9,6 +9,9 @@ Use any agent framework or your own implementation. The integration boundary is
 the hosted endpoint's input/answer contract, not the framework inside it. Run
 directly from Python; an EvalSurge API server is optional.
 
+For the concise purpose, design, customer journey, and proposed AgentBricks CLI
+integration, see the [product design brief](docs/PRODUCT_DESIGN_BRIEF.md).
+
 The current quickstart generates traffic **locally**, against either a locally
 hosted HTTP agent or a deployed Databricks App. You do not need a notebook,
 runner App, or EvalSurge API server.

@@ -269,8 +269,8 @@ async def test_requests_cli_wait_and_network_timeouts_do_not_retry_or_cancel(
     api_url, observed = requests_api
     target_url, _ = endpoint
     if network_timeout:
-        observed["poll_delay"] = 0.2
-        monkeypatch.setattr(example, "READ_TIMEOUT_SECONDS", 0.05)
+        observed["poll_delay"] = 3.0
+        monkeypatch.setattr(example, "READ_TIMEOUT_SECONDS", 2.0)
     code = await asyncio.to_thread(
         example.main,
         [
@@ -283,7 +283,7 @@ async def test_requests_cli_wait_and_network_timeouts_do_not_retry_or_cancel(
             "--max-requests",
             "2",
             "--wait-timeout",
-            "5" if network_timeout else "0.2",
+            "10" if network_timeout else "0.2",
         ],
     )
     output = capsys.readouterr()
