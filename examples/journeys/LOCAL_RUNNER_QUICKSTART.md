@@ -18,7 +18,7 @@ wheel and importing it do not establish live target validation:
 ```bash
 python3 -m venv .venv-runner
 source .venv-runner/bin/activate
-python -m pip install './evalsurge-0.2.1.dev2026101202-py3-none-any.whl[local]'
+python -m pip install './evalsurge-0.2.1.dev2026101203-py3-none-any.whl[local]'
 python -c 'from evalsurge import Agent, EvalSurge, RunCreate, format_summary; print("Local SDK imports available")'
 ```
 
@@ -125,8 +125,10 @@ answer-based judging, use your cases, captured answers and authoritative
 references. No agent reinvocation is performed during judging. Explicit catalog
 judges, reviewed custom aliases and automatic planning are illustrated in
 [the dataset/judge examples](../quality/README.md). Judge provider configuration
-is separate from the agent's model configuration, and traces are required only
-for judges that depend on internal evidence.
+is separate from the agent's model configuration. Answer-only judges need no
+tracing; trace-aware judges require their internal evidence. If you separately
+enable internal profiling, correlated trace readiness is required even with
+evaluation off; see [the profiling guide](../../docs/PROFILING_AND_EVALUATION.md).
 
 Completion is not a passing quality verdict. Five requests also do not establish
 sustainable capacity or zero generator overhead. Check timing coverage, error
@@ -142,7 +144,7 @@ from the reviewed wheel into a separate agent environment:
 
 ```bash
 python3 -m venv .venv-agent
-.venv-agent/bin/python -m pip install './evalsurge-0.2.1.dev2026101202-py3-none-any.whl[agents]'
+.venv-agent/bin/python -m pip install './evalsurge-0.2.1.dev2026101203-py3-none-any.whl[agents]'
 .venv-agent/bin/python real_framework_agent.py \
   --framework langgraph --profile YOUR_EXPLICIT_PROFILE \
   --workspace-host https://YOUR_WORKSPACE.cloud.databricks.com \

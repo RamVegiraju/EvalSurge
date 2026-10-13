@@ -18,6 +18,7 @@ from scripts.verify_wheel import REQUIRED_FILES, verify, verify_sdist
         "evalsurge/__init__.py",
         "evalsurge/_version.py",
         "evalsurge/client.py",
+        "evalsurge/tracing.py",
         "evalsurge/local.py",
         "evalsurge/facade.py",
         "evalsurge/calibration.py",
@@ -32,6 +33,7 @@ from scripts.verify_wheel import REQUIRED_FILES, verify, verify_sdist
         "benchmark_agents/locust_runner.py",
         "benchmark_agents/locustfile.py",
         "benchmark_agents/runner.py",
+        "benchmark_agents/trace_ids.py",
         "benchmark_agents/storage.py",
         "benchmark_agents/evaluation_errors.py",
         "benchmark_agents/evaluation_details.py",
@@ -108,4 +110,20 @@ def test_source_assets_exclude_local_metadata_without_reading_it(
         with pytest.raises(ValueError):
             verify_sdist(source)
     else:
+        verify_sdist(source)
+
+
+@pytest.mark.parametrize(
+    "private_member",
+    ["docs/PRODUCT_DESIGN_BRIEF.md", "docs/EvalSurge_Product_Brief.docx", "docs/assets/report.png"],
+)
+def test_source_rejects_publication_excluded_material_by_member_name(
+    tmp_path: Path, private_member: str
+) -> None:
+    """No real briefing bytes are read, and the forbidden archive is never extracted."""
+    source = tmp_path / "evalsurge-private.tar.gz"
+    with tarfile.open(source, "w:gz") as archive:
+        for name in REQUIRED_FILES | {private_member}:
+            archive.addfile(tarfile.TarInfo(f"evalsurge-test/{name}"))
+    with pytest.raises(ValueError, match="publication-excluded"):
         verify_sdist(source)

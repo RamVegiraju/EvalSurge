@@ -1517,6 +1517,21 @@
             ],
             "title": "Profiling",
             "type": "string"
+          },
+          "profiling_readiness": {
+            "default": "not_run",
+            "enum": [
+              "not_run",
+              "pending",
+              "running",
+              "skipped",
+              "passed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "Profiling Readiness",
+            "type": "string"
           }
         },
         "required": [
@@ -1823,6 +1838,78 @@
           }
         },
         "title": "PreflightResult",
+        "type": "object"
+      },
+      "ProfilingPreflight": {
+        "additionalProperties": false,
+        "description": "Excluded probe trace readiness, independent from inference and evaluation.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfilingReadinessError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "status": {
+            "default": "not_run",
+            "enum": [
+              "not_run",
+              "pending",
+              "running",
+              "skipped",
+              "passed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "ProfilingPreflight",
+        "type": "object"
+      },
+      "ProfilingReadinessError": {
+        "additionalProperties": false,
+        "description": "Fixed trace-readiness guidance; never includes raw store/trace exceptions.",
+        "properties": {
+          "code": {
+            "const": "trace_readiness_failed",
+            "default": "trace_readiness_failed",
+            "title": "Code",
+            "type": "string"
+          },
+          "guidance": {
+            "default": "Check real agent-side tracing, exact experiment/run/request correlation, sampling, export and tracking-store permissions before retrying.",
+            "description": "Fixed operator action, without trace content or credential values.",
+            "title": "Guidance",
+            "type": "string"
+          },
+          "message": {
+            "description": "Safe explanation and corrective guidance.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "ProfilingReadinessError",
         "type": "object"
       },
       "ProfilingSummary": {
@@ -2179,7 +2266,8 @@
               "scope_mismatch",
               "invalid",
               "budget",
-              "collection_failed"
+              "collection_failed",
+              "unsupported_scope"
             ],
             "title": "Status",
             "type": "string"
@@ -2283,6 +2371,9 @@
           },
           "preflight": {
             "$ref": "#/components/schemas/PreflightResult"
+          },
+          "profiling_preflight": {
+            "$ref": "#/components/schemas/ProfilingPreflight"
           },
           "status": {
             "enum": [
@@ -2577,6 +2668,10 @@
           "preflight": {
             "$ref": "#/components/schemas/PreflightResult",
             "description": "Mandatory first-case inference check before measured load; historical runs use not_run."
+          },
+          "profiling_preflight": {
+            "$ref": "#/components/schemas/ProfilingPreflight",
+            "description": "Configured trace export/correlation checked from the same excluded probe; independent of inference and judges."
           },
           "profiling_status": {
             "default": "pending",
@@ -3544,7 +3639,7 @@
     },
     "description": "Check inference once before benchmarking one concurrency level, then evaluate captured answers with a frozen plan. Local, single-tenant prototype; not a maximum-capacity discovery service.",
     "title": "EvalSurge",
-    "version": "0.2.1.dev2026101202"
+    "version": "0.2.1.dev2026101203"
   },
   "openapi": "3.1.0",
   "paths": {

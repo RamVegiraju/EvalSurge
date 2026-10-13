@@ -12,7 +12,7 @@ import requests
 from gevent.lock import Semaphore
 from locust import HttpUser, constant, events, task
 
-from benchmark_agents.adapters import get_adapter
+from benchmark_agents.adapters import failed_response_trace_id, get_adapter
 from benchmark_agents.connections import Connection, authentication
 from benchmark_agents.models import RunRequest
 from benchmark_agents.runner import HubLagProbe, generator_health, payload, summarize
@@ -222,6 +222,8 @@ class AgentUser(HttpUser):
                 ) as response:
                     try:
                         row["http_status"] = response.status_code or None
+                        if not 200 <= response.status_code < 300:
+                            row["trace_id"] = failed_response_trace_id(response)
                         response.raise_for_status()
                         if not 200 <= response.status_code < 300:
                             raise ValueError("Target returned a non-success HTTP status")

@@ -104,11 +104,14 @@ pass rate. The October 4 record is framework integration, not the new notebook
 journey or October 8 App quality. Associated earlier failures remain retained;
 later successful runs do not erase them.
 
-The new direct/notebook/quality samples are not new live test results. Current
-workspace validation requires profile reauthentication before fresh App checks;
-previous checks found the test Apps absent. Classic notebook compute still needs
-explicit selection and separate real-model validation; serverless is another gate.
-See [the SDK milestone and live gates](SDK_MILESTONE.md) for the pending journey matrix.
+The October 12 `0.2.1.dev2026101202` installed-wheel smokes subsequently validated
+local-runner LangGraph/OpenAI Agents over both local HTTP and retained deployed
+Apps, with one probe and one measured request per cell and evaluation off. That
+evidence is specific to the recorded wheel and old App deployments: it does not
+validate a newer artifact, the public App templates, judges or trace coverage.
+CrewAI remains blocked, and notebook/runner-App load generation is deferred or
+unverified. See [the exact live record](LIVE_MATRIX_RESULTS.md) and
+[SDK milestone and live gates](SDK_MILESTONE.md) before claiming broader coverage.
 
 ## Choose your judges and dataset
 

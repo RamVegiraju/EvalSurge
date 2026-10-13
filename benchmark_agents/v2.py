@@ -9,7 +9,7 @@ from fastapi import APIRouter, FastAPI, Header, Query, Response
 from .coordinator import CoordinatorError, RunCoordinator
 from .diagnostics import Capabilities, build_capabilities
 from .planner import fingerprint
-from .run_views import TERMINAL, report_view, result_view, status_view
+from .run_views import TERMINAL, report_view, result_view
 from .settings import load_settings
 from .v2_models import (
     Acknowledgment,
@@ -119,7 +119,7 @@ def install_routes(app: FastAPI, coordinator: RunCoordinator) -> None:
     @router.get("/runs/{run_id}", response_model=RunStatus)
     async def status(run_id: UUID, response: Response) -> RunStatus:
         """Poll lifecycle and independent phases without transferring report contents."""
-        view = status_view(coordinator.read_run(run_id))
+        view = coordinator.read_status(run_id)
         response.headers["Retry-After"] = str(int(view.poll_after_seconds))
         return view
 

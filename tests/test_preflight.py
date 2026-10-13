@@ -18,6 +18,44 @@ from benchmark_agents.locust_runner import preflight_result, run_load, run_prefl
 from benchmark_agents.storage import append_event, atomic_json
 from tests.test_template import configuration
 
+_ENDPOINT_PRIVATE_SENTINELS = (
+    "private provider failure",
+    "private-invalid-json",
+    "private answer",
+    "Answer—yes",
+)
+
+
+def _assert_no_endpoint_payload(snapshot: dict[str, Any]) -> None:
+    """Reject known endpoint fixture contents without rejecting storage metadata.
+
+    Args:
+        snapshot: Public run or report document from the controlled local endpoint.
+
+    Raises:
+        AssertionError: Provider details, malformed bytes or answer text were exported.
+
+    Operator-owned tracking paths may legitimately contain the word ``private``.
+    These exact sentinels come from ``endpoint`` and are protected probe contents.
+    """
+    encoded = json.dumps(snapshot, ensure_ascii=False)
+    for protected in _ENDPOINT_PRIVATE_SENTINELS:
+        assert protected not in encoded
+
+
+@pytest.mark.parametrize("protected", _ENDPOINT_PRIVATE_SENTINELS)
+def test_probe_privacy_assertion_keeps_payload_sentinels_distinct_from_metadata(
+    protected: str,
+) -> None:
+    """Pure assertion checks reject each fixture detail, including Unicode answer text."""
+    snapshot: dict[str, Any] = {
+        "plan": {"judge_tracking_uri": "sqlite:////private/operator-metadata.sqlite"}
+    }
+    _assert_no_endpoint_payload(snapshot)
+    snapshot["preflight"] = {"error": {"message": protected}}
+    with pytest.raises(AssertionError):
+        _assert_no_endpoint_payload(snapshot)
+
 
 async def submit_and_wait(
     client: httpx.AsyncClient, body: dict[str, Any], key: str = "once"
@@ -102,13 +140,14 @@ async def test_failed_inference_stops_before_load_and_returns_safe_report(
         assert run["preflight"]["error"]["code"] == code
         assert run["preflight"]["request_id"]
         assert "Load test did not start" in run["preflight"]["error"]["message"]
-        assert "private" not in json.dumps(run)
+        _assert_no_endpoint_payload(run)
         assert run["metrics"] == {}
         assert server["received"] == 1
         records = (await client.get(url + "/requests")).json()
         assert records["total"] == 0
         report = await client.get(url + "/report")
         assert report.status_code == 200
+        _assert_no_endpoint_payload(report.json())
         assert report.json()["run"]["preflight"] == run["preflight"]
         assert report.json()["profiling"]["total_requests"] == report.json()["total"] == 0
         repeated = await client.post("/v1/runs", json=body, headers={"Idempotency-Key": "once"})
@@ -277,8 +316,10 @@ async def test_connection_failure_is_safe_and_stops_before_load(tmp_path: Path) 
 async def test_preflight_worker_start_error_surfaces_safe_failure_and_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    worker_details = "private worker details"
+
     async def broken_worker(*args: Any, **kwargs: Any) -> None:
-        raise OSError("private worker details")
+        raise OSError(worker_details)
 
     monkeypatch.setattr(coordinator, "run_preflight", broken_worker)
     monkeypatch.setattr(
@@ -296,8 +337,11 @@ async def test_preflight_worker_start_error_surfaces_safe_failure_and_report(
         assert run["status"] == run["preflight"]["status"] == "failed"
         assert run["load_status"] == run["evaluation_status"] == "skipped"
         assert run["preflight"]["error"]["code"] == "worker_failed"
-        assert "private" not in json.dumps(run)
-        assert (await client.get(url + "/report")).status_code == 200
+        assert worker_details not in json.dumps(run)
+        report = await client.get(url + "/report")
+        assert report.status_code == 200
+        assert worker_details not in report.text
+        assert report.json()["run"]["preflight"] == run["preflight"]
 
 
 async def test_killed_preflight_worker_never_starts_load(

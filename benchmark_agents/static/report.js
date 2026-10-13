@@ -177,6 +177,14 @@ function runFailures(run) {
     error: run.planning_error,
     phase: "planning",
   });
+  const tracing = run.profiling_preflight;
+  if (tracing?.status === "failed" || tracing?.error) failures.push({
+    title: tracing.status === "failed" ? "Trace readiness failed — load did not start" :
+      `Trace readiness ${humanize(tracing.status).toLowerCase()}`,
+    status: tracing.status,
+    error: tracing.error,
+    phase: "profiling",
+  });
   const preflight = run.evaluation_preflight;
   if (preflight?.status === "failed" || preflight?.error) failures.push({
     title: preflight.status === "failed" ? "Evaluation preflight failed — load never started" :
@@ -510,6 +518,7 @@ function render() {
     ["Load", `${config.load.concurrency} closed-loop users · one load level`],
     ] : [["Planning", humanize(phases?.planning ?? "not_run")]]),
     ["Inference preflight", humanize(run.preflight?.status ?? "not_run")],
+    ["Trace readiness", humanize(run.profiling_preflight?.status ?? phases?.profiling_readiness ?? "not_run")],
     ["Evaluation preflight", humanize(run.evaluation_preflight?.status ?? "not_run")],
     ["Phase outcomes", `Load: ${run.load_status ?? phases?.load ?? "unknown"} · traces: ${run.profiling_status ?? phases?.profiling ?? "unknown"} · eval: ${run.evaluation_status ?? phases?.evaluation ?? "unknown"}`],
   ];

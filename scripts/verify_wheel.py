@@ -1,4 +1,4 @@
-"""Verify release archives' required assets and exclude local assistant metadata."""
+"""Verify release assets and reject local metadata or publication-excluded material."""
 
 import ast
 import tarfile
@@ -15,6 +15,7 @@ REQUIRED_FILES = {
     "evalsurge/remote.py",
     "evalsurge/cli.py",
     "evalsurge/serving.py",
+    "evalsurge/tracing.py",
     "evalsurge/calibration.py",
     "evalsurge/_calibration_locust.py",
     "evalsurge/serverless.py",
@@ -33,6 +34,7 @@ REQUIRED_FILES = {
     "benchmark_agents/target_resolver.py",
     "benchmark_agents/providers.py",
     "benchmark_agents/adapters.py",
+    "benchmark_agents/trace_ids.py",
     "benchmark_agents/limits.py",
     "benchmark_agents/locust_runner.py",
     "benchmark_agents/locustfile.py",
@@ -148,8 +150,8 @@ def verify_sdist(source: Path) -> None:
         source: Built source archive with one package/version root directory.
 
     Raises:
-        ValueError: Required package assets are absent or local assistant metadata
-            is present. Rejected metadata contents are never read or displayed.
+        ValueError: Required assets are absent or publication-excluded material is
+            present. Rejected contents are never read or displayed.
         OSError: The archive cannot be read.
         tarfile.TarError: The archive is malformed.
     """
@@ -157,6 +159,9 @@ def verify_sdist(source: Path) -> None:
         names = {member.name.partition("/")[2] for member in archive.getmembers()}
     if any(".isaac" in Path(name).parts for name in names):
         raise ValueError("Source distribution contains local assistant metadata")
+    excluded_files = {"docs/PRODUCT_DESIGN_BRIEF.md", "docs/EvalSurge_Product_Brief.docx"}
+    if names & excluded_files or any(name.startswith("docs/assets/") for name in names):
+        raise ValueError("Source distribution contains publication-excluded design/report material")
     missing = REQUIRED_FILES - names
     if missing:
         raise ValueError(

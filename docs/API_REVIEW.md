@@ -1,5 +1,41 @@
 # API and implementation review — 0.2.0
 
+## CLI lifecycle observers — October 12, 2026
+
+[Proposed ADR 0021](adr/0021-cli-live-lifecycle-progress.md) adds optional
+`wait(on_status=...)` and CLI `--progress` / `--no-progress`. Existing waits,
+report returns and server polling hints remain compatible. Typed unified clients
+receive `RunStatus`; compatible raw remote clients receive detached status
+documents. Legacy local keyword runs remain unchanged without callbacks.
+Observers add no remote polls, target calls or measured-worker logging. Direct
+status reads avoid deep-copying protected cases/rows, but historical snapshot
+parsing remains. Progress is allowlisted metadata on stderr, not live metrics or
+an observer-overhead certification. Callback errors/timeouts do not cancel runs;
+normal direct-context cleanup still owns dispatch cancellation and drain.
+
+## Independent trace readiness — October 12, 2026
+
+[Proposed ADR 0020](adr/0020-load-only-correlated-trace-readiness.md) verifies
+explicitly configured trace evidence using the same excluded inference probe,
+even with evaluation off. Legacy RunResponse and v2 Result add defaulted
+`profiling_preflight`; v2 PhaseStates adds defaulted `profiling_readiness`.
+Historical documents use `not_run`. Successful inference remains `passed` if
+trace readiness fails; the independent profiling outcome fails, measured load is
+skipped, and safe `trace_readiness_failed` guidance identifies the evidence issue.
+No new request fields, credentials, routes, model calls, load engine or measured
+timing definition is introduced. Older strict response clients can reject these
+additive fields; update client and server together.
+
+The optional agent-side `traced_handler` wrapper records a real handler boundary
+in an exact existing experiment and preserves actual correlation; it enables no
+autologging or resource provisioning. A root alone is not model/tool bottleneck
+evidence. The bounded collector still has a governed Databricks UC trace-location
+compatibility gap; local native telemetry tests are not App/real-model proof.
+Native UC identifiers receive a bounded wire extension without authorizing content
+reads: collection emits `unsupported_scope` and configured readiness stops before
+load. Legacy non-UC IDs retain the 128-character bound. Fixed readiness `guidance`
+is additive; HTTP errors can retain real header IDs without becoming successes.
+
 ## Generator observation additions — October 10, 2026
 
 [Proposed ADR 0014](adr/0014-measurement-integrity-and-journal-ownership.md)

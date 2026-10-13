@@ -25,6 +25,97 @@ This applies equally to runner-local HTTP agents and Databricks App targets;
 but shared inference/load/evaluation path. An App Runtime Store/session ID does
 not supply agent memory or MLflow traces.
 
+## Load-only tracing golden path
+
+Evaluation and tracing are independent. Keep `evaluation.mode="off"` (the default)
+and configure a private operator trace scope in the runner:
+
+```python
+from benchmark_agents.settings import Settings, TraceSettings
+from evalsurge import Agent, Case, EvalSurge, Load, RunCreate, TargetReference
+
+settings = Settings(
+    tracking_uri="http://localhost:5000",  # existing operator-owned store
+    tracing=TraceSettings(enabled=True, experiment_ids=("123",), max_traces=100),
+)
+request = RunCreate(
+    target=TargetReference(connection_id="agent"),
+    cases=[Case(input={"query": "Can an opened item be refunded?"})],
+    load=Load(concurrency=5, duration_seconds=10, max_requests=5),
+)
+with EvalSurge(
+    targets={"agent": Agent.http("http://127.0.0.1:8000/invoke", protocol="http-json")},
+    settings=settings,
+) as client:
+    report = client.start(request).wait()
+```
+
+Start the actual agent and tracking service separately; neither is created by this
+example. The `local_runner_traced_http_target.py` journey provides the same bounded
+load-only flow with explicit endpoint, tracking URI and experiment arguments.
+The same request vocabulary can bind `Agent.databricks_app(...)`, but the current
+collector supports experiment-scoped trace locations only. MLflow's newer UC
+schema/table-prefix trace IDs are retained, but collection returns
+`unsupported_scope` without fetching protected trace content until experiment
+membership has a reviewed verification contract. Governed Databricks trace
+coverage is therefore not yet established. Do not silently use legacy
+storage to bypass this limitation. Trace-read credentials belong to the runner;
+trace-export credentials and instrumentation belong to the agent.
+Do not put either into RunCreate. A profile reference in `databricks://<profile>`
+must be explicitly selected; no profile or broad experiment is auto-discovered.
+
+Before measured traffic, configured tracing now verifies a complete, correctly
+scoped trace from the **same excluded inference probe**, even with no judges.
+Missing/invalid exports or mismatched metadata fail with `trace_readiness_failed`
+and safe guidance in independent `profiling_preflight`; the probe's successful
+inference remains `passed`, profiling fails and measured load is skipped. No
+additional target invocation occurs. Successful readiness verifies one trace,
+not all future exports, concurrency capacity, or instrumentation fidelity.
+
+In an agent process using the optional HTTP serving helper, an explicit boundary
+wrapper can preserve real correlation:
+
+```python
+from evalsurge.serving import create_app
+from evalsurge.tracing import traced_handler
+
+# real_handler is your existing async agent handler returning AgentAnswer.
+# Configure local tracking/auth and select an existing experiment beforehand.
+app = create_app(
+    traced_handler(real_handler, experiment_id="123"),
+    isolation="request",
+)
+```
+
+This wrapper executes the handler once, records actual protected input/output,
+attaches benchmark run/request metadata, and returns the real trace ID. It does
+not create experiments, enable autologging, or invent model/tool/retrieval spans.
+Enable and verify the native integration for your framework in the agent process
+(for example, LangGraph uses `mlflow.langchain.autolog()`); do not stack duplicate
+instrumentation. Existing native serving roots can attach the correlation metadata
+directly instead. Additional threads require deliberate context propagation.
+Handler exceptions retain their real native error-trace IDs in safe HTTP headers;
+failed HTTP attempts can therefore remain correlated without becoming successes.
+No trace ID is invented when the process/network fails before returning headers.
+
+On Databricks, select/provision governed Unity Catalog trace storage separately,
+including catalog/schema, SQL warehouse and the exact bound experiment. Use the
+agent's native instrumentation: this experiment-only helper explicitly rejects
+Databricks tracking URIs rather than overriding a governed destination with legacy
+storage. Governed collection remains blocked as described above; neither the
+helper nor the runner provisions resources.
+Enable asynchronous agent export and flush at lifecycle cleanup, not per request.
+Instrumentation/export overhead remains in measured response latency; it is not
+subtracted or claimed to be zero.
+
+Every invocation may export a trace, but report collection is bounded (at most
+200 traces per run, 1,000 spans per trace). Sampling, scope, export and collection
+budgets remain explicit gaps. A boundary-only span establishes mapping and handler
+duration, **not internal bottlenecks**. Uninstrumented endpoints remain supported
+as client-only reports with unknown internal timings rather than invented zeros.
+See [ADR 0020](adr/0020-load-only-correlated-trace-readiness.md) for semantics,
+failure behavior, review gates and limitations.
+
 ## Correlation
 
 EvalSurge forwards `X-Benchmark-Run-ID` and `X-Benchmark-Request-ID`. Inside the agent's
@@ -67,6 +158,18 @@ backoff, validates experiment and exact correlation, and rejects incomplete/inva
 trees. A 60-second admission deadline bounds starting fetches, not a stalled remote
 transport call. Remote MLflow HTTP timeouts/retries must be configured; hard process
 deadlines for this phase are a production gate.
+
+Native incremental export can make spans visible before benchmark correlation
+metadata. Only absent run/request keys in an already matching trace/experiment
+receive the existing four-fetch visibility budget (0.5/2/4-second backoff).
+Every reread must pass all exact scope checks; conflicting present values fail
+immediately. Exhausted absence stays a `missing` evidence gap, never permission
+to load or judge. No target is reinvoked and no agent-side flush is added.
+
+For a bounded demonstration with three actual tools and a disclosed slow shipping
+step, see [the multi-tool heatmap sample](../examples/journeys/multitool_heatmap/README.md).
+Its earlier source-workflow smoke used real model inference; native collector
+regressions and public sample contract checks are separate non-inference evidence.
 
 ## Honest attribution
 

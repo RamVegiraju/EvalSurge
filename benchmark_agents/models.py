@@ -339,6 +339,28 @@ class PreflightResult(Model):
     error: PreflightError | None = Field(default=None, description="Safe failure details.")
 
 
+class ProfilingReadinessError(Model):
+    """Fixed trace-readiness guidance; never includes raw store/trace exceptions."""
+
+    code: Literal["trace_readiness_failed"] = "trace_readiness_failed"
+    message: str = Field(description="Safe explanation and corrective guidance.")
+    guidance: str = Field(
+        default="Check real agent-side tracing, exact experiment/run/request correlation, "
+        "sampling, export and tracking-store permissions before retrying.",
+        description="Fixed operator action, without trace content or credential values.",
+    )
+
+
+class ProfilingPreflight(Model):
+    """Excluded probe trace readiness, independent from inference and evaluation."""
+
+    status: Literal[
+        "not_run", "pending", "running", "skipped", "passed", "failed", "cancelled", "interrupted"
+    ] = "not_run"
+    request_id: str | None = None
+    error: ProfilingReadinessError | None = None
+
+
 class EvaluationError(Model):
     """Content-free evaluation failure with corrective guidance, never provider text."""
 
@@ -389,6 +411,10 @@ class RunResponse(Model):
     evaluation_preflight: EvaluationPreflight = Field(
         default_factory=EvaluationPreflight,
         description="Selected judges must assess the inference probe before load; historical runs use not_run.",
+    )
+    profiling_preflight: ProfilingPreflight = Field(
+        default_factory=ProfilingPreflight,
+        description="Configured trace export/correlation checked from the same excluded probe; independent of inference and judges.",
     )
     load_error: LoadError | None = Field(
         default=None, description="Safe load-worker failure details."
@@ -445,6 +471,7 @@ class RequestProfile(Model):
         "invalid",
         "budget",
         "collection_failed",
+        "unsupported_scope",
     ] = Field(description="Observed trace availability or an explicit evidence gap.")
     agent_duration_ms: float | None = Field(
         default=None, description="Complete agent-root duration in milliseconds, when validated."

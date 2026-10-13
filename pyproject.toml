@@ -1,6 +1,6 @@
 [project]
 name = "evalsurge"
-version = "0.2.1.dev2026101202"
+version = "0.2.1.dev2026101203"
 description = "Concurrency benchmarks and evidence-aware MLflow evaluation for hosted agents"
 readme = "README.md"
 license = "MIT"
@@ -51,4 +51,9 @@ dev-mode-dirs = ["."]
 packages = ["benchmark_agents", "evalsurge"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["/.isaac"]
+exclude = [
+  "/.isaac",
+  "/docs/PRODUCT_DESIGN_BRIEF.md",
+  "/docs/EvalSurge_Product_Brief.docx",
+  "/docs/assets",
+]

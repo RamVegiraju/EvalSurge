@@ -730,6 +730,32 @@ def test_load_worker_failure_is_actionable_without_changing_measurements(
         assert "Generation" in output["nodes"]["waterfall"]["text"]
 
 
+def test_trace_readiness_diagnostic_preserves_inference_success(
+    evidence: dict[str, Any],
+) -> None:
+    """Render metadata only; a trace-store failure is not a failed model invocation."""
+    diagnostic = {
+        "code": "trace_readiness_failed",
+        "message": "A complete correlated trace was unavailable.",
+        "guidance": "Check agent-side export and authorized trace scope.",
+    }
+    evidence["run"].update(status="failed", load_status="failed", profiling_status="failed")
+    evidence["run"]["preflight"] = {"status": "passed"}
+    evidence["run"]["evaluation_preflight"] = {"status": "skipped"}
+    evidence["run"]["evaluation"] = {"status": "skipped", "results": []}
+    evidence["run"]["profiling_preflight"] = {"status": "failed", "error": diagnostic}
+    output = render(evidence)
+    context = output["nodes"]["context"]["text"]
+    assert "Inference preflightPassed" in context
+    assert "Trace readinessFailed" in context
+    assert "Trace readiness failed — load did not start" in context
+    assert "Trace readiness failed" in output["nodes"]["message"]["text"]
+    for field in ("code", "message", "guidance"):
+        assert diagnostic[field] in context
+    assert "Inference check failed" not in context
+    assert "Evaluation failed" not in context
+
+
 def test_load_worker_diagnostics_are_text_only(evidence: dict[str, Any]) -> None:
     diagnostic = {
         "code": "worker_failed",

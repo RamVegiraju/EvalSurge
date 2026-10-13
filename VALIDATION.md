@@ -1,4 +1,395 @@
-# Validation — 0.2.1.dev2026101202 checkpoint
+# Validation — 0.2.1.dev2026101203 checkpoint
+
+## Pre-demo technical publication verification — October 12, 2026
+
+The user approved parallel code/asset review, ten separately bounded real-model
+calls, the disclosed controlled-regression/CI exception, and a technical-only
+push. The ten calls below are exhausted. No further inference, deployment,
+resource deletion or package publication was performed during final verification.
+
+The first full controlled suite is preserved: **18 failed, 1,855 passed, 42
+warnings in 293.15 seconds**. It exposed stale test/document expectations and
+installation prerequisites, not a newly fixed inference failure:
+
+- Ten probe-privacy checks matched the generic word `private`, including legitimate
+  macOS tracking paths. Checks now reject exact provider/answer sentinels and
+  include four assertion regressions; safe metadata does not waive payload privacy.
+- One unsafe-file fixture depended on the shell umask. Explicit `chmod(0o644)`
+  now establishes and checks its intentionally unsafe permissions before dispatch.
+- Four framework phase assertions omitted additive `profiling_readiness=skipped`.
+- One quickstart expectation still named the historical `.1202` wheel.
+- Two isolated installation checks lacked a cached public-index cryptography
+  artifact. They use the existing task-local supported-source override, without
+  changing dependency versions, lock hashes or public index provenance.
+
+The corrected framework/example subset passed **5 tests**; precise privacy and
+permission regressions passed **15 tests, 38 deselected, in 9.82 seconds**. The
+earlier focused native non-inference/schema/presentation set passed **389 tests**;
+the final documentation/native trace subset passed **20 tests**. Those subsets
+overlap and are not additive coverage counts.
+
+Full verification then passed on Python **3.12.13/macOS**:
+
+```bash
+uv sync --locked --offline --extra agents --group dev \
+  --python /Users/ram.vegiraju/Desktop/TestFolder/EvalSurge/.venv/bin/python \
+  --default-index https://pypi.org/simple
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync ruff format --check .
+uv run --frozen --no-sync pytest -q
+uv run --frozen --no-sync python scripts/export_openapi.py --check
+uv run --frozen --no-sync openapi-spec-validator docs/openapi.json
+node --check benchmark_agents/static/report.js
+git diff --check
+git diff --cached --check
+```
+
+Locked sync resolved **190** records and checked **182** installed packages,
+without downloading or rewriting the lock. Explicit public lock identity was
+selected **offline**; it is not direct registry access or a proxy bypass. The
+full test command used normal `umask 022` and the existing approved task-local
+installation source setting for isolated package checks. Its private logs/source
+URL are not published. Result: **1,877 passed, 42 warnings in 361.68 seconds**;
+the warnings are one upstream MLflow/SQLAlchemy `noload` deprecation and 41
+upstream MLflow/Pandas positional `.all(0)` notices. Ruff lint and format passed
+for **260 files**; OpenAPI equality and schema validation, JS syntax and both
+whitespace checks passed. Provider-fixture tests remain controlled inference,
+not the real-model evidence in the next section.
+
+The three exact previously failing Python 3.11 CI cases also passed locally in
+a fresh CPython **3.11.14/macOS arm64** environment, with 181 existing locked,
+hash-pinned dependencies and a successful native gevent build:
+
+```bash
+uv run --no-project --no-sync \
+  /private/tmp/evalsurge-py311-ci-review.w2cgEg/venv/bin/python \
+  -m pytest -q --tb=short \
+  'tests/test_measurement_dispatch.py::test_authentication_initialization_single_flight_preserves_refresh[False]' \
+  'tests/test_python_example.py::test_python_benchmark_cli_saves_success_or_preflight_failure[normal-0]' \
+  'tests/test_requests_example.py::test_requests_cli_wait_and_network_timeouts_do_not_retry_or_cancel[True]' \
+  --junitxml=/private/tmp/evalsurge-py311-ci-review.w2cgEg/prior-ci.xml
+```
+
+Result: **3 passed in 8.70 seconds**. These use localhost HTTP/Locust with
+controlled responses; the authentication ownership check is non-agent/non-model.
+No failures reproduced, so no speculative runtime/test changes were made.
+This is not Linux verification or a claim that earlier CI failures were flakes.
+Remote CI must be inspected after the actual push; configured jobs are not passes.
+
+Independent code review found no actionable P1/P2 blocker in the changed collector,
+readiness, CLI observer, safe trace headers or sample. It is not designated
+maintainer approval: ADRs 0020/0021 remain proposed. The caller/asset audit found
+no unused tracked assets safe to remove; report/docs assets and compatibility
+snapshots retain callers. Private caches, failures and paid-run evidence remain
+preserved. Product briefs, `docs/assets/` and their unrelated root README link
+remain local and excluded from the staged technical source.
+
+An offline build from that selectively staged source produced a wheel identical
+to the real-model-tested artifact below. Required package/report/docs assets,
+static internal imports, source-distribution exclusions and absence of the
+unrelated README brief link were checked. No earlier artifact was overwritten.
+The final build command uses a fresh technical-only index export, not the dirty
+working tree:
+
+```bash
+git checkout-index --all \
+  --prefix=/private/tmp/evalsurge-final-release-20261012.g90MFU/final-source/
+uv build --offline --no-build-isolation --no-cache \
+  --python /Users/ram.vegiraju/Desktop/TestFolder/EvalSurge/.venv/bin/python \
+  /private/tmp/evalsurge-final-release-20261012.g90MFU/final-source \
+  --out-dir /private/tmp/evalsurge-final-release-20261012.g90MFU/final-dist
+```
+
+The unchanged lock SHA256 is
+`fc0080a3964731580738e5e528e45adc25419ffef318b1f023bc4e8c09c377ef`.
+Report HTTP/JSON retrieval was rechecked: four actual profiles, full coverage,
+no gaps, completed lifecycle and passed trace readiness. Browser control was
+unavailable/not approved, so no actual visual inspection is claimed. Remaining
+App/UC, CrewAI, judge-quality, capacity and overhead boundaries stay explicit.
+
+## Installed-wheel multi-tool live validation — October 12, 2026
+
+The user explicitly approved ten actual model calls and the separately disclosed
+controlled regression/CI exception. This checkpoint uses a new version, never an
+overwrite of the earlier `.dev2026101202` artifact:
+
+```text
+evalsurge-0.2.1.dev2026101203-py3-none-any.whl
+SHA256 1b46d96185afc7225faf6254db1181b9e023525bb67c0cb714ce948ea5b1d20f
+```
+
+Source/project/runtime/OpenAPI and the root lock entry identify `.dev2026101203`;
+all non-project dependency versions, hashes and index provenance remain unchanged.
+The technical-only Git index supplied the build source, excluding the dirty root
+README brief link and untracked product documents/assets. The wheel was installed
+with required locked dependency hashes in a fresh Python 3.12.13 environment
+outside the checkout. Runtime checks proved `evalsurge` and the Locust launcher
+were ordinary wheel imports beneath that environment's `site-packages`.
+Dependency validation passed for 150 packages including agent-framework dependencies.
+The initial offline requirements export stopped on implicit interpreter/index
+selection; explicitly selecting Python 3.12/public lock identity passed. An
+offline cache miss then required the supported approved package source. No public
+registry bypass, dependency upgrade or lock provenance rewrite occurred.
+
+The real tests executed the public `examples.journeys.multitool_heatmap.agent`
+and `.runner` entrypoints copied outside the checkout. Agent and runner used this
+installed wheel; actual LangGraph called real `system.ai.gpt-oss-120b` through
+`/ai-gateway/mlflow/v1/responses`, with exact selected `e2-demo-field-eng` profile
+and workspace. Bounds were five physical calls per agent lifetime, 512 output
+tokens and 30-second model timeout, zero retries/fallback; one excluded probe and
+four measured attempts per run. Trace destinations were separate local SQLite
+experiments. The disclosed synthetic tools/decision were actually executed; only
+shipping's delayed scenario waited two seconds inside its span. No provider
+completion, framework or agent was substituted, and no App was deployed.
+
+| Observation | Synchronous export | Asynchronous export |
+| --- | --- | --- |
+| Run ID | `fefaebd2-792f-4a36-9c42-5cd320e81edb` | `e36199e5-b5c6-4717-a294-c33816012ce9` |
+| Excluded probes / measured attempts | 1 / 4 | 1 / 4 |
+| Inference / trace readiness | passed / passed | passed / passed |
+| Successful measured answers / errors | 4 / 0 | 4 / 0 |
+| Correlated measured profiles / gaps | 4/4 / none | 4/4 / none |
+| Actual spans per measured trace | 6 | 6 |
+| Configured / peak observed HTTP concurrency | 5 / 4 | 5 / 4 |
+| Successful latency p50 / p95 (ms) | 1982.77 / 4128.81 | 2359.61 / 4254.58 |
+| Successful throughput including drain (req/s) | 0.96 | 0.93 |
+| Output-token usage coverage | 100% | 100% |
+| Delayed shipping spans (ms) | 2001.253 / 2003.961 | 2001.353 / 2001.354 |
+| Normal shipping spans (ms) | 0.078 / 0.128 | 0.080 / 0.106 |
+| Delayed Tools occupancy (ms) | 2006.830 / 2019.989 | 2004.143 / 2004.821 |
+| Normal Tools occupancy (ms) | 7.201 / 19.669 | 2.045 / 2.134 |
+| Measurements / journal drain / worker exit | complete / yes / 0 | complete / yes / 0 |
+
+The model, three named tools, eligibility decision and correlated boundary are
+present. The heatmap's category-level Tools occupancy distinguishes delayed from
+normal requests; waterfalls retain the individual spans. Both agent processes
+exited cleanly after their owned shutdown (including async exporter exit flush).
+Raw captures, traces and failure evidence remain private and uncommitted. Ten
+approved model calls were consumed; no judging or additional canary was run.
+
+These are local HTTP/local SQLite functional smokes, not App/UC tracing support,
+quality calibration, sustainable capacity, zero instrumentation overhead or
+browser visual verification. Nonstreaming HTTP reports TTFT as unavailable, not
+zero. The first earlier asynchronous probe remains failed and its exact initially
+mismatching field remains unknown. Native regression evidence establishes the
+metadata-visibility failure mode; these fresh smokes establish the new public
+entrypoints' success against this exact installed artifact.
+
+Separate fresh `scripts/verify_install.py --surface all --offline` checks passed
+for isolated **base/local/server** installations through the approved cached
+source, using required hashes and unchanged lock metadata. These checks exercised
+installed imports, public models, empty SDK ownership, CLI/sample help and native
+Locust class listing, with zero inference, auth or target dispatch. They do not
+establish public-index publication or a new dependency resolution. Private
+installer diagnostics and source URLs were not copied into repository documents.
+
+## Earlier preparation: reusable multi-tool sample and metadata visibility — October 12, 2026
+
+Added `examples/journeys/multitool_heatmap/` with separate agent/runner entrypoints,
+synthetic order/policy documents, three actually executed tool functions, a
+business-rule decision and real Responses inference. It is a fixed serial
+LangGraph workflow, not model-selected tool use. The sample owns the disclosed
+two-second nonblocking shipping delay and explicit sync/async **local SQLite**
+export selection (sync remains this sample's default); neither is injected by
+the load generator. Evaluation stays off. Explicit
+profile/host/model selection and consent are required; the agent lifetime caps
+physical model attempts at five, matching one excluded probe plus four measured
+attempts. The original private source workflow's live evidence below is distinct
+from validation of these new public entrypoints. No fresh inference was run.
+
+A native MLflow 3.16.1 reproduction persisted actual spans with the exporter’s
+`TracingClient.log_spans()` before its `start_trace()` metadata write. A real
+`MlflowClient.get_trace()` returned a non-null trace in the authorized experiment
+with absent benchmark run/request keys. Before the fix, the regression failed
+with `scope_mismatch`. The collector now rereads that same ID, within the existing
+four-read and shared 60-second admission budgets, only for absent correlation
+keys after matching the trace ID/experiment. Conflicting present keys still fail
+immediately; exhausted absence remains `missing`, and no normalization/judging
+or measured load is authorized. Tests cover either/both absent keys, permanent
+absence, four conflicting scope components and deadline/backoff boundaries.
+Production load-only planning also rejects incomplete enabled tracing; this
+existing guard was regression-tested, not changed.
+
+This reproduces and fixes a native storage-visibility failure mode. The first
+paid asynchronous probe remains failed, and its originally mismatching field
+was not captured. No claim of fresh live asynchronous/App/UC success or browser
+visual verification follows. No target reinvocation, default export change,
+per-request flush, timing subtraction or additional load engine was added.
+
+Focused command:
+
+```bash
+uv run --frozen --no-sync pytest -q \
+  tests/test_trace_visibility.py tests/test_load_only_tracing.py \
+  tests/test_cli_progress.py tests/test_cli.py tests/test_remote_sdk.py \
+  tests/test_unified_sdk_contract.py tests/test_unified_usability_contract.py \
+  tests/test_summary.py tests/test_report_ui.py tests/test_wheel.py \
+  tests/test_docs_ui.py tests/test_serving.py tests/test_streaming.py \
+  tests/test_simple_examples.py::test_multitool_heatmap_request_bounds_and_non_inference_inputs \
+  tests/test_simple_examples.py::test_multitool_heatmap_rejects_inputs_before_inference \
+  tests/test_simple_examples.py::test_multitool_heatmap_declared_data_and_serial_source_contract \
+  tests/test_simple_examples.py::test_journey_sources_have_named_non_inference_contract_coverage \
+  tests/test_simple_examples.py::test_multitool_heatmap_documented_viewer_contract_and_links \
+  tests/test_simple_examples.py::test_multitool_heatmap_export_configuration_without_lifespan \
+  tests/test_simple_examples.py::test_multitool_heatmap_invalid_export_rejected_before_lifespan
+```
+
+Final sample follow-up: **389 passed in 17.21 seconds**, one upstream SQLAlchemy `noload` deprecation
+warning. These are schema/lifecycle/rendering, native **non-LLM telemetry**,
+input/data and source checks. No provider completion or agent was substituted;
+they do not establish successful real inference. Separate read-only review found
+no high-severity scope weakening in the collector fix. That agent review is not
+designated maintainer approval for proposed ADRs 0020/0021.
+
+The sample now prints retained report/run information after both success and
+failed readiness, releases direct-run storage ownership before presenting the
+optional existing viewer URL, and exits nonzero on `RunFailed` without a
+traceback or another model call. Viewer documentation/source checks do not
+establish actual browser visual verification. Sync/async factory tests do not
+start the agent lifespan, authenticate, export or invoke a provider.
+
+Final non-inference checks also passed: Ruff lint; Ruff format (260 files);
+OpenAPI snapshot equality and schema validation; Node report JavaScript syntax;
+working and staged diff whitespace checks. Dependencies/lockfile were unchanged;
+no registry install, deployment or fresh model call was performed.
+
+An offline diagnostic build from the reviewed Git index (not the dirty working
+tree) passed wheel and source-distribution verification at
+`0.2.1.dev2026101202`. Archive member checks excluded the product briefs,
+`docs/assets/` and local assistant metadata; the archived root README was also
+checked for absence of the unrelated product-brief link. The source copy and
+build outputs stayed in a fresh private temporary directory. No existing
+artifact was overwritten or new release published. The first build attempt
+was denied access to the existing uv cache by the filesystem sandbox; its
+explicitly approved offline rerun succeeded without downloading dependencies.
+
+The full suite and push-triggered CI contain controlled provider responses and
+were not run under this request; their explicit disclosure/approval gate remains.
+The previous Python 3.11 CI failures below remain unresolved. Product briefs,
+their assets and the unrelated README brief link remain preserved locally and
+excluded from the proposed technical publication.
+
+## Real multi-tool heatmap smoke — October 12, 2026
+
+A private validation harness exercised the current working tree with an actual
+serial LangGraph workflow and real `system.ai.gpt-oss-120b` Responses inference
+under the previously selected profile. Three actual tool functions read synthetic
+order/policy data and compute a shipping quote; a separate decision applies return
+eligibility rules before model synthesis. This is a deterministic workflow, not
+evidence of model-selected tool calls. Only the delayed case injects a disclosed
+two-second nonblocking wait inside `quote_return_shipping`. No agent/framework or
+provider completion was stubbed; evaluation was off.
+
+The first run, `7d16f885-a05b-47d2-ba2d-73963945165e`, completed one real probe but
+failed trace readiness with `scope_mismatch`; measured load was skipped. A later
+read-only recheck of its retained trace passes all four exact scope checks and
+normalization. This is consistent with asynchronous export/metadata visibility;
+the mismatching field at the original read was not captured, so the precise race
+is not proven. The original failure and artifacts remain unchanged. At the time
+of that run, no collector retry behavior, trust boundary, default exporter or
+load engine had changed; the subsequent native regression fix is recorded above.
+
+With explicitly synchronous **local SQLite** trace export, run
+`92f6c1b1-3be8-468b-97b9-1dd4e14cdb8e` passed inference and trace readiness,
+then completed **4/4 measured requests**, **0 errors**, and **100% trace coverage**.
+It used one excluded probe, a ten-second dispatch ceiling, five configured users
+and four observed in-flight attempts. The request cap ends dispatch early; this
+is a smoke, not a ten-second sustained window or capacity result. Actual model
+attempts/completions total **6/6 across both runs**, with no retries, fallbacks or
+judges and at most 512 output tokens/call. Target lifespans, provider clients and
+CLI/load workers closed; only the read-only loopback report viewer remains.
+
+Measured delayed shipping spans were **2001.264 / 2000.719 ms**, compared with
+**0.088 / 0.109 ms** for normal quotes. The heatmap's aggregate Tools column
+records **2007.875 / 2010.865 ms** versus **12.904 / 3.641 ms**. All four profiles
+retain separate order, policy, shipping, eligibility and native `CHAT_MODEL`
+spans with exact run/request correlation. Serial tool durations match exclusive
+Tools occupancy. Synchronous export overhead is included in client latency;
+these results do not certify zero overhead or server-only metric accuracy.
+
+Commands used `uv run --frozen --no-sync python <private-harness>/live_check.py`
+and a subsequent `verify_heatmap.py` over retained evidence only. The latter made
+zero further model calls, checked native spans/profile arithmetic, and executed
+the shipped report JavaScript against the actual generated report with the
+bounded DOM harness. Light/dark Tools values and shading, per-tool waterfalls,
+hotspots and theme roundtrips passed. This is **not browser visual verification**.
+Protected records are retained under the private multi-tool heatmap validation
+directories; no live artifacts or private tool data were added to Git. No App,
+UC-tracing, release-wheel or remote-CI success is established by this check.
+
+## Trace readiness and live CLI progress — October 12, 2026
+
+Working-tree checks are based on `b5c915eff1b346188f8163e844a70ab647e2ca5f`.
+This patch is uncommitted and unpushed, not a newly frozen release artifact.
+
+Configured tracing now verifies the same excluded inference probe before load,
+including when evaluation is off. Failed trace readiness retains successful
+inference and has independent typed outcomes and safe report/summary guidance.
+The optional local experiment helper creates real correlated boundary spans,
+not model/tool spans. Databricks tracking URIs are rejected by that helper;
+governed UC IDs survive transport but collection fails closed with
+`unsupported_scope` before content fetch. No App/UC tracing success is claimed.
+
+CLI `--progress` emits allowlisted phases and bounded heartbeats on stderr;
+JSON stays on stdout. SDK observers reuse remote polls or lightweight direct
+status projections, without changing the Locust hot path. Independent review
+found a direct waiter deadline overrun; the fix checks before each callback and
+clamps waits to remaining time. A controlled-clock regression verifies that
+timeout does not cancel underlying work. Blocking callbacks remain nonpreemptible.
+
+Final integrated command:
+
+```bash
+uv run --frozen --no-sync pytest -q \
+  tests/test_cli_progress.py tests/test_cli.py tests/test_remote_sdk.py \
+  tests/test_unified_sdk_contract.py tests/test_unified_usability_contract.py \
+  tests/test_summary.py tests/test_report_ui.py tests/test_wheel.py \
+  tests/test_docs_ui.py tests/test_load_only_tracing.py tests/test_serving.py \
+  tests/test_streaming.py \
+  tests/test_simple_examples.py::test_journey_sources_have_named_non_inference_contract_coverage
+```
+
+**363 passed in 10.05 seconds**, with one upstream SQLAlchemy `noload`
+deprecation warning. These checks use lifecycle/report metadata, decoder wire
+samples and real native local MLflow telemetry over non-LLM arithmetic handlers.
+They make no agent/model calls and are not real-inference validation. Native
+telemetry checks verify actual spans and correlation; no framework/model
+completions are substituted as evidence of live success.
+
+Additional checks passed:
+
+- `uv run --frozen --no-sync ruff check .` and `ruff format --check .`
+  (255 files formatted).
+- `uv run --frozen --no-sync python scripts/export_openapi.py --check` and
+  `uv run --frozen --no-sync openapi-spec-validator docs/openapi.json`.
+  The initially stale additive snapshot was regenerated before these final checks.
+- `node --check benchmark_agents/static/report.js` and `git diff --check`.
+- `uv build --no-build-isolation --offline --out-dir <private-diagnostic-dir>`;
+  direct `verify()` / `verify_sdist()` archive checks passed. This diagnostic
+  build retains the existing development version and must not replace the
+  previously frozen artifact or be published as a new release.
+
+Archive member inspection found that untracked publication-excluded brief/report
+files entered the initial source build. Exact sdist exclusions and regression
+gates now reject them without reading their contents; the rebuilt archive passes.
+Those user-owned files and the unrelated README link edit remain untouched and
+outside any proposed publication. Dependencies and `uv.lock` are unchanged.
+
+The previous pushed checkpoint's CI run `38303883690` still has an unresolved
+Python 3.11 gate: **3 failed, 1797 passed**. Failures are
+`test_authentication_initialization_single_flight_preserves_refresh[False]`,
+`test_python_benchmark_cli_saves_success_or_preflight_failure[normal-0]`, and
+`test_requests_cli_wait_and_network_timeouts_do_not_retry_or_cancel[True]`.
+Python 3.12–3.14 tests and security jobs passed for that checkpoint, not this
+uncommitted patch. Do not call the three failures confirmed flakes or infer
+current remote CI success. Full inference/controlled-provider suites were not
+rerun; their disclosure/consent gate still applies.
+
+ADRs 0020/0021 require designated maintainer review. Governed UC scope support,
+fresh bounded real-agent/App trace validation, full collection coverage and
+instrumentation/generator overhead validation remain separate release gates.
+No deployment, paid traffic, resource provisioning or cleanup was performed
+for these changes.
 
 ## Report light/dark theme — October 12, 2026
 

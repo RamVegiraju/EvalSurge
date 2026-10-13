@@ -4,11 +4,12 @@ import re
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from .models import ProfilingSummary, RequestProfile, SpanProfile, TraceSource
 from .runner import percentile
 from .storage import atomic_json
+from .trace_ids import uc_namespace
 
 CATEGORIES = ("model", "tool", "retrieval", "memory", "orchestration", "parallel")
 TRACE_ID = re.compile(r"^[a-zA-Z0-9_-]{1,128}$")
@@ -17,6 +18,7 @@ PROFILE_NOTES = [
     "Concurrent leaf spans occupy the parallel bucket; inclusive span times must not be summed.",
     "Client-minus-agent time remains unattributed; clock origins are not aligned.",
     "One closed-loop load level measures throughput, not sustainable capacity.",
+    "Boundary-only traces establish request mapping, not internal model/tool bottlenecks.",
 ]
 
 
@@ -175,6 +177,49 @@ def summarize_profiles(profiles: list[RequestProfile]) -> ProfilingSummary:
     )
 
 
+def _scope_status(
+    trace: Any, trace_id: str, run_id: str, request_id: str, source: TraceSource
+) -> Literal["available", "missing", "scope_mismatch"]:
+    """Separate absent export metadata from conflicting authorization evidence.
+
+    Args:
+        trace: Actual fetched native MLflow trace; no content is normalized yet.
+        trace_id: Exact target-returned identifier used for this fetch.
+        run_id: Admitted benchmark identifier, never inferred from the trace.
+        request_id: Exact captured attempt identifier.
+        source: Frozen operator-owned experiment allowlist.
+
+    Returns:
+        ``available`` only for exact scope/correlation; ``missing`` for absent
+        run/request keys in an already matching experiment/trace; otherwise
+        ``scope_mismatch``. Even one conflicting present key fails immediately.
+
+    Raises:
+        AttributeError, TypeError: Malformed native metadata. The caller records
+            an invalid profile rather than accepting or retrying that trace.
+
+    Limitations:
+        Missing metadata is not authorization. It only permits bounded rereads
+        of the same identifier outside measured load; no search or scope change.
+    """
+    location = trace.info.trace_location.mlflow_experiment
+    if (
+        location is None
+        or location.experiment_id not in source.experiment_ids
+        or trace.info.trace_id != trace_id
+    ):
+        return "scope_mismatch"
+    metadata = trace.info.trace_metadata
+    if not isinstance(metadata, dict):
+        raise TypeError("Invalid native trace metadata")
+    expected = {"evalsurge.run_id": run_id, "evalsurge.request_id": request_id}
+    if any(key in metadata and metadata[key] != value for key, value in expected.items()):
+        return "scope_mismatch"
+    if any(key not in metadata for key in expected):
+        return "missing"
+    return "available"
+
+
 def collect_profiles(
     rows: list[dict[str, Any]],
     run_id: str,
@@ -184,7 +229,9 @@ def collect_profiles(
 ) -> tuple[ProfilingSummary, dict[str, Any]]:
     """Fetch correlated traces after load and persist content-free report artifacts.
 
-    Missing exports receive at most four fetch attempts with bounded backoff. The collector stops
+    Missing exports/correlation keys receive at most four fetch attempts with bounded backoff.
+    Incrementally visible spans alone are not evidence readiness. Conflicting
+    trace/experiment/run/request values fail closed without retries. The collector stops
     starting fetches after 60 seconds or max_traces attempts. Only the configured
     experiment scope and exact run/request metadata are accepted. The operator
     must configure MLflow transport timeouts separately for remote trace stores.
@@ -211,40 +258,45 @@ def collect_profiles(
         if source and trace_id:
             if fetched >= source.max_traces or time.monotonic() >= deadline:
                 profile.status = "budget"
+            elif uc_namespace(trace_id) is not None:
+                # Native UC locations can be shared by experiments. Never mistake
+                # location equality or caller metadata for authorized membership.
+                profile.status = "unsupported_scope"
             elif not isinstance(trace_id, str) or not TRACE_ID.fullmatch(trace_id):
                 profile.status = "invalid"
             else:
                 fetched += 1
-                trace = None
                 for attempt in range(4):
+                    if attempt and time.monotonic() >= deadline:
+                        break
                     try:
                         trace = client.get_trace(trace_id, display=False)
                     except Exception:  # noqa: BLE001
                         trace = None
-                    if trace is not None or time.monotonic() >= deadline:
+                    if trace is not None:
+                        try:
+                            profile.status = _scope_status(
+                                trace, trace_id, run_id, row["request_id"], source
+                            )
+                        except (TypeError, AttributeError):
+                            profile.status = "invalid"
+                            break
+                        if profile.status == "scope_mismatch":
+                            break
+                        if profile.status == "available":
+                            try:
+                                profile = normalize_trace(trace, row, source.max_spans)
+                            except (ValueError, TypeError, AttributeError):
+                                profile.status = "invalid"
+                            else:
+                                traces[row["request_id"]] = trace
+                            break
+                    if time.monotonic() >= deadline:
                         break
                     if attempt < 3:
                         time.sleep(
                             min((0.5, 2.0, 4.0)[attempt], max(0.0, deadline - time.monotonic()))
                         )
-                if trace is not None:
-                    metadata = trace.info.trace_metadata
-                    location = trace.info.trace_location.mlflow_experiment
-                    if (
-                        location is None
-                        or location.experiment_id not in source.experiment_ids
-                        or metadata.get("evalsurge.run_id") != run_id
-                        or metadata.get("evalsurge.request_id") != row["request_id"]
-                        or trace.info.trace_id != trace_id
-                    ):
-                        profile.status = "scope_mismatch"
-                    else:
-                        try:
-                            profile = normalize_trace(trace, row, source.max_spans)
-                        except (ValueError, TypeError, AttributeError):
-                            profile.status = "invalid"
-                        else:
-                            traces[row["request_id"]] = trace
         profiles.append(profile)
         atomic_json(directory / "profiles" / f"{row['request_id']}.json", profile.model_dump())
     summary = summarize_profiles(profiles)

@@ -263,6 +263,12 @@ uv run --no-sync evalsurge targets --local --settings operator.toml
 uv run --no-sync evalsurge run benchmark.json --local --settings operator.toml --wait
 ```
 
+Interactive waits show content-free lifecycle updates on stderr. Use `--progress`
+to force updates or `--no-progress` to suppress them; `--json` keeps structured
+report output alone on stdout. Progress reuses remote polls, does not dispatch
+target requests and does not claim live latency/throughput. See
+[live CLI progress](CLI_PROGRESS.md).
+
 Local CLI mode uses the same v2 request and private settings without an API server.
 It needs the `server` extra. Static target discovery proves registration, not
 credentials, deployment health, or actual inference. Invalid request guidance

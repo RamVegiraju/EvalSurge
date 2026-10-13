@@ -2,7 +2,14 @@
 
 from typing import TYPE_CHECKING, Any
 
-from benchmark_agents.models import Evaluation, Load, RunReport, Sample
+from benchmark_agents.models import (
+    Evaluation,
+    Load,
+    ProfilingPreflight,
+    ProfilingReadinessError,
+    RunReport,
+    Sample,
+)
 from benchmark_agents.v2_models import (
     Acknowledgment,
     AssessmentOutcome,
@@ -87,6 +94,8 @@ __all__ = [
     "Load",
     "RunFailed",
     "RunReport",
+    "ProfilingPreflight",
+    "ProfilingReadinessError",
     "Sample",
     "RemoteClient",
     "RemoteRun",

@@ -1,6 +1,7 @@
 # Python API: direct execution first
 
-Install the [reviewed wheel](INSTALLATION.md) with `[server]` for direct execution;
+Install the [reviewed wheel](INSTALLATION.md) with `[local]` (or the compatible
+`[server]` extra) for direct execution;
 `[agents]` additionally installs LangGraph and OpenAI Agents dependencies for the
 repository demos, not the example source files. The base package
 contains lightweight remote SDK/CLI dependencies. Public request/result models
@@ -132,6 +133,27 @@ does not cancel the run. Failure exceptions retain the report; inspect independe
 preflight, evaluation-readiness, load, and evidence outcomes. Successful lifecycle
 completion is not a quality pass. `completed_with_gaps` preserves available evidence.
 
+Unified direct and typed remote handles can observe progress without fetching
+reports or dispatching additional target requests:
+
+```python
+report = run.wait(timeout=300, on_status=lambda status: print(status.status))
+```
+
+The observer receives a detached `RunStatus`; a legacy dictionary remote handle
+instead receives a status dictionary. Remote observation reuses existing polls.
+Direct observation reads lightweight status at one-second intervals, plus initial
+and terminal observations, on the
+client's owning loop, not in Locust's request path. Keep callbacks short: slow
+printing or callbacks consume caller resources and waiter budget. Blocking
+callbacks cannot be forcibly interrupted. Synchronous direct
+callbacks must not call the same sync client's methods from its owning loop;
+the existing thread guard rejects that reentry.
+Callback errors propagate and stop waiting but do not cancel the run; direct
+context exit still stops dispatch
+and drains owned work. This is lifecycle progress, not live request counts or
+latency estimates. See [CLI progress](CLI_PROGRESS.md) for interactive usage.
+
 Cancellation stops new preflight/load dispatch and drains active work; it cannot
 undo model/tool actions and does not promise to interrupt native judging. Report
 pages are limited to 100 profiles; the initial report is not every trace in a run.
@@ -157,9 +179,10 @@ required traces, or provider configuration remain explicit failures/gaps.
 
 ## Retained Databricks notebook path — deferred
 
-**Deferred by user October 11, 2026; historically authentication-blocked, not
-live-validated.** The active installation/load-generation choices are local
-Python and the [dedicated runner App](../examples/journeys/app_runner/README.md).
+**Deferred; historically authentication-blocked, not live-validated.** The active
+installation/load-generation choice is local Python. Notebook and
+[dedicated runner App](../examples/journeys/app_runner/README.md) sources remain
+retained but deferred; they are not current onboarding requirements.
 No notebook credential is required for this milestone. Historical failures and
 source remain preserved; the following describes the deferred path, not current
 onboarding or an execution approval. Review

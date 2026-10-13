@@ -9,6 +9,7 @@ to the customer. Correlation/session keys are untrusted labels, not identities.
 import json
 import math
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID, uuid4
@@ -21,8 +22,21 @@ from starlette.requests import ClientDisconnect
 
 from benchmark_agents.adapters import JSON_RESPONSE_LIMIT
 from benchmark_agents.limits import MAX_REQUEST_BYTES
+from benchmark_agents.trace_ids import MAX_TRACE_ID_CHARS, valid_wire_trace_id
 
 Isolation = Literal["request", "case", "shared"]
+
+
+@dataclass
+class _ResponseTrace:
+    """Invocation-owned native ID carrier; never process-global last-trace state."""
+
+    trace_id: str | None = None
+
+
+_response_trace: ContextVar[_ResponseTrace | None] = ContextVar(
+    "evalsurge_response_trace", default=None
+)
 
 
 @dataclass(frozen=True)
@@ -52,7 +66,7 @@ class AgentAnswer(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
     outputs: str = Field(min_length=1, max_length=JSON_RESPONSE_LIMIT)
-    trace_id: str | None = Field(default=None, min_length=1, max_length=128)
+    trace_id: str | None = Field(default=None, min_length=1, max_length=MAX_TRACE_ID_CHARS)
     usage: AnswerUsage | None = None
 
     @field_validator("outputs", "trace_id")
@@ -80,16 +94,27 @@ class AgentAnswer(BaseModel):
                 raise ValueError("Answer text exceeds the response byte limit")
         return value
 
+    @field_validator("trace_id")
+    @classmethod
+    def valid_trace_id(cls, value: str | None) -> str | None:
+        """Preserve legacy limits while accepting bounded native UC trace identifiers."""
+        if value is not None and not valid_wire_trace_id(value):
+            raise ValueError("Trace ID must meet the legacy or native UC identifier contract")
+        return value
+
 
 AgentHandler = Callable[[dict[str, Any], InvocationContext], Awaitable[AgentAnswer]]
 
 
-def _failure(status: int, code: str, message: str) -> JSONResponse:
+def _failure(status: int, code: str, message: str, *, trace_id: str | None = None) -> JSONResponse:
     """Return only fixed helper diagnostics, never customer input/exception text."""
+    headers = {"Cache-Control": "no-store"}
+    if valid_wire_trace_id(trace_id) and all(32 <= ord(c) <= 126 for c in trace_id):
+        headers["X-MLflow-Trace-ID"] = trace_id
     return JSONResponse(
         {"error": {"code": code, "message": message}},
         status_code=status,
-        headers={"Cache-Control": "no-store"},
+        headers=headers,
     )
 
 
@@ -292,17 +317,28 @@ def create_app(handler: AgentHandler, *, isolation: Isolation, path: str = "/inv
             return _failure(413, "input_too_large", "Input exceeds the eight-megabyte limit.")
         except (ValueError, RuntimeError, ClientDisconnect):
             return _failure(422, "invalid_input", "Provide a nonempty finite UTF-8 JSON object.")
+        capture = _ResponseTrace()
+        token = _response_trace.set(capture)
         try:
-            answer = await handler(inputs, context)
-        except Exception:  # noqa: BLE001 - do not expose customer exception/credential content
-            return _failure(
-                502, "agent_execution_failed", "The agent handler did not complete successfully."
-            )
-        try:
-            return _answer_response(answer)
-        except (ValueError, TypeError, RecursionError, UnicodeError):
-            return _failure(
-                502, "invalid_agent_answer", "The agent must return a valid completed AgentAnswer."
-            )
+            try:
+                answer = await handler(inputs, context)
+            except Exception:  # noqa: BLE001 - do not expose customer exception/credential content
+                return _failure(
+                    502,
+                    "agent_execution_failed",
+                    "The agent handler did not complete successfully.",
+                    trace_id=capture.trace_id,
+                )
+            try:
+                return _answer_response(answer)
+            except (ValueError, TypeError, RecursionError, UnicodeError):
+                return _failure(
+                    502,
+                    "invalid_agent_answer",
+                    "The agent must return a valid completed AgentAnswer.",
+                    trace_id=capture.trace_id,
+                )
+        finally:
+            _response_trace.reset(token)
 
     return app

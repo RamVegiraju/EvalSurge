@@ -141,6 +141,25 @@ def test_unknown_usage_and_ttft_are_not_known_zero() -> None:
     assert "Reported output tokens: 0.00 tokens/s." in format_summary(result)
 
 
+def test_trace_readiness_is_independent_and_content_free() -> None:
+    """Missing trace evidence never rewrites inference success or renders private errors."""
+    result = result_document()
+    result["status"] = "failed"
+    result["phases"].update(
+        inference="passed", profiling_readiness="failed", load="failed", evaluation="skipped"
+    )
+    result["profiling_preflight"] = {
+        "status": "failed",
+        "error": {"code": "private-code", "message": "private-trace-store-error"},
+    }
+    output = format_summary(result)
+    assert "Inference readiness: passed." in output
+    assert "Trace readiness: failed." in output
+    assert "Measured load did not start." in output
+    assert "private-code" not in output and "private-trace-store-error" not in output
+    assert "Trace readiness: not_run." in format_summary(result_document())
+
+
 @pytest.mark.parametrize(
     "unsafe", ["\x1b[31msecret", "secret\nforged", "secret\rforged", "secret\x00", "secret\u202e"]
 )

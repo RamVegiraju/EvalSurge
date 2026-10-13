@@ -1,11 +1,55 @@
 # Demo finish-and-validate checkpoint — October 12, 2026
 
-## Current validated scope: local installation and local traffic generation
+## Current artifact: installed local multi-tool tracing sample
 
-The fresh validated milestone is a simple installed-package local SDK and six
-target journeys: LangGraph, OpenAI Agents, and CrewAI, each hosted as a local
+The current `0.2.1.dev2026101203` wheel includes independent load-only trace
+readiness, CLI lifecycle progress and bounded retries for missing exact trace
+correlation metadata. Its frozen artifact is:
+
+```text
+evalsurge-0.2.1.dev2026101203-py3-none-any.whl
+SHA256 1b46d96185afc7225faf6254db1181b9e023525bb67c0cb714ce948ea5b1d20f
+```
+
+Fresh isolated uv **base/local/server installations** outside the checkout passed
+on macOS against exact locked hashes using the approved source's artifact cache,
+with zero model, target or authentication calls. This is not public publication,
+Linux/App installation or fresh range-based dependency-resolution evidence.
+
+Both public [multi-tool sample](../examples/journeys/multitool_heatmap/README.md)
+entrypoints then ran from the installed wheel outside the checkout against a
+separate local HTTP LangGraph agent. The fixed serial graph executed three actual
+tools over synthetic documents/computation, an eligibility decision and actual
+`system.ai.gpt-oss-120b` Responses inference using the explicitly selected
+`e2-demo-field-eng` profile. No model completions were stubbed or substituted.
+
+| Trace export | Run ID | Measured outcomes |
+| --- | --- | --- |
+| Synchronous | `fefaebd2-792f-4a36-9c42-5cd320e81edb` | 4/4 successes, zero errors, 100% trace coverage |
+| Asynchronous | `e36199e5-b5c6-4717-a294-c33816012ce9` | 4/4 successes, zero errors, 100% trace coverage |
+
+Each run added one excluded successful probe and retained six spans per request.
+The delayed shipping tool was approximately 2,001 ms, making the injected delay
+visible in content-free trace evidence. Five users were configured, but the
+four-request measured cap permitted at most four concurrent measured attempts.
+The ten-call model budget is exhausted; no judges, retries, fallback inference,
+App deployment or App load were performed. Both agent processes exited cleanly.
+
+These are functional local HTTP smokes, not capacity or accuracy certification,
+fresh native App template deployment, governed UC trace collection, or browser
+visual verification. The first earlier asynchronous probe remains recorded as
+failed; later success does not erase it or prove its original mismatching field.
+See [validation](../VALIDATION.md) for exact measurements, archived failures and
+controlled-suite results. The earlier installation-alias checkpoint below remains
+specific to its own `.1202` artifact and older App deployments.
+
+## Historical installation-alias checkpoint: local installation and traffic generation
+
+The installation-alias milestone covers a simple installed-package local SDK and
+six intended target journeys: LangGraph, OpenAI Agents, and CrewAI, each hosted as a local
 HTTP agent or a deployed Databricks App. No EvalSurge API server is required. The additive
 `[local]` install name uses the existing execution stack; `[server]` stays compatible.
+Four of those six basic real-model cells passed; CrewAI remains blocked as recorded below.
 See [the local-runner quickstart](../examples/journeys/LOCAL_RUNNER_QUICKSTART.md).
 
 The package change is a new `0.2.1.dev2026101202` artifact, not a replacement for
@@ -33,7 +77,7 @@ Apps **STOPPED / UNAVAILABLE**, deployments/resources unchanged. Nothing was
 deleted. CrewAI's two cells remain blocked; no advisory waiver or inference was
 performed.
 
-These smokes validate the latest installed local runner against retained old
+These smokes validate that exact `.1202` installed local runner against retained old
 App deployments, not deployment of the current public templates, the unchanged
 five-request quickstarts, quality, active cancellation, capacity or zero observer
 effect. App-target generator health remains unknown; hub-lag maxima were

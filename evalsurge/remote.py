@@ -188,9 +188,19 @@ class RemoteRun:
         """Read lightweight lifecycle status without changing server work."""
         return self._client.status(self.id)
 
-    def wait(self, timeout: float | None = 3600) -> dict[str, Any]:
-        """Wait in seconds and return a report; timeout never cancels the run."""
-        return self._client.wait(self.id, timeout=timeout, _initial_delay=self._poll_after_seconds)
+    def wait(
+        self,
+        timeout: float | None = 3600,
+        *,
+        on_status: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
+        """Wait in seconds; an optional observer reuses existing lifecycle polls."""
+        return self._client.wait(
+            self.id,
+            timeout=timeout,
+            _initial_delay=self._poll_after_seconds,
+            on_status=on_status,
+        )
 
     def result(self) -> dict[str, Any]:
         """Read the separate typed result, retaining independent phase outcomes."""
@@ -519,6 +529,7 @@ class RemoteClient:
         timeout: float | None = 3600,
         *,
         _initial_delay: float = 0,
+        on_status: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         """Poll lifecycle/report readiness with a total budget measured in seconds.
 
@@ -526,6 +537,10 @@ class RemoteClient:
             run_id: Existing service run UUID.
             timeout: Positive total wait seconds; None explicitly waits indefinitely.
             _initial_delay: Acceptance guidance supplied by RemoteRun.
+            on_status: Optional synchronous observer of detached status responses.
+                Called after lifecycle validation, with no extra HTTP polls.
+                Keep it short; callback time consumes the wait budget. Exceptions
+                propagate without retrying the callback or cancelling server work.
 
         Returns:
             Report on completed/completed_with_gaps; completion is not a quality pass.
@@ -575,19 +590,21 @@ class RemoteClient:
                 remaining()
                 self._state(body, identifier)
                 terminal = body["status"] in _SUCCESS | _FAILURE
+                delay = None
                 if not terminal:
                     hints = [
                         value
                         for value in (retry, _hint(body.get("poll_after_seconds")))
                         if value is not None
                     ]
-                    pause(max(0.1, max(hints)) if hints else self._poll_interval)
+                    delay = max(0.1, max(hints)) if hints else self._poll_interval
             except RemoteRateLimitError as exc:
                 pause(
                     max(0.1, exc.retry_after_seconds)
                     if exc.retry_after_seconds is not None
                     else self._poll_interval
                 )
+                continue
             except RemoteConflictError as exc:
                 if not terminal or exc.code != "report_not_ready":
                     raise
@@ -596,6 +613,11 @@ class RemoteClient:
                     if exc.retry_after_seconds is not None
                     else self._poll_interval
                 )
+                continue
+            if on_status is not None:
+                on_status(dict(body))
+            if delay is not None:
+                pause(delay)
 
 
 def _typed_response(model: type[Any], body: dict[str, Any]) -> Any:
@@ -625,9 +647,19 @@ class TypedRemoteRun:
         """Read independent lifecycle phases without protected request contents."""
         return self._client.status(self.id)
 
-    def wait(self, timeout: float | None = None) -> Report:
-        """Wait in seconds; completion does not imply a passing quality verdict."""
-        return self._client.wait(self.id, timeout=timeout, _initial_delay=self._poll_after_seconds)
+    def wait(
+        self,
+        timeout: float | None = None,
+        *,
+        on_status: Callable[[RunStatus], None] | None = None,
+    ) -> Report:
+        """Wait in seconds, optionally observing typed lifecycle status without extra polls."""
+        return self._client.wait(
+            self.id,
+            timeout=timeout,
+            _initial_delay=self._poll_after_seconds,
+            on_status=on_status,
+        )
 
     def result(self) -> Result:
         """Read available performance and protected quality evidence."""
@@ -669,14 +701,39 @@ class TypedRemoteClient(RemoteClient):
         return _typed_response(Acknowledgment, super().cancel(run_id))
 
     def wait(
-        self, run_id: UUID | str, timeout: float | None = None, *, _initial_delay: float = 0
+        self,
+        run_id: UUID | str,
+        timeout: float | None = None,
+        *,
+        _initial_delay: float = 0,
+        on_status: Callable[[RunStatus], None] | None = None,
     ) -> Report:
         """Return a typed report; failed lifecycles retain typed evidence on the error.
 
         Timeout leaves service work active. False judge verdicts are returned normally.
+        A short synchronous observer sees typed status from existing polls; errors
+        propagate and consume waiter budget, never cancelling server-owned work.
         """
+        observer_failed = False
+
+        def observe(body: dict[str, Any]) -> None:
+            nonlocal observer_failed
+            try:
+                if on_status is not None:
+                    on_status(_typed_response(RunStatus, body))
+            except Exception:
+                observer_failed = True
+                raise
+
         try:
-            body = super().wait(run_id, timeout, _initial_delay=_initial_delay)
+            body = super().wait(
+                run_id,
+                timeout,
+                _initial_delay=_initial_delay,
+                on_status=observe if on_status is not None else None,
+            )
         except RemoteRunFailed as error:
+            if observer_failed:
+                raise
             raise RemoteRunFailed(_typed_response(Report, error.report)) from None
         return _typed_response(Report, body)

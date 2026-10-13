@@ -65,7 +65,7 @@ you actually received:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install './evalsurge-0.2.1.dev2026101202-py3-none-any.whl[local]'
+python -m pip install './evalsurge-0.2.1.dev2026101203-py3-none-any.whl[local]'
 python -c 'from evalsurge import Agent, EvalSurge, RunCreate; print("Direct SDK imports available")'
 ```
 

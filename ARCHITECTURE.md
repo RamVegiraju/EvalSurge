@@ -47,7 +47,9 @@ flowchart LR
     F --> Q[Static evaluation readiness]
     Q -->|ready| V[Single inference preflight via Locust]
     Q -->|failed| R
-    V -->|passed| B[Judge readiness on captured probe]
+    V -->|passed| O[Configured trace readiness on captured probe]
+    O -->|passed or tracing off| B[Judge readiness on captured probe]
+    O -->|failed| R
     B -->|passed or performance-only| L[Locust subprocess]
     B -->|failed| R
     V -->|failed| R
@@ -143,6 +145,15 @@ Quality sampling stratifies on case and request-start time, not completion order
 ## Instrumentation and latency attribution
 
 Endpoint-only measurements observe a client envelope and optionally a returned MLflow trace ID. They cannot reconstruct remote retrieval, tool, orchestration, queueing, or LLM spans. Auto-enabling MLflow requires changes inside the hosted agent process or existing trace export, plus correlation IDs.
+
+When an operator explicitly configures tracing, the same excluded inference probe
+must yield a complete authorized correlated trace before measured load, even with
+evaluation off. `profiling_preflight` remains independent of successful inference
+and judge readiness. The optional agent-side `evalsurge.tracing.traced_handler`
+wraps actual handler work; it creates no destination or internal model/tool spans.
+Experiment-only collection currently rejects UC schema/table-prefix locations
+with an explicit scope gap; it does not broaden authorization to shared tables.
+See proposed [ADR 0020](docs/adr/0020-load-only-correlated-trace-readiness.md).
 
 The real framework demos attach run/request IDs to server traces and emit a trace-ID metadata event before answer text. The collector validates exact metadata and experiment membership, then excludes trace contents from report artifacts. Actual Trace objects remain in memory for trace-aware native evaluation only. Each attempt has a separately persisted profile; the report reads at most 100 profiles per page.
 

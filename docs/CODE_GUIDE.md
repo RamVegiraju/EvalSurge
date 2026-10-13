@@ -34,6 +34,15 @@ retain submission-time configuration without validating that unused registry.
 `run_views.py` shares pure presentation with REST. `validation.py` shares bounded
 field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-unified-direct-and-remote-sdk.md).
 
+`wait(on_status=...)` observes unified lifecycle status outside the Locust worker.
+Remote observers reuse existing HTTP polls; direct observers use the coordinator's
+`read_status()` projection before copying protected cases or request rows.
+Historical cache misses still read existing snapshots. The CLI renders allowlisted
+phase changes and bounded heartbeats on stderr via `--progress`; JSON stays on
+stdout. Observer exceptions stop waiting, not inference ownership. See
+[CLI progress](CLI_PROGRESS.md) and proposed
+[ADR 0021](adr/0021-cli-live-lifecycle-progress.md).
+
 ## Request-to-report flow
 
 1. `api.create_app()` installs HTTP authentication/error handling/metadata over
@@ -48,7 +57,8 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
    `validate_plan()` independently determines evidence readiness and freezes data
    hashes, installed rubric sources, judge configuration, and sampling settings.
 4. `RunCoordinator._execute()` validates frozen evaluation setup before invoking the
-   target, calls `locust_runner.run_preflight()` once, and reuses its answer in
+   target, calls `locust_runner.run_preflight()` once, verifies configured trace
+   readiness from that same probe even with evaluation off, and reuses its answer in
    `run_evaluation_preflight()` before `run_load()`. Only completed readiness
    assessments permit load; performance-only skips judging. Workers share one
    Locust path; probes/readiness are excluded from measured/quality/report rows.
@@ -58,7 +68,9 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
    JSON contract; `runner.summarize()` aggregates client measurements.
 6. `profiling.collect_profiles()` validates exact trace correlation and scope after
    load, persists bounded content-free profiles, and retains actual Trace objects
-   transiently for native trace-aware judging.
+   transiently for native trace-aware judging. The same collector serves excluded
+   probe readiness. Incrementally absent correlation keys permit bounded same-ID
+   rereads only after the ID/experiment match; any present conflict fails closed.
 7. Completed load calls synchronous `evaluator.evaluate(rows, plan, traces)` in an
    owner thread, which launches a separate native evaluation process. The child
    establishes serial/synchronous MLflow settings before imports and returns
@@ -84,6 +96,7 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 | `evalsurge/_retrieval.py` | Pure status/result/report receipt consistency shared by the packaged launcher and historical validation scripts; no inference or authentication work. |
 | `evalsurge/calibration.py` | Explicitly NON-agent bounded localhost timing diagnostic over the production Locust path; owns native handlers and cancellation-resistant cleanup receipts, never certifies accuracy. |
 | `evalsurge/serving.py` | Optional agent-side `create_app()` calls the customer async handler, preserves bounded JSON inputs, validates completed answers and propagates explicit correlation/state keys; no framework loading in the runner or automatic auth/tracing. |
+| `evalsurge/tracing.py` | Optional agent-side `traced_handler()` records a real local/legacy handler boundary and returns its actual correlated trace ID, including safe HTTP error headers; rejects Databricks URIs rather than overriding governed storage. No provisioning, framework autologging, judge calls or invented internal spans. |
 | `run_views.py` | Shared status/result/report projections, including planless terminal failures; no target or judge execution. |
 | `validation.py` | `validate_request()` detaches schema inputs and emits safe bounded `RequestValidationError`; no raw submitted values. |
 | `v2_models.py` | Canonical request plus typed result/evaluation/coverage/evidence-gap variants; completion and quality remain independent. |
@@ -95,6 +108,7 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 | `locust_runner.py` | `run_preflight()` reuses `run_load()` for one first-case invocation; `preflight_result()` reduces evidence to safe diagnostics. `run_load()` owns subprocess creation, cancellation markers, outer deadline, and recovery. |
 | `locustfile.py` | `start()` starts the measured window; `finish()` writes the aggregate snapshot; `AgentUser.invoke()` owns sequential request lifecycle and active counters. |
 | `streaming.py` | `consume()` mutates one measurement row from a supported single-line SSE data event. It does not open connections or measure its own clock. |
+| `trace_ids.py` | Pure bounded legacy/native-UC wire parsing. Identifier syntax never grants trace scope; governed collection remains unsupported without verified experiment membership. |
 | `runner.py` | `payload()` builds adapter envelopes; `percentile()` computes nearest-rank statistics; `summarize()` reports descriptive performance, not capacity or a quality verdict. |
 | `storage.py` | `CooperativeJournal` owns a bounded FIFO, one native file writer and per-event fsync acknowledgments in Locust; `atomic_json()` replaces snapshots; legacy `append_event()` remains for callers outside the worker; `recover_rows()` reconstructs latest per-attempt state without resuming work. |
 | `sampling.py` | `select_rows()` balances shuffled case/time strata using the frozen seed and assessment budget; it preserves input rows. |
@@ -166,6 +180,20 @@ field-specific diagnostics without importing FastAPI. See [ADR 0011](adr/0011-un
 
 ## Examples and retained history
 
+- `examples/journeys/multitool_heatmap/` separates a real serial LangGraph HTTP
+  agent from its local runner. Three actual tools read disclosed synthetic data
+  and compute shipping, one separately traced step applies eligibility rules,
+  and a real Responses model explains the result. Delayed cases add two seconds
+  inside shipping, not the generator. The sample defaults to explicit local
+  SQLite sync export for the retained demonstration; both sync and async export
+  passed fresh real-model runs with the exact installed `0.2.1.dev2026101203`
+  wheel. This is local HTTP/SQLite evidence, not App or governed UC validation.
+  Four measured attempts plus one excluded probe and
+  a five-model-attempt agent-lifetime cap bound this smoke. The category heatmap
+  aggregates Tools; waterfalls/hotspots preserve individual tool names. Offline
+  source/input checks remain separate from the artifact-specific live entrypoint
+  evidence recorded in [validation](../VALIDATION.md). Browser visual review,
+  calibrated instrumentation overhead and maintainer approval remain separate gates.
 - `examples/journeys/local_runner_http_target.py` and
   `local_runner_databricks_app_target.py` distinguish the load-generator machine
   from the separately hosted HTTP/App agent, sharing a five-attempt v2 workload.

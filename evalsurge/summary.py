@@ -186,12 +186,19 @@ def format_summary(value: Result | Report | Mapping[str, Any]) -> str:
         for key, label in (
             ("planning", "Planning"),
             ("inference", "Inference readiness"),
+            ("profiling_readiness", "Trace readiness"),
             ("evaluation_readiness", "Judge readiness"),
             ("load", "Load"),
             ("profiling", "Profiling"),
             ("evaluation", "Evaluation"),
         ):
-            lines.append(f"{label}: {_state(phases.get(key), _PHASE_STATES)}.")
+            default = "not_run" if key == "profiling_readiness" else None
+            lines.append(f"{label}: {_state(phases.get(key, default), _PHASE_STATES)}.")
+        if phases.get("profiling_readiness") == "failed":
+            lines.append(
+                "Trace readiness failed; inspect configured export and authorized scope in "
+                "the protected report. Measured load did not start."
+            )
     decisions = _mapping(run.get("summary"))
     for key, label, allowed in (
         ("performance", "Performance", {"pending", "complete", "incomplete", "not_run"}),

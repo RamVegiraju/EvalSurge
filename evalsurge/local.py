@@ -6,7 +6,8 @@ the operator context, never credentials or provider routing inside RunCreate.
 
 import asyncio
 import json
-from collections.abc import Mapping
+import math
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -14,10 +15,10 @@ from typing import Any
 from uuid import UUID
 
 from benchmark_agents.configuration import configured_environment, environment
-from benchmark_agents.coordinator import CoordinatorError
+from benchmark_agents.coordinator import CoordinatorError, RunCoordinator
 from benchmark_agents.models import Accepted, RunReport
 from benchmark_agents.planner import fingerprint
-from benchmark_agents.run_views import TERMINAL, report_view, result_view, status_view
+from benchmark_agents.run_views import TERMINAL, report_view, result_view
 from benchmark_agents.settings import ConnectionSettings, Settings, load_settings
 from benchmark_agents.target_resolver import TargetResolutionError, resolve_registered_target
 from benchmark_agents.v2_models import Acknowledgment, Links, Report, Result, RunCreate, RunStatus
@@ -96,6 +97,63 @@ def _detached_request(config: Mapping[str, Any] | RunCreate) -> RunCreate:
     return request
 
 
+async def _wait_observed(
+    coordinator: RunCoordinator,
+    run_id: UUID,
+    timeout: float | None,
+    on_status: Callable[[RunStatus], None],
+    *,
+    clock: Callable[[], float] | None = None,
+) -> None:
+    """Observe owned lifecycle at one-second intervals without cancelling run work.
+
+    Args:
+        coordinator: Open direct client's exclusive coordinator, not a load worker.
+        run_id: Existing unified run whose protected payload stays in the coordinator.
+        timeout: Positive finite waiter seconds or no deadline.
+        on_status: Short synchronous callback receiving a detached typed status.
+        clock: Internal monotonic seconds seam; defaults to the owning loop clock.
+
+    Raises:
+        TimeoutError: Wait budget expires, including observer time.
+        CoordinatorError: Run or report lookup fails.
+        Exception: Observer errors propagate without cancelling the run.
+
+    Side Effects:
+        Owns only a shielded waiter task and content-free in-memory status reads.
+        No target requests, extra load engines or measured-worker logging occur.
+        Slow observers can consume caller resources; this is not a zero-overhead
+        guarantee. Cancelling this waiter leaves inference ownership unchanged.
+    """
+    if timeout is not None and (timeout <= 0 or not math.isfinite(timeout)):
+        raise ValueError("timeout must be positive finite seconds")
+    loop = asyncio.get_running_loop()
+    now = clock or loop.time
+    deadline = now() + timeout if timeout is not None else None
+    waiter = asyncio.create_task(coordinator.wait(run_id, timeout))
+
+    def remaining() -> float | None:
+        """Include observer time and never begin another callback after expiry."""
+        budget = deadline - now() if deadline is not None else None
+        if budget is not None and budget <= 0:
+            raise TimeoutError("Wait timed out; underlying run was not cancelled.")
+        return budget
+
+    try:
+        while True:
+            remaining()
+            on_status(coordinator.read_status(run_id))
+            budget = remaining()
+            if waiter.done():
+                await waiter
+                return
+            await asyncio.wait({waiter}, timeout=min(1, budget) if budget is not None else 1)
+    finally:
+        if not waiter.done():
+            waiter.cancel()
+        await asyncio.gather(waiter, return_exceptions=True)
+
+
 @dataclass(frozen=True, slots=True)
 class AsyncDirectRun:
     """Typed handle tied to a native async context and its opening event loop."""
@@ -115,9 +173,14 @@ class AsyncDirectRun:
         """Read protected evidence with bounded profile pagination."""
         return await self._client.report(self.id, offset=offset, limit=limit)
 
-    async def wait(self, timeout: float | None = None) -> Report:
-        """Wait in seconds without cancellation on timeout or quality-negative verdicts."""
-        return await self._client.wait(self.id, timeout=timeout)
+    async def wait(
+        self,
+        timeout: float | None = None,
+        *,
+        on_status: Callable[[RunStatus], None] | None = None,
+    ) -> Report:
+        """Wait in seconds, optionally observing typed status outside the load worker."""
+        return await self._client.wait(self.id, timeout=timeout, on_status=on_status)
 
     async def cancel(self) -> Acknowledgment:
         """Stop new dispatch; already active requests drain."""
@@ -245,7 +308,7 @@ class AsyncClient(LegacyAsyncClient):
     async def status(self, run_id: UUID | str) -> RunStatus:
         """Read a detached public lifecycle, without prompts or target configuration."""
         with configured_environment(self._operator):
-            return status_view(self._owned_coordinator().read_run(UUID(str(run_id))))
+            return self._owned_coordinator().read_status(UUID(str(run_id)))
 
     async def result(self, run_id: UUID | str) -> Result:
         """Read independent performance/quality; false verdicts are not failures."""
@@ -270,22 +333,49 @@ class AsyncClient(LegacyAsyncClient):
                 return await super().report(identifier, offset=offset, limit=limit)
             return report_view(coordinator, identifier, offset, limit)
 
-    async def wait(self, run_id: UUID | str, timeout: float | None = None) -> Report | RunReport:
+    async def wait(
+        self,
+        run_id: UUID | str,
+        timeout: float | None = None,
+        *,
+        on_status: Callable[[RunStatus], None] | None = None,
+    ) -> Report | RunReport:
         """Wait without cancelling the run; lifecycle failures retain inspectable reports.
 
         A completed run can have negative quality verdicts. Only failed,
         interrupted or cancelled lifecycle states raise RunFailed.
+        A short synchronous observer receives content-free status at one-second
+        intervals plus initial/terminal observations on the owning loop. Its time
+        consumes waiter budget; exceptions
+        propagate without cancelling inference. Legacy runs omit this observer.
         """
         with configured_environment(self._operator):
             coordinator = self._owned_coordinator()
             identifier = UUID(str(run_id))
             if coordinator.read_run(identifier).get("evaluation_mode") is None:
+                if on_status is not None:
+                    raise ValueError("Status observers require a unified run")
                 return await super().wait(identifier, timeout)
+            observer_failed = False
+
+            def observe(status: RunStatus) -> None:
+                nonlocal observer_failed
+                try:
+                    if on_status is not None:
+                        on_status(status)
+                except Exception:
+                    observer_failed = True
+                    raise
+
             try:
-                await coordinator.wait(identifier, timeout)
+                if on_status is None:
+                    await coordinator.wait(identifier, timeout)
+                else:
+                    await _wait_observed(coordinator, identifier, timeout, observe)
             except CoordinatorError as error:
                 if (
-                    error.status_code != 409
+                    observer_failed
+                    or error.status_code != 409
                     or coordinator.read_run(identifier)["status"] not in TERMINAL
                 ):
                     raise
@@ -329,9 +419,14 @@ class DirectRun:
         """Read protected evidence with bounded profile pagination."""
         return self._client.report(self.id, offset=offset, limit=limit)
 
-    def wait(self, timeout: float | None = None) -> Report:
-        """Wait in seconds; timeout does not cancel work and quality is not a gate."""
-        return self._client.wait(self.id, timeout)
+    def wait(
+        self,
+        timeout: float | None = None,
+        *,
+        on_status: Callable[[RunStatus], None] | None = None,
+    ) -> Report:
+        """Wait in seconds, optionally observing typed status outside the load worker."""
+        return self._client.wait(self.id, timeout, on_status=on_status)
 
     def cancel(self) -> Acknowledgment:
         """Stop new dispatch; active requests drain."""
@@ -380,10 +475,20 @@ class Client(LegacyClient):
         self._require_open()
         return self._call(lambda: self._async_client.result(run_id))
 
-    def wait(self, run_id: UUID | str, timeout: float | None = None) -> Report | RunReport:
-        """Wait without cancelling owned work; failures retain the appropriate report."""
+    def wait(
+        self,
+        run_id: UUID | str,
+        timeout: float | None = None,
+        *,
+        on_status: Callable[[RunStatus], None] | None = None,
+    ) -> Report | RunReport:
+        """Wait without cancelling work; observers run on the dedicated owning loop.
+
+        Observer exceptions propagate and consume waiter budget, but do not cancel
+        underlying work. Context exit still owns normal dispatch cancellation/drain.
+        """
         self._require_open()
-        return self._call(lambda: self._async_client.wait(run_id, timeout))
+        return self._call(lambda: self._async_client.wait(run_id, timeout, on_status=on_status))
 
     def report(self, run_id: UUID | str, *, offset: int = 0, limit: int = 25) -> Report | RunReport:
         """Read a typed unified report or the compatible legacy report."""

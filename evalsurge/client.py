@@ -217,6 +217,8 @@ class RunFailed(RuntimeError):
         message = f"Benchmark run {report.run.id} {report.run.status}."
         if report.run.preflight.error is not None:
             message += " " + report.run.preflight.error.message
+        elif report.run.profiling_preflight.error is not None:
+            message += " " + report.run.profiling_preflight.error.message
         elif report.run.evaluation_preflight.error is not None:
             failure = report.run.evaluation_preflight.error
             message += f" {failure.message} {failure.guidance}"

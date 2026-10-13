@@ -17,6 +17,23 @@ users, at most five measured invocations, a ten-second dispatch window and one
 excluded readiness probe. Evaluation defaults to off. These are short functional
 smokes, not sustainable-capacity tests or model/token/spend quotas.
 
+For independent profiling with evaluation off, use
+[local_runner_traced_http_target.py](journeys/local_runner_traced_http_target.py).
+It uses the same five-request bound but requires an existing instrumented agent,
+exact tracking destination and authorized experiment. Its source/request/native
+local-telemetry contracts are tested; this new journey has not yet received fresh
+real-agent validation. Governed Databricks UC collection remains fail-closed, not
+a demonstrated App tracing path. See [profiling setup](../docs/PROFILING_AND_EVALUATION.md).
+
+For named tools and a deliberately slow step, use the
+[multi-tool heatmap sample](journeys/multitool_heatmap/README.md): an actual serial
+LangGraph workflow, three actual tools over disclosed synthetic documents,
+one eligibility decision and a real model answer. Separate agent and runner
+entrypoints keep tool work out of Locust. The four-measured-request workload
+compares normal shipping with an injected two-second agent-side delay. Its
+underlying real-model smoke and rendered report passed; the original async-export
+probe remains failed, and browser visual verification remains unavailable.
+
 Install the [reviewed wheel](../docs/INSTALLATION.md) with `[local]`; `[server]`
 remains the compatible extra name and neither requires starting an API server.
 The wheel does not include example source files. Copy either script into the
@@ -95,6 +112,7 @@ observed execution/completeness, not calibrated accuracy of the measurement impl
 | [crewai_agent.py](crewai_agent.py) | Standalone loopback CrewAI HTTP agent, in its own environment | Isolated dependency install/check passed; ChromaDB advisory gate failed, so no actual-model inference. See the [prerequisite record](journeys/agent_apps/crewai/README.md) |
 | [native agent-App projects](journeys/agent_apps/README.md) | Separate LangGraph/OpenAI Agents/CrewAI agent Apps, not the runner App | Prepared DurableAgentServer source; dependencies, supported deployment/Runtime Store provisioning and actual inference remain separate gates. No fresh live deployment evidence |
 | [local_runner_http_target.py](journeys/local_runner_http_target.py) | Laptop → already hosted HTTP endpoint | Calls the supplied endpoint; does not deploy or establish its framework/model by itself |
+| [multi-tool heatmap](journeys/multitool_heatmap/README.md) | Local Python runner → separate loopback HTTP LangGraph agent | Real model plus three actual tools over synthetic files; deliberate shipping delay and sample-only synchronous local trace export. Public-file checks are offline, not new live inference |
 | [local_runner_databricks_app_target.py](journeys/local_runner_databricks_app_target.py) | Laptop → already deployed Databricks App | Exact App/profile selection; not a local stand-in for App hosting |
 | [Private direct runner App](journeys/app_runner/README.md) | Dedicated `load-test` App → separate HTTP/App agent | Prepared; disabled installation failed and stopped diagnostic remains. EvalSurge startup, live native worker OAuth, protected export and actual-model traffic remain unverified |
 | [serverless_runner_databricks_app_target.py](journeys/serverless_runner_databricks_app_target.py) / [serverless_runner_app_target.py](../scripts/validation/serverless_runner_app_target.py) | Deferred serverless EvalSurge/Locust runner → existing deployed App | Historical authentication blocker retained; zero-inference guards do not establish notebook-to-App success |

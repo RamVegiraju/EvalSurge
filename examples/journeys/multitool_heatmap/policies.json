@@ -1,0 +1,7 @@
+{
+  "electronics": {
+    "return_window_days": 30,
+    "allow_opened": false,
+    "customer_pays_return_shipping": true
+  }
+}

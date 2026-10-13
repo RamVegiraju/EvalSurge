@@ -907,7 +907,7 @@ wheels = [
 
 [[package]]
 name = "evalsurge"
-version = "0.2.1.dev2026101202"
+version = "0.2.1.dev2026101203"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

@@ -162,6 +162,12 @@ tracking destinations. Report profiles strip inputs, outputs, and attributes, bu
 span/tool names can still be sensitive. Full source traces and captured request data
 remain protected evidence, not sanitized public telemetry.
 
+Incremental trace visibility permits bounded same-ID rereads only when the trace
+identifier and experiment already match and required run/request metadata keys
+are absent. Any conflicting present key fails immediately, even alongside an
+absent key. Missing metadata never grants scope, permits normalization or starts
+measured load. No experiment search or caller-selected destination is added.
+
 Artifacts contain input prompts, responses, reference data, model/profile identifiers, and request metadata. Protect the artifact directory and MLflow store with filesystem permissions and a retention policy. Do not commit live artifacts. Deleting artifacts also deletes local idempotency history. Journal flushing protects against worker-process interruption, not disk failure or filesystem loss.
 
 The Locust journal now has one owned bounded FIFO/native file writer. Start

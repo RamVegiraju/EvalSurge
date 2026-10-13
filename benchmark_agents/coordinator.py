@@ -28,6 +28,8 @@ from .models import (
     Plan,
     PreflightError,
     PreflightResult,
+    ProfilingPreflight,
+    ProfilingReadinessError,
     ProfilingSummary,
     RequestPage,
     RequestProfile,
@@ -42,6 +44,7 @@ from .profiling import PROFILE_NOTES, collect_profiles
 from .report_links import experiment_links
 from .runner import payload
 from .storage import atomic_json, recover_rows
+from .v2_models import RunStatus
 
 
 class CoordinatorError(Exception):
@@ -269,6 +272,26 @@ class RunCoordinator:
         """
         return copy.deepcopy(self._read_run(run_id))
 
+    def read_status(self, run_id: UUID) -> RunStatus:
+        """Project detached content-free status without copying protected run payloads.
+
+        Args:
+            run_id: Existing resource in this coordinator's owned artifact store.
+
+        Returns:
+            Typed lifecycle and independent phases; no case, request or report rows.
+
+        Raises:
+            CoordinatorError: Run is unknown or persisted metadata is unavailable.
+            RuntimeError: Storage is not owned or is closing.
+
+        Active runs use in-memory state. Historical cache misses retain the existing
+        snapshot read; this does not implement an indexed metadata store.
+        """
+        from .run_views import status_view
+
+        return status_view(self._read_run(run_id))
+
     def _read_run(self, run_id: UUID) -> dict[str, Any]:
         """Read owned state or recover an abandoned snapshot without replaying actions.
 
@@ -302,6 +325,7 @@ class RunCoordinator:
                 profiling_status="skipped",
                 preflight=PreflightResult(status="not_run").model_dump(),
                 evaluation_preflight=EvaluationPreflight(status="not_run").model_dump(),
+                profiling_preflight=ProfilingPreflight(status="not_run").model_dump(),
             )
         if result["status"] == "preflighting":
             probe_root = self.root / "preflights" / key
@@ -328,8 +352,14 @@ class RunCoordinator:
                     **readiness,
                     "status": "interrupted",
                 }
+            profile_check = result.get("profiling_preflight", {})
+            if profile_check.get("status") in {"pending", "running"}:
+                result["profiling_preflight"] = {**profile_check, "status": "interrupted"}
         elif result["status"] in {"queued", "running", "profiling", "evaluating"}:
             result["status"] = "interrupted"
+            profile_check = result.get("profiling_preflight", {})
+            if profile_check.get("status") in {"pending", "running"}:
+                result["profiling_preflight"] = {**profile_check, "status": "interrupted"}
             readiness = result.get("evaluation_preflight", {})
             if readiness.get("status") in {"pending", "running"}:
                 result["evaluation_preflight"] = {**readiness, "status": "interrupted"}
@@ -558,6 +588,7 @@ class RunCoordinator:
                 "evaluation_status": "pending",
                 "preflight": PreflightResult(status="pending").model_dump(),
                 "evaluation_preflight": EvaluationPreflight(status="pending").model_dump(),
+                "profiling_preflight": ProfilingPreflight(status="pending").model_dump(),
                 "config": request.model_dump(mode="json"),
                 "plan": plan.model_dump() if plan else None,
                 "planning_status": "pending" if plan is None else "completed",
@@ -611,6 +642,10 @@ class RunCoordinator:
             self.runs[run_id]["evaluation_preflight"] = EvaluationPreflight(
                 status="not_run"
             ).model_dump()
+        if self.runs[run_id].get("profiling_preflight", {}).get("status") == "pending":
+            self.runs[run_id]["profiling_preflight"] = ProfilingPreflight(
+                status="not_run"
+            ).model_dump()
         profiling = ProfilingSummary(
             total_requests=0,
             traced_requests=0,
@@ -622,7 +657,11 @@ class RunCoordinator:
         atomic_json(self.root / run_id / "profiling.json", profiling.model_dump())
 
     async def _probe_readiness(
-        self, run_id: str, plan: Plan, row: dict[str, Any]
+        self,
+        run_id: str,
+        plan: Plan,
+        row: dict[str, Any],
+        verified_traces: dict[str, Any] | None = None,
     ) -> EvaluationPreflight:
         """Check selected judges against one protected, already captured probe.
 
@@ -630,6 +669,8 @@ class RunCoordinator:
             run_id: Admitted run's correlation identifier.
             plan: Frozen scorer definitions and operator-owned evidence scope.
             row: Successful excluded probe record, never a measured attempt.
+            verified_traces: Optional scoped traces already checked independently
+                of judges; reuse avoids duplicate collector work.
 
         Returns:
             Readiness execution state, independent of the assessment's quality.
@@ -643,11 +684,11 @@ class RunCoordinator:
         Native judging owns a separately bounded/cancellable child process;
         trusted scorer code is not a sandbox and committed calls cannot be undone.
         """
-        probe_traces = {}
+        probe_traces = verified_traces or {}
         trace_scorers = [
             item for item in plan.registered_scorers if "trace" in item.required_fields
         ]
-        if trace_scorers:
+        if trace_scorers and verified_traces is None:
             try:
                 _coverage, probe_traces = await asyncio.to_thread(
                     collect_profiles,
@@ -675,6 +716,85 @@ class RunCoordinator:
             probe_traces,
             cancellation=self.cancellations[run_id],
         )
+
+    async def _profiling_readiness(
+        self, run_id: str, plan: Plan, row: dict[str, Any]
+    ) -> tuple[ProfilingReadinessError | None, dict[str, Any]]:
+        """Verify the excluded probe's actual trace independently of evaluation.
+
+        Args:
+            run_id: Exact admitted benchmark UUID.
+            plan: Frozen operator trace scope and collection limits.
+            row: Captured successful excluded inference probe, not a measured row.
+
+        Returns:
+            Safe readiness failure or None, plus verified native Trace objects for
+            reuse by selected trace-dependent judges. Disabled tracing does no read.
+
+        Side Effects:
+            Configured tracing reads only the returned trace ID under exact
+            experiment/run/request checks, then writes protected content-free
+            probe profiles. No target, planner or judge is invoked. Bounded
+            collector retries stay outside measured load; remote transport
+            timeouts remain operator-owned rather than a hard thread deadline.
+        """
+        if plan.trace_source is None:
+            return None, {}
+        try:
+            coverage, traces = await asyncio.to_thread(
+                collect_profiles,
+                [row],
+                run_id,
+                plan.trace_source.model_copy(update={"max_traces": 1}),
+                self.root / "preflights" / run_id / "readiness-profiles",
+            )
+        except Exception:  # noqa: BLE001 - fixed guidance excludes trace-store/provider details
+            return ProfilingReadinessError(
+                code="trace_readiness_failed",
+                message="Inference completed, but its configured trace could not be collected. "
+                "Check operator tracking-store access and transport timeouts; load did not start.",
+            ), {}
+        if coverage.traced_requests != 1 or row["request_id"] not in traces:
+            if coverage.gaps.get("unsupported_scope"):
+                return ProfilingReadinessError(
+                    message="Inference completed, but the configured UC trace scope cannot "
+                    "yet be verified; load did not start.",
+                    guidance="Governed Unity Catalog IDs are retained, but experiment scope "
+                    "must be verified before collecting them. Do not silently switch to "
+                    "legacy storage; use an explicitly supported trace scope or wait for "
+                    "reviewed UC scope support.",
+                ), {}
+            return ProfilingReadinessError(
+                code="trace_readiness_failed",
+                message="Inference completed, but a complete correlated trace was unavailable. "
+                "Enable agent-side export, return its real trace ID, and attach exact benchmark "
+                "run/request metadata in an authorized experiment. Check sampling and export "
+                "lag; load did not start.",
+            ), {}
+        return None, traces
+
+    def _fail_profiling_readiness(
+        self, run_id: str, request_id: str, error: ProfilingReadinessError
+    ) -> None:
+        """Skip load for missing probe evidence without changing inference success.
+
+        Args:
+            run_id: Admitted run whose successful excluded probe is retained.
+            request_id: That probe's exact request correlation ID.
+            error: Fixed content-free trace readiness guidance.
+
+        Side Effects:
+            Stores independent failed profiling readiness and a zero-load profile
+            shell. Selected judges are not run; raw probe input/output is excluded.
+        """
+        run = self.runs[run_id]
+        run["profiling_preflight"] = ProfilingPreflight(
+            status="failed", request_id=request_id, error=error
+        ).model_dump()
+        if run["evaluation_preflight"]["status"] == "running":
+            run["evaluation_preflight"] = EvaluationPreflight(status="not_run").model_dump()
+        self._skip_load(run_id, "failed")
+        run["profiling_status"] = "failed"
 
     async def _execute(
         self, run_id: str, request: RunRequest, plan: Plan | None, connection: Connection
@@ -765,11 +885,38 @@ class RunCoordinator:
                         "cancelled" if cancel.is_set() else "not_run"
                     )
                 return
-            if plan.recommendations:
+            if plan.trace_source or plan.recommendations:
                 probe_rows, _ = recover_rows(self.root / "preflights" / run_id)
                 if len(probe_rows) != 1 or not probe_rows[0].get("success"):
                     raise RuntimeError("Successful inference probe capture is unavailable")
-                checked = await self._probe_readiness(run_id, plan, probe_rows[0])
+                run["profiling_preflight"] = ProfilingPreflight(
+                    status="running" if plan.trace_source else "skipped",
+                    request_id=probe_rows[0]["request_id"],
+                ).model_dump()
+                self._persist(run_id)
+                trace_error, verified_traces = await self._profiling_readiness(
+                    run_id, plan, probe_rows[0]
+                )
+                if cancel.is_set():
+                    if plan.trace_source:
+                        run["profiling_preflight"]["status"] = "cancelled"
+                    if run["evaluation_preflight"]["status"] == "running":
+                        run["evaluation_preflight"] = EvaluationPreflight(
+                            status="cancelled"
+                        ).model_dump()
+                    self._skip_load(run_id, "cancelled")
+                    return
+                if trace_error is not None:
+                    self._fail_profiling_readiness(run_id, probe_rows[0]["request_id"], trace_error)
+                    return
+                if plan.trace_source:
+                    run["profiling_preflight"]["status"] = "passed"
+            else:
+                run["profiling_preflight"] = ProfilingPreflight(status="skipped").model_dump()
+            if plan.recommendations:
+                checked = await self._probe_readiness(
+                    run_id, plan, probe_rows[0], verified_traces if plan.trace_source else None
+                )
                 run["evaluation_preflight"] = checked.model_dump()
                 atomic_json(
                     self.root / "preflights" / run_id / "evaluation.json", checked.model_dump()

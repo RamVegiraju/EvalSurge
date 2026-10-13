@@ -320,10 +320,13 @@ def test_attempt_cap_counts_actual_reservations_not_outcomes(tmp_path):
 
 
 def test_unsafe_journal_fails_before_dispatch_reservation(tmp_path):
+    """Create an explicitly unsafe file even when the invoking shell uses umask 077."""
     private = tmp_path / "private"
     private.mkdir(mode=0o700)
     path = private / "attempts.jsonl"
     path.touch(mode=0o644)
+    path.chmod(0o644)
+    assert path.stat().st_mode & 0o077
     with pytest.raises(RuntimeError, match="private regular file"):
         record_judge_attempt(path, 2)
     assert path.read_text() == ""

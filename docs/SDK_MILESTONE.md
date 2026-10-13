@@ -8,9 +8,11 @@ required. Exact check results are recorded in [validation](../VALIDATION.md).
 
 For the October 13 demo, use the artifact-specific
 [finish-and-validate checkpoint](DEMO_READINESS.md). Historical live App passes
-predate the journal changes and do not validate this build. The packaged
-serverless import repair and shared `format_summary()` are implemented; independently
-refreshable worker authentication and fresh live journeys remain separate gates.
+are artifact-specific: October 12 local HTTP/App smokes passed for the
+`0.2.1.dev2026101202` wheel, but do not validate newer trace/progress changes or
+deployment of the current public App templates. The packaged serverless import
+repair and shared `format_summary()` are implemented; notebook and runner-App
+load generation remain deferred or gated, not prerequisites for the local demo.
 
 ## Real-inference journey matrix
 
@@ -18,9 +20,9 @@ refreshable worker authentication and fresh live journeys remain separate gates.
 | --- | --- | --- |
 | Local runner → local HTTP agent | `examples/journeys/local_runner_http_target.py`; `scripts/validation/local_runner_http_target_journeys.py` | Actual compiled/native framework and actual selected model; typed status/result/report, failed pre-provider probe, active cancellation and cleanup |
 | Local runner → deployed App | `examples/journeys/local_runner_databricks_app_target.py`; explicit native App harness | Existing authorized App, verified deployed framework/source and actual model; refreshed OAuth, correct native protocol, fail-fast, cancellation and reports |
-| Classic notebook runner → App (deferred) | Retained `examples/journeys/classic_notebook.py` | Out of the current serverless-only scope; no cluster created/started or classic fallback |
+| Classic notebook runner → App (deferred) | Retained `examples/journeys/classic_notebook.py` | Outside the current local-runner scope; no cluster created/started or classic fallback |
 | Optional REST/server → registered target | Existing live REST/framework harness plus new typed remote SDK | Service auth, operator-only aliases, same frozen request and measured/judged semantics, inspectable failure report |
-| Serverless notebook runner → App | `examples/journeys/serverless_runner_databricks_app_target.py`; `scripts/validation/serverless_runner_app_target.py` | Prepared/authentication-blocked. Agent remains in its deployed App; notebook hosts EvalSurge/Locust only. Driver prerequisites checked; independent worker runtime-OAuth failed. Current profile-only App contract is not established on serverless |
+| Serverless notebook runner → App (deferred) | `examples/journeys/serverless_runner_databricks_app_target.py`; `scripts/validation/serverless_runner_app_target.py` | Prepared/authentication-blocked. Agent remains in its deployed App; notebook hosts EvalSurge/Locust only. Driver prerequisites checked; independent worker runtime-OAuth failed. Current profile-only App contract is not established on serverless |
 | Retained notebook-local helper diagnostic | `scripts/validation/serverless_sdk_journeys.py` | Not an advertised agent-hosting option or a deployed-App substitute; any retained receipts are classified separately |
 
 Dry-run prints only bounds, for example:

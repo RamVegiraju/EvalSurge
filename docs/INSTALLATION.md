@@ -13,12 +13,45 @@ Use Python 3.11+ on Linux or macOS and a dedicated environment. This guide uses 
 reviewed build artifact; it does not assert that this alpha is published on PyPI.
 Replace the wheel filename with the artifact you actually received.
 
-The current source snapshot is `0.2.1.dev2026101202`, a PEP 440 development
+The current source snapshot is `0.2.1.dev2026101203`, a PEP 440 development
 snapshot rather than a stable release. The project metadata and lock identify
 the same version; this demo label does not upgrade any dependency or establish
 publication on a package index.
-This snapshot adds the `local` installation alias. Its exact reviewed wheel has
-passed fresh isolated **pip base/local/server installs** outside the checkout
+This snapshot retains the `local` installation alias and adds independent
+load-only trace readiness, CLI lifecycle progress, and bounded rereads when exact
+trace correlation metadata has not yet become visible. Its build, installation,
+and real-model checks used this exact artifact:
+
+```text
+evalsurge-0.2.1.dev2026101203-py3-none-any.whl
+SHA256 1b46d96185afc7225faf6254db1181b9e023525bb67c0cb714ce948ea5b1d20f
+```
+
+Fresh isolated **uv base/local/server installs** outside the checkout passed on
+macOS using the unchanged locked hashes from the explicitly approved source's
+artifact cache. Installed imports, SDK lifecycle setup, packaged assets, dependency
+checks and CLI/sample help made zero inference, target or authentication calls.
+This is not public-PyPI publication, Linux/App installation or newest-compatible
+dependency-resolution evidence.
+
+The installed wheel then passed both synchronous and asynchronous trace-export
+variants of the [multi-tool sample](../examples/journeys/multitool_heatmap/README.md)
+against a separate loopback-hosted LangGraph agent using actual
+`system.ai.gpt-oss-120b` Responses inference. Each run used one excluded probe and
+four measured attempts, with four measured successes, zero errors and complete
+measured trace coverage. Five users were configured; only four could be active
+under that request cap. There were ten actual model calls total, no judges or
+fallback completions, and both agent processes shut down cleanly. The tools use
+disclosed synthetic documents and computation, not stubbed model answers.
+These tiny runs do not establish sustainable capacity, zero observer effect,
+fresh App deployment, governed trace collection or browser visual verification.
+See [the exact validation record](../VALIDATION.md) for retained run IDs, outcomes
+and remaining gates. Earlier wheel passes remain separate evidence.
+
+## Historical installation-alias artifact
+
+The earlier `0.2.1.dev2026101202` installation-alias wheel passed fresh isolated
+**pip base/local/server installs** outside the checkout
 on macOS, using required dependency hashes through the approved package source:
 
 ```text
@@ -44,7 +77,7 @@ native-auth build or this installation-alias snapshot.
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install './evalsurge-0.2.1.dev2026101202-py3-none-any.whl[local]'
+.venv/bin/python -m pip install './evalsurge-0.2.1.dev2026101203-py3-none-any.whl[local]'
 .venv/bin/python -c 'from evalsurge import Agent, EvalSurge, RunCreate; print("Direct SDK imports available")'
 .venv/bin/evalsurge --help
 ```
@@ -53,7 +86,7 @@ If you prefer uv, the equivalent installation is:
 
 ```bash
 uv venv --python 3.12
-uv pip install './evalsurge-0.2.1.dev2026101202-py3-none-any.whl[local]'
+uv pip install './evalsurge-0.2.1.dev2026101203-py3-none-any.whl[local]'
 uv run --no-project python -c 'from evalsurge import Agent, EvalSurge, RunCreate; print("Direct SDK imports available")'
 uv run --no-project evalsurge --help
 ```
@@ -93,6 +126,10 @@ The local CLI can use the same v2 JSON request with operator settings:
 .venv/bin/evalsurge run request.json --local --settings operator.toml --wait
 ```
 
+Add `--progress` for live phase updates, or `--no-progress` to suppress automatic
+interactive updates. [CLI progress](CLI_PROGRESS.md) goes to stderr and leaves
+JSON stdout clean; it does not enable judges or tracing.
+
 `doctor` does not invoke the agent or a judge. Use JSON for dependency-minimal
 configuration; YAML requires optional PyYAML. Avoid treating a completed lifecycle
 as a passing quality check, and remember that evaluation is off by default.
@@ -126,7 +163,7 @@ contents. No public-registry fallback is authorized.
 
 ```bash
 uv venv --python 3.12
-uv pip install ./evalsurge-0.2.1.dev2026101202-py3-none-any.whl
+uv pip install ./evalsurge-0.2.1.dev2026101203-py3-none-any.whl
 uv run --no-project python -c 'from evalsurge import EvalSurge, RunCreate; print("Remote SDK imports available")'
 ```
 
@@ -193,7 +230,7 @@ wheel, select the `local` surface and an explicitly approved dependency source:
 ```bash
 uv run --frozen --no-sync python scripts/verify_install.py --surface local \
   --installer pip --dependency-index "$APPROVED_PACKAGE_INDEX" \
-  --wheel /absolute/path/evalsurge-0.2.1.dev2026101202-py3-none-any.whl \
+  --wheel /absolute/path/evalsurge-0.2.1.dev2026101203-py3-none-any.whl \
   --evidence-dir /absolute/path/new-private-install-evidence
 ```
 

@@ -11,6 +11,7 @@ from requests.exceptions import ContentDecodingError
 
 from .models import Sample, Target
 from .streaming import consume
+from .trace_ids import valid_wire_trace_id
 
 JSON_RESPONSE_LIMIT = 2_000_000
 
@@ -133,18 +134,28 @@ def _trace_id(value: Any) -> str:
         value: Header or JSON trace identifier, not a tracing destination.
 
     Returns:
-        The unchanged nonblank string, bounded to 128 characters.
+        The unchanged legacy string (128 characters) or bounded native UC ID.
 
     Raises:
         InvalidResponse: The identifier is absent, blank, wrong-type, or oversized.
     """
-    if not isinstance(value, str) or not value.strip() or len(value) > 128:
+    if not valid_wire_trace_id(value):
         raise InvalidResponse("Invalid trace identifier in JSON response")
-    try:
-        value.encode("utf-8")
-    except UnicodeEncodeError:
-        raise InvalidResponse("Invalid trace identifier in JSON response") from None
     return value
+
+
+def failed_response_trace_id(response: Response) -> str | None:
+    """Retain safe trace metadata from a failed HTTP response without reading its body.
+
+    Args:
+        response: Caller-owned non-success HTTP response.
+
+    Returns:
+        Its bounded native/legacy trace header, or None for absent/invalid metadata.
+        HTTP failure remains authoritative; this never changes success or timing.
+    """
+    value = response.headers.get("X-MLflow-Trace-ID")
+    return value if valid_wire_trace_id(value) else None
 
 
 def _reject_constant(value: str) -> NoReturn:

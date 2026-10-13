@@ -1,0 +1,9 @@
+{
+  "DEMO-42": {
+    "category": "electronics",
+    "opened": false,
+    "days_since_purchase": 12,
+    "weight_grams": 850,
+    "price_cents": 8900
+  }
+}

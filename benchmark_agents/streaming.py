@@ -3,6 +3,8 @@
 import json
 from typing import Any
 
+from .trace_ids import valid_wire_trace_id
+
 
 def consume(row: dict[str, Any], data: str, elapsed_ms: float) -> bool:
     """Apply one single-line SSE data payload to a mutable measurement row.
@@ -29,12 +31,8 @@ def consume(row: dict[str, Any], data: str, elapsed_ms: float) -> bool:
     kind = event.get("type", "")
     if kind == "evalsurge.trace" or (not kind and "trace_id" in event):
         trace_id = event.get("trace_id")
-        if not isinstance(trace_id, str) or not trace_id.strip() or len(trace_id) > 128:
+        if not valid_wire_trace_id(trace_id):
             raise ValueError("Invalid trace identifier")
-        try:
-            trace_id.encode("utf-8")
-        except UnicodeEncodeError:
-            raise ValueError("Invalid trace identifier") from None
         if row.get("trace_id") is not None and row["trace_id"] != trace_id:
             raise ValueError("Trace identifiers disagree")
         row["trace_id"] = trace_id

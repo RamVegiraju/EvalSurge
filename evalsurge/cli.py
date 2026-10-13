@@ -12,13 +12,15 @@ import math
 import os
 import re
 import sys
+import time
 import webbrowser
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from pydantic import BaseModel
 
+from benchmark_agents.v2_models import LifecycleStatus, PhaseStates
 from benchmark_agents.validation import RequestValidationError, validate_request
 
 from .remote import MAX_REQUEST_BYTES, RemoteClient, RemoteError
@@ -73,6 +75,12 @@ def _parser() -> argparse.ArgumentParser:
     service_options(run)
     run.add_argument("config", type=Path)
     run.add_argument("--wait", action="store_true", help="Wait for report readiness")
+    run.add_argument(
+        "--progress",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Show content-free live phase updates on stderr (automatic for interactive waits)",
+    )
     run.add_argument("--timeout", type=float, default=3600, help="Total wait budget in seconds")
     run.add_argument(
         "--open-report", action="store_true", help="Open a credential-free report shell"
@@ -232,6 +240,49 @@ def _targets(capabilities: dict[str, Any]) -> None:
     print("Static configuration only; authentication and target health are unverified.")
 
 
+class _LiveProgress:
+    """Bounded lifecycle presentation, never a live metric or request-content logger."""
+
+    def __init__(self, *, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self._started = clock()
+        self._last_update = float("-inf")
+        self._last_state: tuple[str, tuple[str, ...]] | None = None
+
+    def __call__(self, status: BaseModel | dict[str, Any]) -> None:
+        """Print allowlisted phases on changes or a ten-second heartbeat.
+
+        Args:
+            status: Existing waiter observation, not protected result/report data.
+
+        Side Effects:
+            Writes a bounded line to stderr. Names, URLs, inputs, provider errors
+            and unrecognized values are omitted; JSON stdout remains untouched.
+            Rendering occurs in the caller, never the Locust request hot path.
+        """
+        body = _document(status)
+        value = body.get("status")
+        lifecycle = (
+            value if isinstance(value, str) and value in get_args(LifecycleStatus) else "unknown"
+        )
+        phases = body.get("phases")
+        parts = []
+        if isinstance(phases, dict):
+            for name, field in PhaseStates.model_fields.items():
+                phase = phases.get(name)
+                if isinstance(phase, str) and phase in get_args(field.annotation):
+                    parts.append(f"{name}={phase}")
+        state = (lifecycle, tuple(parts))
+        now = self._clock()
+        if state == self._last_state and now - self._last_update < 10:
+            return
+        elapsed = max(0, now - self._started)
+        detail = f" | {', '.join(parts)}" if parts else ""
+        print(f"[{elapsed:.0f}s] {lifecycle}{detail}", file=sys.stderr)
+        self._last_update = now
+        self._last_state = state
+
+
 def _run(
     client: Any,
     args: argparse.Namespace,
@@ -259,7 +310,14 @@ def _run(
         print(f"Run {run.id} accepted.")
     report = None
     if args.wait or local:
-        report = _document(run.wait(timeout=args.timeout))
+        progress = args.progress
+        if progress is None:
+            progress = not structured and sys.stderr.isatty()
+        report = _document(
+            run.wait(timeout=args.timeout, on_status=_LiveProgress())
+            if progress
+            else run.wait(timeout=args.timeout)
+        )
         if not structured:
             _summary(report)
     if args.open_report:
@@ -327,6 +385,8 @@ def main(
             raise _ConfigurationError(
                 "--open-report needs an API report server; local runs return typed report data."
             )
+        if args.command == "run" and args.progress is True and not (args.wait or local):
+            raise _ConfigurationError("--progress requires --wait or --local.")
         config = _configuration(args.config) if args.command == "run" else None
         if (
             args.command == "run"

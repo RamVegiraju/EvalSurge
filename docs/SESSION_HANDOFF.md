@@ -1,6 +1,79 @@
 # EvalSurge session handoff — October 12, 2026
 
-## Current checkpoint: reviewed local wheel and four real-model smoke cells
+## Current checkpoint: installed multi-tool wheel, review and technical publication
+
+The active milestone remains local Python traffic generation against a separately
+hosted HTTP agent or a deployed Databricks App. Notebook/App-hosted generators
+remain deferred. Preserve older receipts below; they are artifact-specific history,
+not evidence that the latest build passed every framework/hosting combination.
+
+- Branch: `main`; pre-publication base HEAD:
+  `b5c915eff1b346188f8163e844a70ab647e2ca5f`.
+  Inspect Git for the final commit/push and actual remote CI status.
+- Source, runtime, OpenAPI and project lock version: `0.2.1.dev2026101203`.
+  Non-project dependency versions, hashes and provenance are unchanged.
+- Preserve and exclude the untracked product briefs, `docs/assets/`, and their
+  unrelated README link from technical publication. Do not reset or broad-stage.
+- The user approved ten real-model calls, controlled regression/CI exceptions,
+  parallel review, safe repository cleanup and pushing the technical changes.
+  All ten model calls were consumed; new inference needs new bounded consent.
+
+### Completed work and exact artifact
+
+Load-only trace readiness is independent of evaluation. The same excluded probe
+must provide authorized correlation before measured dispatch when tracing is
+configured. CLI lifecycle progress stays outside the worker and prints no prompt,
+answer, credential or live metric estimate. The collector now permits bounded
+same-ID rereads for absent correlation keys only after trace/experiment agreement;
+any present conflict still fails closed. Proposed ADRs 0020/0021 record the contracts
+and still require designated maintainer review.
+
+The reusable `examples/journeys/multitool_heatmap/` sample executes an actual serial
+LangGraph, three tools over disclosed synthetic data, a business-rule decision and
+real model inference. Its delayed shipping tool waits two seconds in the agent,
+not in the generator. Evaluation is off; no sessions, model fallback or retries.
+
+```text
+evalsurge-0.2.1.dev2026101203-py3-none-any.whl
+SHA256 1b46d96185afc7225faf6254db1181b9e023525bb67c0cb714ce948ea5b1d20f
+```
+
+The exact wheel passed isolated base/local/server installation and actual
+sample entrypoints copied outside the checkout on Python 3.12.13/macOS. Imports
+resolved from installed site-packages. Selected profile: `e2-demo-field-eng`;
+selected model: `system.ai.gpt-oss-120b`, via MLflow Responses. Each sync/async
+export run used one excluded probe plus four measured attempts: 4/4 measured
+successes, no errors, full trace coverage and six spans/request. Concurrency five
+was configured; the four-attempt cap allowed a peak of four. Both agent processes
+shut down cleanly. Individual delayed shipping spans were approximately 2,001 ms.
+
+- Sync run: `fefaebd2-792f-4a36-9c42-5cd320e81edb`.
+- Async run: `e36199e5-b5c6-4717-a294-c33816012ce9`.
+- Installed viewer was left running at
+  `http://127.0.0.1:57123/reports/?run=e36199e5-b5c6-4717-a294-c33816012ce9`.
+  HTTP/JSON retrieval passed. Browser visual inspection was not established.
+
+The first earlier asynchronous paid probe remains failed; its originally
+mismatching field was not recorded. Native MLflow regression evidence reproduces
+the missing-metadata visibility failure mode, not that exact historical cause.
+The asset/caller audit found no unused tracked assets safe to delete. Private
+artifacts/caches and failure evidence remain retained, not published.
+
+### Remaining gates and verification
+
+See the latest `VALIDATION.md` checkpoint for exact commands, full-suite results,
+fixture repairs, artifact checks and preserved first failures. Controlled provider
+responses are regression evidence, never real-model success. Final local
+verification passed 1,877 tests on Python 3.12.13, plus the three exact prior CI
+failure cases on isolated macOS Python 3.11.14. Lint/format, OpenAPI, JS syntax,
+locked sync and archive checks passed; the rebuilt wheel matches the tested hash.
+These do not establish Linux/remote CI success. Final publication
+must exclude product/internal materials and retain an identical tested wheel hash.
+Current local HTTP/SQLite success does not validate deployed App/UC tracing,
+CrewAI, new judge quality, sustainable capacity, zero overhead, Linux installation
+or browser rendering. Do not revive deferred cloud generators without direction.
+
+## Historical checkpoint: reviewed local wheel and four real-model smoke cells
 
 The current milestone is **local Python load generation** against either a hosted
 HTTP agent or a separate Databricks agent App. Direct execution needs no separate

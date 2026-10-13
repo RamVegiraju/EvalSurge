@@ -72,6 +72,15 @@ failure prevents measured load; its capture is not a measured attempt or a quali
 sample. Successful preflight establishes first-case readiness only, not readiness
 of every case or concurrency capacity.
 
+When the operator enables tracing, the same captured probe must also establish
+profiling readiness even when evaluation is off. The returned trace ID,
+authorized experiment and exact run/request correlation must agree, with a valid
+complete span tree. Missing correlation keys can be retried within the existing
+bounded collection budget; any present conflicting value fails immediately.
+No target is reinvoked to obtain evidence. Failed trace readiness leaves inference
+success intact but prevents measured load. See
+[the profiling guide](PROFILING_AND_EVALUATION.md) for configuration and limits.
+
 Selected judges reuse the captured probe for excluded readiness assessments.
 Answer-only judges require no trace. A selected trace-required judge additionally
 requires an actual trace with the exact returned trace ID, benchmark run ID,

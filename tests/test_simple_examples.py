@@ -1,5 +1,6 @@
 """Run every user-facing example through real Python, Locust, framework, and MLflow APIs."""
 
+import ast
 import asyncio
 import json
 import os
@@ -359,6 +360,7 @@ async def test_local_framework_request_runs_real_v2_pipeline_with_isolated_memor
             assert result["phases"] == {
                 "planning": "completed",
                 "inference": "passed",
+                "profiling_readiness": "skipped",
                 "evaluation_readiness": "skipped",
                 "load": "completed",
                 "profiling": "completed",
@@ -565,6 +567,10 @@ def test_journey_sources_have_named_non_inference_contract_coverage() -> None:
         "direct_http.py": "test_unified_journey_examples.py",
         "local_runner_databricks_app_target.py": "test_unified_journey_examples.py",
         "local_runner_http_target.py": "test_unified_journey_examples.py",
+        "local_runner_traced_http_target.py": "test_load_only_tracing.py",
+        "multitool_heatmap/agent.py": "test_simple_examples.py",
+        "multitool_heatmap/handler.py": "test_simple_examples.py",
+        "multitool_heatmap/runner.py": "test_simple_examples.py",
         "framework_runner_matrix.py": "test_framework_runner_matrix.py",
         "serverless_runner_databricks_app_target.py": "test_serverless_notebook_examples.py",
         "serverless_runner_http_target.py": "test_serverless_notebook_examples.py",
@@ -583,3 +589,179 @@ def test_journey_sources_have_named_non_inference_contract_coverage() -> None:
     plan = (ROOT / "docs" / "RUNNER_TARGET_VALIDATION.md").read_text()
     assert "fifteen" in plan and "15" in plan
     assert "Listed samples are not automatically successful live runs" in plan
+
+
+def test_multitool_heatmap_request_bounds_and_non_inference_inputs() -> None:
+    """Construct the public request and reject inputs without agent/model execution."""
+    from examples.journeys.multitool_heatmap.handler import validate_inputs
+    from examples.journeys.multitool_heatmap.runner import request
+
+    run = request()
+    assert run.evaluation.mode == "off"
+    assert run.load.concurrency == 5
+    assert run.load.duration_seconds == 10
+    assert run.load.max_requests == 4
+    assert run.load.timeout_seconds == 40
+    assert [case.input["scenario"] for case in run.cases] == ["delayed", "normal"]
+    assert all(case.input["order_id"] == "DEMO-42" for case in run.cases)
+    for case in run.cases:
+        validate_inputs(case.input)
+    assert all(not case.reference for case in run.cases)
+    assert "profile" not in run.model_dump_json()
+    assert "tracking_uri" not in run.model_dump_json()
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        {"scenario": "unknown"},
+        {"scenario": []},
+        {"order_id": "another-order"},
+        {"query": " "},
+        {"query": "x" * 513},
+        {"query": None},
+        {"extra": "not-declared"},
+    ],
+)
+def test_multitool_heatmap_rejects_inputs_before_inference(update: dict[str, Any]) -> None:
+    """Actual input validation only; intentional pre-provider failure, no stub/client."""
+    from examples.journeys.multitool_heatmap.handler import validate_inputs
+
+    inputs = {"query": "Can I return this?", "order_id": "DEMO-42", "scenario": "normal"}
+    with pytest.raises(ValueError, match="Unsupported demonstration input"):
+        validate_inputs({**inputs, **update})
+
+
+def test_multitool_heatmap_declared_data_and_serial_source_contract() -> None:
+    """Inspect synthetic documents/AST without constructing or executing the graph.
+
+    This is a no-inference source/data contract, not an end-to-end agent test.
+    The real-model trace/report record in VALIDATION.md is separate evidence.
+    """
+    directory = ROOT / "examples/journeys/multitool_heatmap"
+    orders = json.loads((directory / "orders.json").read_text())
+    policies = json.loads((directory / "policies.json").read_text())
+    assert orders["DEMO-42"]["category"] in policies
+    assert orders["DEMO-42"]["days_since_purchase"] <= policies["electronics"]["return_window_days"]
+    assert not orders["DEMO-42"]["opened"]
+
+    tree = ast.parse((directory / "handler.py").read_text())
+    tool_names = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr == "trace":
+            options = {item.arg: ast.literal_eval(item.value) for item in node.keywords}
+            if options.get("span_type") == "TOOL":
+                tool_names.add(options["name"])
+    assert tool_names == {"lookup_order", "lookup_return_policy", "quote_return_shipping"}
+    edges = {
+        tuple(arg.value if isinstance(arg, ast.Constant) else arg.id for arg in node.args)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "add_edge"
+    }
+    assert edges == {
+        ("START", "order"),
+        ("order", "policy"),
+        ("policy", "shipping"),
+        ("shipping", "decision"),
+        ("decision", "answer"),
+        ("answer", "END"),
+    }
+    runner_tree = ast.parse((directory / "runner.py").read_text())
+    assert not any(
+        isinstance(node, ast.ImportFrom) and node.module in {"handler", ".handler"}
+        for node in ast.walk(runner_tree)
+    )
+    agent_source = (directory / "agent.py").read_text()
+    assert "flush_trace_async_logging" not in agent_source
+    assert "max_retries=0" in agent_source
+    assert 'host="127.0.0.1"' in agent_source
+    assert "attempts >= 5" in agent_source
+
+
+def test_multitool_heatmap_documented_viewer_contract_and_links() -> None:
+    """Check source/docs wiring for the existing viewer without starting any server."""
+    directory = ROOT / "examples/journeys/multitool_heatmap"
+    readme = (directory / "README.md").read_text()
+    for relative in re.findall(r"\]\((\.\./[^)]+)\)", readme):
+        assert (directory / relative).resolve().is_file(), relative
+    assert "benchmark_agents.api:app" in readme
+    assert "BENCHMARK_ARTIFACT_DIR=/absolute/private/demo/benchmark" in readme
+    assert "--host 127.0.0.1 --port 9003 --no-proxy-headers" in readme
+    assert "BENCHMARK_CONFIG" in readme and "BENCHMARK_API_KEY" in readme
+    api_tree = ast.parse((ROOT / "benchmark_agents/api.py").read_text())
+    assert any(
+        isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "app" for target in node.targets)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "create_app"
+        for node in api_tree.body
+    )
+    runner_tree = ast.parse((directory / "runner.py").read_text())
+    main = next(
+        node
+        for node in runner_tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "main"
+    )
+    execution = next(index for index, node in enumerate(main.body) if isinstance(node, ast.With))
+    post_execution_strings = [
+        node.value
+        for statement in main.body[execution + 1 :]
+        for node in ast.walk(statement)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    ]
+    assert any("Run ID:" in value for value in post_execution_strings)
+    assert any("http://127.0.0.1:9003/reports/?run=" in value for value in post_execution_strings)
+    # Source-only ownership/exit contract; this does not simulate agent lifecycle.
+    assert any(
+        isinstance(node, ast.ExceptHandler)
+        and isinstance(node.type, ast.Name)
+        and node.type.id == "RunFailed"
+        for node in ast.walk(main.body[execution])
+    )
+    assert any(
+        isinstance(node, ast.Raise)
+        and isinstance(node.exc, ast.Call)
+        and isinstance(node.exc.func, ast.Name)
+        and node.exc.func.id == "SystemExit"
+        and len(node.exc.args) == 1
+        and isinstance(node.exc.args[0], ast.Constant)
+        and node.exc.args[0].value == 1
+        for statement in main.body[execution + 1 :]
+        for node in ast.walk(statement)
+    )
+
+
+@pytest.mark.parametrize("mode", ["sync", "async"])
+def test_multitool_heatmap_export_configuration_without_lifespan(mode: str) -> None:
+    """Construct configuration only; no client/auth/exporter/agent/inference runs."""
+    from examples.journeys.multitool_heatmap.agent import create_tool_app
+    from examples.real_framework_handler import ModelSelection
+
+    selection = ModelSelection(
+        "explicit-profile", "explicit-model", "mlflow-responses", "https://workspace.example"
+    )
+    before = os.environ.get("MLFLOW_ENABLE_ASYNC_TRACE_LOGGING")
+    app = create_tool_app(
+        selection, "sqlite:////absolute/private/traces.sqlite", "1", trace_export=mode
+    )
+    assert app.state.trace_export == mode
+    assert os.environ.get("MLFLOW_ENABLE_ASYNC_TRACE_LOGGING") == before
+
+
+def test_multitool_heatmap_invalid_export_rejected_before_lifespan() -> None:
+    """Reject an invalid policy before native clients or export initialization."""
+    from examples.journeys.multitool_heatmap.agent import create_tool_app
+    from examples.real_framework_handler import ModelSelection
+
+    selection = ModelSelection(
+        "explicit-profile", "explicit-model", "mlflow-responses", "https://workspace.example"
+    )
+    with pytest.raises(ValueError, match="Select trace export as sync or async"):
+        create_tool_app(
+            selection, "sqlite:////absolute/private/traces.sqlite", "1", trace_export="other"
+        )

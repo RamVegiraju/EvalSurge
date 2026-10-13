@@ -15,6 +15,7 @@ from .models import (
     LoadStatus,
     Model,
     PreflightResult,
+    ProfilingPreflight,
     ProfilingSummary,
     Recommendation,
     RequestProfile,
@@ -172,6 +173,9 @@ class PhaseStates(Model):
     evaluation_readiness: Literal[
         "not_run", "pending", "running", "skipped", "passed", "failed", "cancelled", "interrupted"
     ]
+    profiling_readiness: Literal[
+        "not_run", "pending", "running", "skipped", "passed", "failed", "cancelled", "interrupted"
+    ] = "not_run"
     load: LoadStatus
     profiling: Literal["pending", "completed", "failed", "skipped"]
     evaluation: EvaluationStatus
@@ -417,6 +421,7 @@ class Result(Model):
     metrics: Performance | None = None
     preflight: PreflightResult
     evaluation_preflight: EvaluationPreflight
+    profiling_preflight: ProfilingPreflight = Field(default_factory=ProfilingPreflight)
     evaluation: EvaluationOutcome = Field(default_factory=EvaluationOutcome)
     load_error: LoadError | None = None
     planning_error: dict[str, str] | None = None
